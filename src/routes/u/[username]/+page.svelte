@@ -61,8 +61,33 @@
 </svelte:head>
 
 {#if loading}
-	<div class="min-h-screen bg-page flex items-center justify-center">
-		<div class="w-8 h-8 border-2 border-border border-t-accent rounded-full animate-spin"></div>
+	<div class="min-h-screen bg-page animate-pulse">
+		<div class="px-6 sm:px-8 pt-12 pb-6 border-b border-border">
+			<div class="max-w-2xl mx-auto">
+				<div class="flex items-center gap-4 mb-4">
+					<div class="w-16 h-16 rounded-full bg-border/50"></div>
+					<div>
+						<div class="h-6 w-36 bg-border/50 rounded mb-2"></div>
+						<div class="h-4 w-24 bg-border/50 rounded"></div>
+					</div>
+				</div>
+				<div class="h-4 w-64 bg-border/50 rounded mb-2"></div>
+				<div class="h-3 w-20 bg-border/50 rounded mt-4"></div>
+			</div>
+		</div>
+		<div class="px-6 sm:px-8 py-8">
+			<div class="max-w-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-4">
+				{#each Array(4) as _}
+					<div class="bg-card border border-border rounded-xl overflow-hidden">
+						<div class="h-36 bg-border/50"></div>
+						<div class="p-4">
+							<div class="h-4 w-32 bg-border/50 rounded mb-2"></div>
+							<div class="h-3 w-20 bg-border/50 rounded"></div>
+						</div>
+					</div>
+				{/each}
+			</div>
+		</div>
 	</div>
 {:else if notFound}
 	<div class="min-h-screen bg-page flex items-center justify-center">

@@ -1,5 +1,7 @@
 <script lang="ts">
-	const PLACES_API_KEY = 'AIzaSyBHM5my2_fF9oy6SBnP_nXP-bWC__0X6lc';
+	import { PUBLIC_GOOGLE_PLACES_API_KEY } from '$env/static/public';
+
+	const PLACES_API_KEY = PUBLIC_GOOGLE_PLACES_API_KEY;
 
 	let {
 		onselect

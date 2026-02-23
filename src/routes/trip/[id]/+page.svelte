@@ -36,85 +36,96 @@
 
 	let mapContainer: HTMLDivElement;
 	let mapLoaded = $state(false);
+	let mapError = $state(false);
 
 	$effect(() => {
-		if (!trip || !mapContainer || mapLoaded) return;
+		if (!trip || !mapContainer || mapLoaded || mapError) return;
 		initMap();
 	});
 
 	async function initMap() {
 		if (!trip) return;
-		const maplibregl = (await import('maplibre-gl')).default;
-
-		const bounds = new maplibregl.LngLatBounds();
-		for (const loc of trip.locations) {
-			bounds.extend([loc.lng, loc.lat]);
+		let maplibregl: typeof import('maplibre-gl').default;
+		try {
+			maplibregl = (await import('maplibre-gl')).default;
+		} catch {
+			mapError = true;
+			return;
 		}
 
-		const styleUrl = STYLE_URLS[trip.mapStyle] ?? STYLE_URLS.streets;
+		try {
+			const bounds = new maplibregl.LngLatBounds();
+			for (const loc of trip.locations) {
+				bounds.extend([loc.lng, loc.lat]);
+			}
 
-		const map = new maplibregl.Map({
-			container: mapContainer,
-			style: styleUrl,
-			bounds,
-			fitBoundsOptions: { padding: 60 },
-			interactive: true,
-			attributionControl: false
-		});
+			const styleUrl = STYLE_URLS[trip.mapStyle] ?? STYLE_URLS.streets;
 
-		map.addControl(new maplibregl.NavigationControl(), 'top-right');
+			const map = new maplibregl.Map({
+				container: mapContainer,
+				style: styleUrl,
+				bounds,
+				fitBoundsOptions: { padding: 60 },
+				interactive: true,
+				attributionControl: false
+			});
 
-		map.on('load', () => {
-			// Draw route lines
-			const sorted = [...trip!.locations].sort((a, b) => a.order - b.order);
-			for (let i = 0; i < sorted.length - 1; i++) {
-				const from = sorted[i];
-				const to = sorted[i + 1];
-				map.addSource(`route-${i}`, {
-					type: 'geojson',
-					data: {
-						type: 'Feature',
-						properties: {},
-						geometry: {
-							type: 'LineString',
-							coordinates: [
-								[from.lng, from.lat],
-								[to.lng, to.lat]
-							]
+			map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+			map.on('error', () => { mapError = true; });
+
+			map.on('load', () => {
+				const sorted = [...trip!.locations].sort((a, b) => a.order - b.order);
+				for (let i = 0; i < sorted.length - 1; i++) {
+					const from = sorted[i];
+					const to = sorted[i + 1];
+					map.addSource(`route-${i}`, {
+						type: 'geojson',
+						data: {
+							type: 'Feature',
+							properties: {},
+							geometry: {
+								type: 'LineString',
+								coordinates: [
+									[from.lng, from.lat],
+									[to.lng, to.lat]
+								]
+							}
 						}
-					}
-				});
-				map.addLayer({
-					id: `route-${i}`,
-					type: 'line',
-					source: `route-${i}`,
-					layout: { 'line-cap': 'round', 'line-join': 'round' },
-					paint: {
-						'line-color': trip!.titleColor,
-						'line-width': 3,
-						'line-opacity': 0.7
-					}
-				});
-			}
+					});
+					map.addLayer({
+						id: `route-${i}`,
+						type: 'line',
+						source: `route-${i}`,
+						layout: { 'line-cap': 'round', 'line-join': 'round' },
+						paint: {
+							'line-color': trip!.titleColor,
+							'line-width': 3,
+							'line-opacity': 0.7
+						}
+					});
+				}
 
-			// Add markers
-			for (const loc of sorted) {
-				const label = loc.label || loc.name.split(',')[0];
-				const el = document.createElement('div');
-				el.className = 'trip-marker';
-				el.style.cssText = `
-					width: 28px; height: 28px; border-radius: 50%;
-					background: ${trip!.titleColor}; border: 3px solid white;
-					box-shadow: 0 2px 8px rgba(0,0,0,0.3); cursor: pointer;
-				`;
-				new maplibregl.Marker({ element: el })
-					.setLngLat([loc.lng, loc.lat])
-					.setPopup(new maplibregl.Popup({ offset: 20 }).setText(label))
-					.addTo(map);
-			}
+				for (const loc of sorted) {
+					const label = loc.label || loc.name.split(',')[0];
+					const el = document.createElement('div');
+					el.className = 'trip-marker';
+					el.style.cssText = `
+						width: 28px; height: 28px; border-radius: 50%;
+						background: ${trip!.titleColor}; border: 3px solid white;
+						box-shadow: 0 2px 8px rgba(0,0,0,0.3); cursor: pointer;
+					`;
+					new maplibregl.Marker({ element: el })
+						.setLngLat([loc.lng, loc.lat])
+						.setPopup(new maplibregl.Popup({ offset: 20 }).setText(label))
+						.addTo(map);
+				}
 
-			mapLoaded = true;
-		});
+				mapLoaded = true;
+			});
+		} catch {
+			mapError = true;
+		}
 	}
 
 	const TRANSPORT_LABELS: Record<string, string> = {
@@ -135,8 +146,31 @@
 </svelte:head>
 
 {#if loading}
-	<div class="min-h-screen bg-page flex items-center justify-center">
-		<div class="w-8 h-8 border-2 border-border border-t-accent rounded-full animate-spin"></div>
+	<div class="min-h-screen bg-page animate-pulse">
+		<div class="h-72 sm:h-96 bg-border/50"></div>
+		<div class="px-6 sm:px-8 py-4 flex items-center gap-3 border-b border-border">
+			<div class="w-8 h-8 rounded-full bg-border/50"></div>
+			<div class="h-4 w-32 bg-border/50 rounded"></div>
+		</div>
+		<div class="px-6 sm:px-8 py-4 flex gap-6 border-b border-border">
+			<div class="h-4 w-16 bg-border/50 rounded"></div>
+			<div class="h-4 w-16 bg-border/50 rounded"></div>
+			<div class="h-4 w-16 bg-border/50 rounded"></div>
+		</div>
+		<div class="px-4 sm:px-8 py-6">
+			<div class="w-full h-72 sm:h-96 rounded-xl bg-border/50"></div>
+		</div>
+		<div class="px-6 sm:px-8 pb-8">
+			<div class="h-5 w-16 bg-border/50 rounded mb-4"></div>
+			<div class="space-y-3">
+				{#each Array(4) as _}
+					<div class="flex items-center gap-3">
+						<div class="w-6 h-6 rounded-full bg-border/50"></div>
+						<div class="h-4 w-40 bg-border/50 rounded"></div>
+					</div>
+				{/each}
+			</div>
+		</div>
 	</div>
 {:else if notFound}
 	<div class="min-h-screen bg-page flex items-center justify-center">
@@ -213,10 +247,16 @@
 
 		<!-- Map -->
 		<div class="px-4 sm:px-8 py-6">
-			<div
-				bind:this={mapContainer}
-				class="w-full h-72 sm:h-96 rounded-xl overflow-hidden border border-border"
-			></div>
+			{#if mapError}
+				<div class="w-full h-72 sm:h-96 rounded-xl border border-border flex items-center justify-center bg-card">
+					<p class="text-sm text-text-muted">Map could not be loaded</p>
+				</div>
+			{:else}
+				<div
+					bind:this={mapContainer}
+					class="w-full h-72 sm:h-96 rounded-xl overflow-hidden border border-border"
+				></div>
+			{/if}
 		</div>
 
 		<!-- Locations list -->
