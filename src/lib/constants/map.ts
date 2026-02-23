@@ -1,6 +1,7 @@
 import type { MapStyle } from '$lib/types';
+import { PUBLIC_MAPTILER_KEY } from '$env/static/public';
 
-export const MAPTILER_KEY = 'd77Rwd4AjfBQ7hVy9Eka';
+export const MAPTILER_KEY = PUBLIC_MAPTILER_KEY;
 
 export const STYLE_URLS: Record<MapStyle, string> = {
 	streets: `https://api.maptiler.com/maps/streets/style.json?key=${MAPTILER_KEY}`,
