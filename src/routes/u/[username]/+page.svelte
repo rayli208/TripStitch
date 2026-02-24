@@ -31,7 +31,8 @@
 				return;
 			}
 			trips = await fetchUserSharedTrips(uid);
-		} catch {
+		} catch (err) {
+			console.error('[Profile] Failed to load public profile:', err);
 			notFound = true;
 		}
 		loading = false;
@@ -99,14 +100,30 @@
 	</div>
 {:else if profile}
 	<div class="min-h-screen bg-page">
+		<!-- Back button -->
+		<div class="px-6 sm:px-8 pt-6">
+			<div class="max-w-2xl mx-auto">
+				<button
+					class="text-sm text-text-muted hover:text-text-primary transition-colors cursor-pointer flex items-center gap-1"
+					onclick={() => history.back()}
+				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+					</svg>
+					Back
+				</button>
+			</div>
+		</div>
+
 		<!-- Profile header -->
-		<div class="px-6 sm:px-8 pt-12 pb-6 border-b border-border">
+		<div class="px-6 sm:px-8 pt-6 pb-6 border-b border-border">
 			<div class="max-w-2xl mx-auto">
 				<div class="flex items-center gap-4 mb-4">
 					{#if profile.avatarUrl}
 						<img
 							src={profile.avatarUrl}
 							alt={profile.displayName}
+							referrerpolicy="no-referrer"
 							class="w-16 h-16 rounded-full border-2 border-border"
 						/>
 					{/if}

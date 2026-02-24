@@ -10,8 +10,10 @@
 		titleColor = $bindable('#FFFFFF'),
 		titleDescription = $bindable(''),
 		fontId = $bindable('inter'),
+		tripDate = $bindable(''),
 		showLogoOnTitle = $bindable(false),
 		brandColors = [],
+		secondaryColor = '#0a0f1e',
 		titleMediaPreviewUrl = null,
 		logoUrl = null,
 		onmedia,
@@ -22,8 +24,10 @@
 		titleColor?: string;
 		titleDescription?: string;
 		fontId?: string;
+		tripDate?: string;
 		showLogoOnTitle?: boolean;
 		brandColors?: string[];
+		secondaryColor?: string;
 		titleMediaPreviewUrl?: string | null;
 		logoUrl?: string | null;
 		onmedia?: (file: File) => void;
@@ -64,6 +68,15 @@
 			rows="2"
 			class="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent resize-none"
 		></textarea>
+	</div>
+
+	<div>
+		<label class="block text-sm font-medium text-text-secondary mb-1.5">Trip Date</label>
+		<input
+			type="date"
+			bind:value={tripDate}
+			class="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+		/>
 	</div>
 
 	<div>
@@ -131,7 +144,7 @@
 			/>
 			<div class="flex items-center gap-2">
 				<img src={logoUrl} alt="Your logo" class="w-6 h-6 rounded object-contain" />
-				<span class="text-sm text-text-secondary">Show logo on title card</span>
+				<span class="text-sm text-text-secondary">Show logo watermark on video</span>
 			</div>
 		</label>
 	{/if}
@@ -143,10 +156,10 @@
 				<div class="relative h-40 flex items-center justify-center">
 					<img src={titleMediaPreviewUrl} alt="Cover" class="absolute inset-0 w-full h-full object-cover" />
 					<div class="absolute inset-0 bg-overlay/40"></div>
-					<div class="relative text-center px-4">
-						<p class="text-2xl font-bold" style="color: {titleColor}; font-family: {fontFamily(fontId)}">{title}</p>
+					<div class="relative text-center px-6 py-4 rounded-xl" style="background: {secondaryColor}bf">
+						<p class="text-2xl font-bold" style="color: {secondaryColor < '#808080' ? '#FFFFFF' : '#0a0f1e'}; font-family: {fontFamily(fontId)}">{title}</p>
 						{#if titleDescription}
-							<p class="text-sm mt-1 opacity-70" style="color: {titleColor}; font-family: {fontFamily(fontId)}">{titleDescription}</p>
+							<p class="text-sm mt-1 opacity-70" style="color: {secondaryColor < '#808080' ? '#FFFFFF' : '#0a0f1e'}; font-family: {fontFamily(fontId)}">{titleDescription}</p>
 						{/if}
 					</div>
 					{#if showLogoOnTitle && logoUrl}
@@ -159,10 +172,10 @@
 				</div>
 			{:else}
 				<div class="relative h-40 flex items-center justify-center" style="background: linear-gradient(to bottom, #0a0a0a, #1a1a2e, #0a0a0a)">
-					<div class="relative text-center px-4">
-						<p class="text-2xl font-bold" style="color: {titleColor}; font-family: {fontFamily(fontId)}">{title}</p>
+					<div class="relative text-center px-6 py-4 rounded-xl" style="background: {secondaryColor}bf">
+						<p class="text-2xl font-bold" style="color: {secondaryColor < '#808080' ? '#FFFFFF' : '#0a0f1e'}; font-family: {fontFamily(fontId)}">{title}</p>
 						{#if titleDescription}
-							<p class="text-sm mt-1 opacity-70" style="color: {titleColor}; font-family: {fontFamily(fontId)}">{titleDescription}</p>
+							<p class="text-sm mt-1 opacity-70" style="color: {secondaryColor < '#808080' ? '#FFFFFF' : '#0a0f1e'}; font-family: {fontFamily(fontId)}">{titleDescription}</p>
 						{/if}
 					</div>
 					{#if showLogoOnTitle && logoUrl}

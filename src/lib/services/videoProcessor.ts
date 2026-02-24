@@ -109,7 +109,8 @@ export async function concatenateBlobs(
 	blobs: Blob[],
 	width: number,
 	height: number,
-	onSegmentDone?: (index: number) => void
+	onSegmentDone?: (index: number) => void,
+	frameOverlay?: (ctx: CanvasRenderingContext2D) => void
 ): Promise<Blob> {
 	console.log(`[VideoProcessor] concatenateBlobs: ${blobs.length} segments, target: ${width}x${height}`);
 	if (blobs.length === 0) throw new Error('No blobs to concatenate');
@@ -135,7 +136,7 @@ export async function concatenateBlobs(
 	recorder.start();
 
 	for (let i = 0; i < blobs.length; i++) {
-		await playBlobOnCanvas(blobs[i], ctx, width, height);
+		await playBlobOnCanvas(blobs[i], ctx, width, height, frameOverlay);
 		URL.revokeObjectURL(URL.createObjectURL(blobs[i]));
 		onSegmentDone?.(i);
 	}
@@ -151,7 +152,8 @@ async function playBlobOnCanvas(
 	blob: Blob,
 	ctx: CanvasRenderingContext2D,
 	width: number,
-	height: number
+	height: number,
+	frameOverlay?: (ctx: CanvasRenderingContext2D) => void
 ): Promise<void> {
 	const video = document.createElement('video');
 	video.muted = true;
@@ -173,6 +175,7 @@ async function playBlobOnCanvas(
 				return;
 			}
 			drawCover(ctx, video, width, height);
+			frameOverlay?.(ctx);
 			requestAnimationFrame(drawFrame);
 		};
 		video.onended = () => resolve();

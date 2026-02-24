@@ -14,6 +14,10 @@
 		videoUrl,
 		videoBlob,
 		keepOriginalAudio = true,
+		musicBlob = null,
+		musicVolume = $bindable(70),
+		musicStartOffset = 0,
+		skipMerge = false,
 		segments = [],
 		onaccept,
 		oncancel
@@ -21,6 +25,10 @@
 		videoUrl: string;
 		videoBlob: Blob;
 		keepOriginalAudio?: boolean;
+		musicBlob?: Blob | null;
+		musicVolume?: number;
+		musicStartOffset?: number;
+		skipMerge?: boolean;
 		segments?: VideoSegmentInfo[];
 		onaccept: (blob: Blob, url: string) => void;
 		oncancel: () => void;
@@ -255,7 +263,13 @@
 	}
 
 	async function acceptVoiceOver() {
-		if (!voiceOverBlob) return;
+		if (!voiceOverBlob || !voiceOverUrl) return;
+
+		if (skipMerge) {
+			onaccept(voiceOverBlob, voiceOverUrl);
+			return;
+		}
+
 		phase = 'merging';
 		mergePercent = 0;
 		mergeMsg = 'Preparing...';
@@ -267,7 +281,10 @@
 				keepOriginalAudio,
 				(pct, msg) => { mergePercent = pct; mergeMsg = msg; },
 				voiceOverVolume / 100,
-				0.2
+				0.2,
+				musicBlob,
+				musicVolume / 100,
+				musicStartOffset
 			);
 			if (voiceOverUrl) URL.revokeObjectURL(voiceOverUrl);
 			onaccept(result.blob, result.url);
@@ -318,25 +335,38 @@
 		height: 6px;
 		border-radius: 3px;
 		outline: none;
+		cursor: pointer;
+	}
+	input[type="range"]::-webkit-slider-runnable-track {
+		height: 6px;
+		border-radius: 3px;
+		background: color-mix(in srgb, currentColor 30%, transparent);
 	}
 	input[type="range"]::-webkit-slider-thumb {
 		-webkit-appearance: none;
 		appearance: none;
-		width: 16px;
-		height: 16px;
+		width: 18px;
+		height: 18px;
 		border-radius: 50%;
 		background: white;
 		border: 2px solid currentColor;
 		cursor: pointer;
-		margin-top: -5px;
+		margin-top: -6px;
+		box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+	}
+	input[type="range"]::-moz-range-track {
+		height: 6px;
+		border-radius: 3px;
+		background: color-mix(in srgb, currentColor 30%, transparent);
 	}
 	input[type="range"]::-moz-range-thumb {
-		width: 16px;
-		height: 16px;
+		width: 18px;
+		height: 18px;
 		border-radius: 50%;
 		background: white;
 		border: 2px solid currentColor;
 		cursor: pointer;
+		box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 	}
 </style>
 
@@ -539,6 +569,24 @@
 					/>
 					<span class="text-xs text-text-muted font-mono w-9 text-right">{voiceOverVolume}%</span>
 				</div>
+
+				<!-- Music volume slider (if music selected) -->
+				{#if musicBlob}
+					<div class="flex items-center gap-3 px-1">
+						<svg class="w-4 h-4 text-accent shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+						</svg>
+						<span class="text-xs text-text-primary w-16 shrink-0">Music</span>
+						<input
+							type="range"
+							min="0"
+							max="100"
+							bind:value={musicVolume}
+							class="flex-1 bg-accent/30 text-accent"
+						/>
+						<span class="text-xs text-text-muted font-mono w-9 text-right">{musicVolume}%</span>
+					</div>
+				{/if}
 
 				<div class="flex justify-center">
 					<Button variant="ghost" onclick={playPreview}>Play Preview</Button>

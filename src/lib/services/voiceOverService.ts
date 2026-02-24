@@ -180,30 +180,36 @@ export function createWaveformRenderer(
 export interface PreviewMixer {
 	connectVoiceOver: (audioElement: HTMLAudioElement) => void;
 	connectOriginalVideo: (videoElement: HTMLVideoElement) => void;
+	connectMusic: (audioElement: HTMLAudioElement) => void;
 	setVoiceOverGain: (value: number) => void;
 	setOriginalGain: (value: number) => void;
+	setMusicGain: (value: number) => void;
 	readonly analyserNode: AnalyserNode;
 	dispose: () => void;
 }
 
-/** Web Audio mixer for preview: taps <audio> (VO) and <video> (original)
- *  into gain nodes feeding a shared analyser + destination. */
+/** Web Audio mixer for preview: taps <audio> (VO), <video> (original),
+ *  and <audio> (music) into gain nodes feeding a shared analyser + destination. */
 export function createPreviewMixer(audioCtx: AudioContext): PreviewMixer {
 	const voGain = audioCtx.createGain();
 	const origGain = audioCtx.createGain();
+	const mGain = audioCtx.createGain();
 	const analyser = audioCtx.createAnalyser();
 	analyser.fftSize = 256;
 	analyser.smoothingTimeConstant = 0.7;
 
 	voGain.gain.value = 1.0;
 	origGain.gain.value = 0.2;
+	mGain.gain.value = 0.7;
 
 	voGain.connect(analyser);
 	origGain.connect(analyser);
+	mGain.connect(analyser);
 	analyser.connect(audioCtx.destination);
 
 	let voSource: MediaElementAudioSourceNode | null = null;
 	let origSource: MediaElementAudioSourceNode | null = null;
+	let musicSource: MediaElementAudioSourceNode | null = null;
 
 	return {
 		connectVoiceOver(audioElement: HTMLAudioElement) {
@@ -214,11 +220,18 @@ export function createPreviewMixer(audioCtx: AudioContext): PreviewMixer {
 			origSource = audioCtx.createMediaElementSource(videoElement);
 			origSource.connect(origGain);
 		},
+		connectMusic(audioElement: HTMLAudioElement) {
+			musicSource = audioCtx.createMediaElementSource(audioElement);
+			musicSource.connect(mGain);
+		},
 		setVoiceOverGain(value: number) {
 			voGain.gain.value = value;
 		},
 		setOriginalGain(value: number) {
 			origGain.gain.value = value;
+		},
+		setMusicGain(value: number) {
+			mGain.gain.value = value;
 		},
 		get analyserNode() {
 			return analyser;
@@ -226,8 +239,10 @@ export function createPreviewMixer(audioCtx: AudioContext): PreviewMixer {
 		dispose() {
 			try { voSource?.disconnect(); } catch { /* ok */ }
 			try { origSource?.disconnect(); } catch { /* ok */ }
+			try { musicSource?.disconnect(); } catch { /* ok */ }
 			try { voGain.disconnect(); } catch { /* ok */ }
 			try { origGain.disconnect(); } catch { /* ok */ }
+			try { mGain.disconnect(); } catch { /* ok */ }
 			try { analyser.disconnect(); } catch { /* ok */ }
 		}
 	};
@@ -235,22 +250,38 @@ export function createPreviewMixer(audioCtx: AudioContext): PreviewMixer {
 
 // ─── Merge ──────────────────────────────────────────────────────────
 
-/** Merge a voice-over audio blob into a video blob.
+/** Merge a voice-over audio blob and/or background music into a video blob.
+ *  voiceOverBlob can be null (music-only merge).
  *  If keepOriginalAudio is true, the video's original audio is mixed in.
  *  voiceOverGain/originalGain control the volume levels (default 1.0 / 0.2).
- *  Returns a new video blob with the voice-over mixed in. */
+ *  musicBlob/musicGain add looping background music with a 3-second fade-out.
+ *  Returns a new video blob with the audio mixed in. */
 export async function mergeVoiceOver(
 	videoBlob: Blob,
-	voiceOverBlob: Blob,
+	voiceOverBlob: Blob | null,
 	keepOriginalAudio: boolean,
 	onProgress?: (percent: number, msg: string) => void,
 	voiceOverGain?: number,
-	originalGain?: number
+	originalGain?: number,
+	musicBlob?: Blob | null,
+	musicGain?: number,
+	musicStartOffset?: number
 ): Promise<{ blob: Blob; url: string }> {
 	const audioCtx = new AudioContext();
 
-	onProgress?.(5, 'Decoding voice-over audio...');
-	const voiceOverBuffer = await audioCtx.decodeAudioData(await voiceOverBlob.arrayBuffer());
+	// Decode voice-over if provided
+	let voiceOverBuffer: AudioBuffer | null = null;
+	if (voiceOverBlob) {
+		onProgress?.(5, 'Decoding voice-over audio...');
+		voiceOverBuffer = await audioCtx.decodeAudioData(await voiceOverBlob.arrayBuffer());
+	}
+
+	// Decode music if provided
+	let musicBuffer: AudioBuffer | null = null;
+	if (musicBlob) {
+		onProgress?.(voiceOverBuffer ? 8 : 5, 'Decoding music...');
+		musicBuffer = await audioCtx.decodeAudioData(await musicBlob.arrayBuffer());
+	}
 
 	// Try to decode original audio from the video
 	let originalBuffer: AudioBuffer | null = null;
@@ -279,15 +310,20 @@ export async function mergeVoiceOver(
 
 	onProgress?.(20, 'Mixing audio tracks...');
 
+	const videoDuration = video.duration || 1;
+
 	// Set up audio mixing destination
 	const dest = audioCtx.createMediaStreamDestination();
 
 	// Voice-over
-	const voSource = audioCtx.createBufferSource();
-	voSource.buffer = voiceOverBuffer;
-	const voGain = audioCtx.createGain();
-	voGain.gain.value = voiceOverGain ?? 1.0;
-	voSource.connect(voGain).connect(dest);
+	let voSource: AudioBufferSourceNode | null = null;
+	if (voiceOverBuffer) {
+		voSource = audioCtx.createBufferSource();
+		voSource.buffer = voiceOverBuffer;
+		const voGain = audioCtx.createGain();
+		voGain.gain.value = voiceOverGain ?? 1.0;
+		voSource.connect(voGain).connect(dest);
+	}
 
 	// Original audio (if available and requested)
 	let origSource: AudioBufferSourceNode | null = null;
@@ -297,6 +333,29 @@ export async function mergeVoiceOver(
 		const origGainNode = audioCtx.createGain();
 		origGainNode.gain.value = originalGain ?? 0.2;
 		origSource.connect(origGainNode).connect(dest);
+	}
+
+	// Background music (starts at offset, loops full song if needed, with 3s fade-out)
+	let musicSource: AudioBufferSourceNode | null = null;
+	const offset = musicStartOffset ?? 0;
+	if (musicBuffer) {
+		musicSource = audioCtx.createBufferSource();
+		musicSource.buffer = musicBuffer;
+		// If the remaining audio from offset to end isn't enough, loop the full song
+		const remaining = musicBuffer.duration - offset;
+		if (remaining < videoDuration) {
+			musicSource.loop = true;
+			musicSource.loopStart = 0;
+			musicSource.loopEnd = musicBuffer.duration;
+		}
+		const musicGainNode = audioCtx.createGain();
+		const gain = musicGain ?? 0.7;
+		musicGainNode.gain.value = gain;
+		// Schedule 3-second fade-out before video ends
+		const fadeStart = Math.max(0, videoDuration - 3);
+		musicGainNode.gain.setValueAtTime(gain, fadeStart);
+		musicGainNode.gain.linearRampToValueAtTime(0, videoDuration);
+		musicSource.connect(musicGainNode).connect(dest);
 	}
 
 	// Get video track from captureStream (no audio since video is muted)
@@ -319,16 +378,16 @@ export async function mergeVoiceOver(
 	});
 
 	// Track playback progress during merge
-	const duration = video.duration || 1;
 	let progressInterval: ReturnType<typeof setInterval> | null = null;
 	progressInterval = setInterval(() => {
-		const pct = Math.min(95, 20 + Math.round((video.currentTime / duration) * 75));
-		onProgress?.(pct, `Merging... ${Math.round(video.currentTime)}s / ${Math.round(duration)}s`);
+		const pct = Math.min(95, 20 + Math.round((video.currentTime / videoDuration) * 75));
+		onProgress?.(pct, `Merging... ${Math.round(video.currentTime)}s / ${Math.round(videoDuration)}s`);
 	}, 250);
 
 	recorder.start();
-	voSource.start();
+	voSource?.start();
 	origSource?.start();
+	musicSource?.start(0, offset);
 	await video.play();
 
 	// Wait for video to finish
@@ -343,8 +402,9 @@ export async function mergeVoiceOver(
 	await new Promise((r) => setTimeout(r, 200));
 
 	recorder.stop();
-	try { voSource.stop(); } catch { /* already stopped */ }
+	try { voSource?.stop(); } catch { /* already stopped */ }
 	try { origSource?.stop(); } catch { /* already stopped */ }
+	try { musicSource?.stop(); } catch { /* already stopped */ }
 	videoStream.getTracks().forEach((t) => t.stop());
 	await audioCtx.close();
 	URL.revokeObjectURL(videoUrl);
@@ -355,4 +415,27 @@ export async function mergeVoiceOver(
 	onProgress?.(100, 'Done!');
 	console.log(`[VoiceOver] Merge complete: ${mergedBlob.size} bytes`);
 	return { blob: mergedBlob, url: mergedUrl };
+}
+
+/** Convenience: merge only background music into a video (no voice-over). */
+export async function mergeMusic(
+	videoBlob: Blob,
+	musicBlob: Blob,
+	keepOriginalAudio: boolean,
+	onProgress?: (percent: number, msg: string) => void,
+	musicGain?: number,
+	originalGain?: number,
+	musicStartOffset?: number
+): Promise<{ blob: Blob; url: string }> {
+	return mergeVoiceOver(
+		videoBlob,
+		null,
+		keepOriginalAudio,
+		onProgress,
+		undefined,
+		originalGain,
+		musicBlob,
+		musicGain,
+		musicStartOffset
+	);
 }

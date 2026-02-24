@@ -24,6 +24,7 @@
 	let tiktok = $state('');
 	let website = $state('');
 	let brandColors = $state<string[]>([]);
+	let secondaryColor = $state('#0a0f1e');
 	let preferredFontId = $state(DEFAULT_FONT_ID);
 
 	let saving = $state(false);
@@ -76,6 +77,7 @@
 			tiktok = p.socialLinks.tiktok ?? '';
 			website = p.socialLinks.website ?? '';
 			brandColors = [...(p.brandColors ?? [])];
+			secondaryColor = p.secondaryColor ?? '#0a0f1e';
 			preferredFontId = p.preferredFontId ?? DEFAULT_FONT_ID;
 		} else if (!profileState.loading && authState.user) {
 			displayName = authState.user.name;
@@ -113,6 +115,7 @@
 				...(website && { website })
 			},
 			brandColors,
+			secondaryColor,
 			preferredFontId
 		});
 
@@ -251,10 +254,10 @@
 				/>
 			</div>
 
-			<!-- Brand Colors -->
+			<!-- Primary Colors -->
 			<div>
-				<span class="block text-sm font-medium text-text-secondary mb-2">Brand Colors</span>
-				<p class="text-xs text-text-muted mb-2">Custom palette for your trip title colors (up to 10). Leave empty to use defaults.</p>
+				<span class="block text-sm font-medium text-text-secondary mb-2">Primary Colors</span>
+				<p class="text-xs text-text-muted mb-2">Color palette for your video text and overlays (up to 10). Leave empty to use defaults.</p>
 
 				<div class="flex flex-wrap items-center gap-2">
 					{#each brandColors as color, i}
@@ -292,6 +295,32 @@
 							</svg>
 						</label>
 					{/if}
+				</div>
+			</div>
+
+			<!-- Secondary Color -->
+			<div>
+				<span class="block text-sm font-medium text-text-secondary mb-2">Secondary Color</span>
+				<p class="text-xs text-text-muted mb-2">Background color for text overlays in your videos. Pick a color that contrasts with your title color.</p>
+				<div class="flex items-center gap-3">
+					<label class="cursor-pointer">
+						<input
+							type="color"
+							bind:value={secondaryColor}
+							class="sr-only"
+						/>
+						<div
+							class="w-10 h-10 rounded-lg border-2 border-border hover:border-primary-light transition-colors"
+							style="background-color: {secondaryColor}"
+						></div>
+					</label>
+					<span class="text-xs text-text-muted font-mono">{secondaryColor}</span>
+					<button
+						class="text-xs text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+						onclick={() => secondaryColor = '#0a0f1e'}
+					>
+						Reset to default
+					</button>
 				</div>
 			</div>
 

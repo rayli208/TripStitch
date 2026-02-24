@@ -1,26 +1,15 @@
 <script lang="ts">
-	import { goto, beforeNavigate } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { createEditorState } from '$lib/state/editor.svelte';
 	import authState from '$lib/state/auth.svelte';
 	import tripsState from '$lib/state/trips.svelte';
-	import profileState from '$lib/state/profile.svelte';
-	import type { AssemblyProgress, VideoSegmentInfo } from '$lib/services/videoAssembler';
-	import type { ExportStepItem } from '$lib/components/editor/ExportStep.svelte';
-	import { checkBrowserSupport, getSupportedMimeType, getFileExtension } from '$lib/utils/browserCompat';
-	import { publishTrip, getShareUrl } from '$lib/services/shareService';
-	import { estimateVideoDuration } from '$lib/utils/durationEstimate';
 	import toast from '$lib/state/toast.svelte';
 	import AppShell from '$lib/components/layout/AppShell.svelte';
-	import StepIndicator from '$lib/components/editor/StepIndicator.svelte';
-	import TitleStep from '$lib/components/editor/TitleStep.svelte';
-	import LocationsStep from '$lib/components/editor/LocationsStep.svelte';
-	import ReviewStep from '$lib/components/editor/ReviewStep.svelte';
-	import ExportStep from '$lib/components/editor/ExportStep.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
+	import Button from '$lib/components/ui/Button.svelte';
 
 	const tripId = page.params.id!;
 
-	// Subscribe to trips so getTrip works even on direct navigation
 	$effect(() => {
 		if (authState.loading) return;
 		if (!authState.isSignedIn) {
@@ -28,331 +17,118 @@
 			return;
 		}
 		tripsState.subscribe();
-		profileState.load();
 		return () => tripsState.unsubscribe();
 	});
 
 	const trip = $derived(tripsState.getTrip(tripId));
 
-	// Redirect if trip not found after loading
 	$effect(() => {
 		if (!tripsState.loading && !trip && !authState.loading && authState.isSignedIn) {
 			goto('/trips');
 		}
 	});
 
-	const editor = createEditorState(
-		trip
-			? {
-					title: trip.title,
-					titleColor: trip.titleColor,
-					titleDescription: trip.titleDescription,
-					fontId: trip.fontId,
-					mapStyle: trip.mapStyle,
-					aspectRatio: trip.aspectRatio,
-					locations: trip.locations
-				}
-			: undefined
-	);
-
-	const brandColors = $derived(profileState.profile?.brandColors ?? []);
-
-	// Duration estimate
-	let videoDurations = $state(new Map<string, number>());
+	// Populate link fields from trip data
+	let youtube = $state('');
+	let instagram = $state('');
+	let tiktok = $state('');
+	let other = $state('');
+	let saving = $state(false);
+	let populated = $state(false);
 
 	$effect(() => {
-		for (const loc of editor.locations) {
-			for (const clip of loc.clips) {
-				if (clip.type === 'video' && clip.file && !videoDurations.has(clip.id)) {
-					const file = clip.file;
-					const clipId = clip.id;
-					const video = document.createElement('video');
-					video.preload = 'metadata';
-					video.onloadedmetadata = () => {
-						const dur = video.duration;
-						URL.revokeObjectURL(video.src);
-						if (isFinite(dur)) {
-							videoDurations = new Map(videoDurations).set(clipId, dur);
-						}
-					};
-					video.onerror = () => URL.revokeObjectURL(video.src);
-					video.src = URL.createObjectURL(file);
-				}
-			}
+		if (trip && !populated) {
+			youtube = trip.videoLinks?.youtube ?? '';
+			instagram = trip.videoLinks?.instagram ?? '';
+			tiktok = trip.videoLinks?.tiktok ?? '';
+			other = trip.videoLinks?.other ?? '';
+			populated = true;
 		}
 	});
 
-	const durationEstimate = $derived(estimateVideoDuration(editor.locations, videoDurations));
-
-	// Export elapsed timer
-	let exportElapsed = $state<number | undefined>(undefined);
-	let elapsedInterval: ReturnType<typeof setInterval> | undefined;
-
-	// Navigation guards
-	$effect(() => {
-		if (editor.hasContent && !exportDone) {
-			const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
-			window.addEventListener('beforeunload', handler);
-			return () => window.removeEventListener('beforeunload', handler);
-		}
-	});
-
-	beforeNavigate(({ cancel }) => {
-		if (editor.hasContent && !exportDone) {
-			if (!confirm('You have unsaved changes. Leave this page?')) {
-				cancel();
-			}
-		}
-	});
-
-	// Export state
-	let isExporting = $state(false);
-	let exportDone = $state(false);
-	let progress = $state<AssemblyProgress | null>(null);
-	let videoUrl = $state<string | null>(null);
-	let videoBlob = $state<Blob | null>(null);
-	let videoSegments = $state<VideoSegmentInfo[]>([]);
-	let error = $state<string | null>(null);
-	let abortController = $state<AbortController | null>(null);
-	let shareUrl = $state<string | null>(null);
-
-	const support = checkBrowserSupport();
-
-	// Build export steps checklist based on current locations
-	let exportSteps = $derived.by<ExportStepItem[]>(() => {
-		const steps: ExportStepItem[] = [];
-		steps.push({ id: 'title', label: 'Creating title card', icon: '🎬' });
-		for (const loc of editor.locations) {
-			const displayName = loc.label || loc.name.split(',')[0];
-			steps.push({ id: `map-${loc.id}`, label: `Map: ${displayName}`, icon: '🗺️' });
-			if (loc.clips.length > 0) {
-				steps.push({
-					id: `clip-${loc.id}`,
-					label: `${loc.clips.length} clip${loc.clips.length !== 1 ? 's' : ''}: ${displayName}`,
-					icon: '🎬'
-				});
-			}
-		}
-		steps.push({ id: 'route', label: 'Drawing final route', icon: '📍' });
-		steps.push({ id: 'finalize', label: 'Stitching together', icon: '✂️' });
-		return steps;
-	});
-
-	async function handleExport() {
-		const tripData = {
-			id: tripId,
-			title: editor.title || 'Untitled Trip',
-			titleColor: editor.titleColor,
-			titleDescription: editor.titleDescription,
-			titleMediaFile: editor.titleMediaFile,
-			titleMediaPreviewUrl: editor.titleMediaPreviewUrl,
-			titleMediaType: editor.titleMediaType,
-			showLogoOnTitle: editor.showLogoOnTitle,
-			fontId: editor.fontId,
-			mapStyle: editor.mapStyle,
-			locations: editor.locations,
-			aspectRatio: editor.aspectRatio,
-			createdAt: trip?.createdAt ?? new Date().toISOString(),
-			updatedAt: new Date().toISOString()
-		};
-
-		// Save trip first
-		await tripsState.updateTrip(tripId, tripData);
-
-		isExporting = true;
-		exportDone = false;
-		error = null;
-		shareUrl = null;
-		progress = { step: 'init', message: 'Getting things ready...', current: 0, total: 1 };
-		abortController = new AbortController();
-		exportElapsed = 0;
-		elapsedInterval = setInterval(() => { exportElapsed = (exportElapsed ?? 0) + 1; }, 1000);
-
+	async function handleSave() {
+		saving = true;
 		try {
-			const { assembleVideo } = await import('$lib/services/videoAssembler');
-
-			progress = { step: 'init', message: 'Preparing map animations...', current: 0, total: 1 };
-
-			const result = await assembleVideo(
-				tripData,
-				editor.aspectRatio,
-				(p) => { progress = p; },
-				abortController.signal,
-				editor.mapStyle,
-				profileState.profile?.logoUrl
-			);
-
-			videoBlob = result.blob;
-			videoUrl = result.url;
-			videoSegments = result.segments;
-			isExporting = false;
-			exportDone = true;
-			progress = { step: 'done', message: 'Your video is ready!', current: 1, total: 1 };
-
-			// Publish to public collection if user has a profile
-			if (profileState.hasProfile && authState.user) {
-				try {
-					await publishTrip(tripData, authState.user.id, profileState.profile!);
-					shareUrl = getShareUrl(tripId);
-				} catch (err) {
-					console.warn('[TripStitch] Failed to publish trip:', err);
-				}
-			}
-		} catch (err) {
-			isExporting = false;
-			if ((err as Error).message === 'Export cancelled') {
-				progress = null;
-				return;
-			}
-			const msg = err instanceof Error ? err.message : 'An unexpected error occurred';
-			error = msg.includes('memory') || msg.includes('Memory')
-				? 'Video too large. Try using shorter clips.'
-				: msg;
-			console.error('[TripStitch] Export error:', err);
-		} finally {
-			abortController = null;
-			clearInterval(elapsedInterval);
+			await tripsState.updateVideoLinks(tripId, {
+				...(youtube.trim() && { youtube: youtube.trim() }),
+				...(instagram.trim() && { instagram: instagram.trim() }),
+				...(tiktok.trim() && { tiktok: tiktok.trim() }),
+				...(other.trim() && { other: other.trim() })
+			});
+			toast.success('Links saved!');
+			goto('/trips');
+		} catch {
+			toast.error('Failed to save links');
 		}
-	}
-
-	function handleCancel() {
-		abortController?.abort();
-		isExporting = false;
-		progress = null;
-		if (videoUrl) {
-			URL.revokeObjectURL(videoUrl);
-			videoUrl = null;
-		}
-		videoBlob = null;
-	}
-
-	function handleRetry() {
-		error = null;
-		handleExport();
-	}
-
-	function handleDownload() {
-		if (!videoBlob || !videoUrl) return;
-		const mimeType = getSupportedMimeType();
-		const ext = getFileExtension(mimeType);
-		const filename = `${editor.title || 'tripstitch'}-${Date.now()}.${ext}`;
-		const a = document.createElement('a');
-		a.href = videoUrl;
-		a.download = filename;
-		a.click();
-	}
-
-	function handleVoiceOverMerged(blob: Blob, url: string) {
-		if (videoUrl) URL.revokeObjectURL(videoUrl);
-		videoBlob = blob;
-		videoUrl = url;
-	}
-
-	function handleDashboard() {
-		if (videoUrl) URL.revokeObjectURL(videoUrl);
-		goto('/trips');
-	}
-
-	function handleCopyLink() {
-		if (!shareUrl) return;
-		navigator.clipboard.writeText(shareUrl);
-		toast.success('Link copied!');
-	}
-
-	async function handleShare() {
-		if (!navigator.share) return;
-		try {
-			if (videoBlob) {
-				const mimeType = getSupportedMimeType();
-				const ext = getFileExtension(mimeType);
-				const file = new File([videoBlob], `${editor.title || 'tripstitch'}.${ext}`, { type: mimeType });
-				await navigator.share({ files: [file] });
-			} else if (shareUrl) {
-				await navigator.share({ title: editor.title || 'TripStitch', url: shareUrl });
-			}
-		} catch (err) {
-			if ((err as Error).name !== 'AbortError') {
-				console.warn('[TripStitch] Share failed:', err);
-			}
-		}
+		saving = false;
 	}
 </script>
 
-<AppShell title="Edit Trip" showBack onback={() => goto('/trips')}>
-	<StepIndicator steps={editor.stepLabels} current={editor.currentStep} />
+<AppShell title="Video Links" showBack onback={() => goto('/trips')}>
+	{#if tripsState.loading}
+		<div class="space-y-4 animate-pulse">
+			<div class="h-6 w-48 bg-border/50 rounded"></div>
+			<div class="h-10 bg-border/50 rounded-lg"></div>
+			<div class="h-10 bg-border/50 rounded-lg"></div>
+			<div class="h-10 bg-border/50 rounded-lg"></div>
+		</div>
+	{:else if trip}
+		<div class="space-y-6 max-w-lg">
+			<div>
+				<h2 class="text-xl font-semibold mb-1">{trip.title}</h2>
+				<p class="text-sm text-text-muted">Add links to where you've posted this video.</p>
+			</div>
 
-	{#if editor.currentStep === 0}
-		<TitleStep
-			bind:title={editor.title}
-			bind:titleColor={editor.titleColor}
-			bind:titleDescription={editor.titleDescription}
-			bind:fontId={editor.fontId}
-			bind:showLogoOnTitle={editor.showLogoOnTitle}
-			{brandColors}
-			titleMediaPreviewUrl={editor.titleMediaPreviewUrl}
-			logoUrl={profileState.profile?.logoUrl ?? null}
-			onmedia={(file) => editor.updateTitleMedia(file)}
-			onremovemedia={() => editor.removeTitleMedia()}
-			onnext={() => editor.nextStep()}
-		/>
-	{:else if editor.currentStep === 1}
-		<LocationsStep
-			locations={editor.locations}
-			canAdd={editor.canAddLocation}
-			onadd={(loc) => editor.addLocation(loc)}
-			onremove={(id) => editor.removeLocation(id)}
-			onaddclip={(locId, file) => editor.addClipToLocation(locId, file)}
-			onremoveclip={(locId, clipId) => editor.removeClip(locId, clipId)}
-			onmoveclip={(locId, from, to) => editor.moveClip(locId, from, to)}
-			ontransport={(id, mode) => editor.updateLocationTransport(id, mode)}
-			onlabel={(id, label) => editor.updateLocationLabel(id, label)}
-			onrating={(id, rating) => editor.updateLocationRating(id, rating)}
-			onclipanimation={(locId, clipId, style) => editor.updateClipAnimation(locId, clipId, style)}
-			onnext={() => editor.nextStep()}
-			onback={() => editor.prevStep()}
-		/>
-	{:else if editor.currentStep === 2}
-		<ReviewStep
-			locations={editor.locations}
-			bind:keepOriginalAudio={editor.keepOriginalAudio}
-			mapStyle={editor.mapStyle}
-			titleColor={editor.titleColor}
-			onremove={(id) => editor.removeLocation(id)}
-			onmove={(from, to) => editor.moveLocation(from, to)}
-			ontransport={(id, mode) => editor.updateLocationTransport(id, mode)}
-			onlabel={(id, label) => editor.updateLocationLabel(id, label)}
-			onnext={() => editor.nextStep()}
-			onback={() => editor.prevStep()}
-		/>
-	{:else}
-		<ExportStep
-			bind:aspectRatio={editor.aspectRatio}
-			bind:mapStyle={editor.mapStyle}
-			canExport={editor.canExport && support.canExport}
-			keepOriginalAudio={editor.keepOriginalAudio}
-			{videoSegments}
-			{isExporting}
-			{exportDone}
-			{progress}
-			{videoUrl}
-			{videoBlob}
-			{error}
-			tripTitle={editor.title}
-			browserSupported={support.canExport}
-			browserWarnings={support.warnings}
-			exportSteps={exportSteps}
-			estimatedDuration={durationEstimate.formatted}
-			{exportElapsed}
-			onexport={handleExport}
-			onback={() => editor.prevStep()}
-			oncancel={handleCancel}
-			onretry={handleRetry}
-			ondownload={handleDownload}
-			onvoiceovermerged={handleVoiceOverMerged}
-			ondashboard={handleDashboard}
-			onshare={typeof navigator !== 'undefined' && navigator.share ? handleShare : undefined}
-			{shareUrl}
-			oncopylink={handleCopyLink}
-		/>
+			<div class="space-y-4">
+				<div>
+					<label class="flex items-center gap-2 text-sm font-medium text-text-secondary mb-1.5">
+						<svg class="w-4 h-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+							<path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+						</svg>
+						YouTube
+					</label>
+					<Input placeholder="https://youtube.com/shorts/..." bind:value={youtube} />
+				</div>
+
+				<div>
+					<label class="flex items-center gap-2 text-sm font-medium text-text-secondary mb-1.5">
+						<svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" style="color: #E4405F">
+							<path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/>
+						</svg>
+						Instagram Reel
+					</label>
+					<Input placeholder="https://instagram.com/reel/..." bind:value={instagram} />
+				</div>
+
+				<div>
+					<label class="flex items-center gap-2 text-sm font-medium text-text-secondary mb-1.5">
+						<svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+							<path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.88-2.88 2.89 2.89 0 0 1 2.88-2.88c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 0 0-.79-.05A6.34 6.34 0 0 0 3.15 15.2a6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.65a8.35 8.35 0 0 0 4.76 1.49v-3.4a4.85 4.85 0 0 1-1-.05z"/>
+						</svg>
+						TikTok
+					</label>
+					<Input placeholder="https://tiktok.com/@user/video/..." bind:value={tiktok} />
+				</div>
+
+				<div>
+					<label class="flex items-center gap-2 text-sm font-medium text-text-secondary mb-1.5">
+						<svg class="w-4 h-4 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+						</svg>
+						Other Link
+					</label>
+					<Input placeholder="https://..." bind:value={other} />
+				</div>
+			</div>
+
+			<div class="flex gap-3 pt-2">
+				<Button variant="primary" onclick={handleSave} disabled={saving}>
+					{saving ? 'Saving...' : 'Save Links'}
+				</Button>
+				<Button variant="secondary" onclick={() => goto('/trips')}>
+					Cancel
+				</Button>
+			</div>
+		</div>
 	{/if}
 </AppShell>

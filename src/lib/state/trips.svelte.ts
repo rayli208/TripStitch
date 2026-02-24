@@ -1,4 +1,4 @@
-import type { Trip } from '$lib/types';
+import type { Trip, VideoLinks } from '$lib/types';
 import { db } from '$lib/firebase';
 import authState from './auth.svelte';
 import {
@@ -21,6 +21,7 @@ function serializeTrip(trip: Trip) {
 		titleDescription: trip.titleDescription ?? '',
 		showLogoOnTitle: trip.showLogoOnTitle ?? false,
 		fontId: trip.fontId ?? 'inter',
+		tripDate: trip.tripDate ?? '',
 		aspectRatio: trip.aspectRatio,
 		createdAt: trip.createdAt,
 		updatedAt: trip.updatedAt,
@@ -29,8 +30,12 @@ function serializeTrip(trip: Trip) {
 			order: loc.order,
 			name: loc.name,
 			label: loc.label,
+			description: loc.description ?? null,
 			lat: loc.lat,
 			lng: loc.lng,
+			city: loc.city ?? null,
+			state: loc.state ?? null,
+			country: loc.country ?? null,
 			clips: loc.clips.map((c) => ({
 				id: c.id,
 				order: c.order,
@@ -89,6 +94,7 @@ function createTripsState() {
 						titleMediaType: null,
 						showLogoOnTitle: data.showLogoOnTitle ?? false,
 						fontId: data.fontId ?? 'inter',
+						tripDate: data.tripDate ?? '',
 						locations: (data.locations ?? []).map((loc: Record<string, unknown>) => {
 							// Backward compat: migrate old single-media to clips array
 							let clips: Record<string, unknown>[];
@@ -116,14 +122,19 @@ function createTripsState() {
 								order: loc.order,
 								name: loc.name,
 								label: loc.label,
+								description: loc.description ?? null,
 								lat: loc.lat,
 								lng: loc.lng,
+								city: loc.city ?? null,
+								state: loc.state ?? null,
+								country: loc.country ?? null,
 								clips,
 								transportMode: loc.transportMode,
 								rating: (loc.rating as number) ?? null
 							};
 						}),
 						aspectRatio: data.aspectRatio,
+						videoLinks: data.videoLinks ?? undefined,
 						createdAt: data.createdAt,
 						updatedAt: data.updatedAt
 					} as Trip;
@@ -160,6 +171,7 @@ function createTripsState() {
 			if (updates.titleDescription !== undefined) data.titleDescription = updates.titleDescription;
 			if (updates.showLogoOnTitle !== undefined) data.showLogoOnTitle = updates.showLogoOnTitle;
 			if (updates.fontId !== undefined) data.fontId = updates.fontId;
+			if (updates.tripDate !== undefined) data.tripDate = updates.tripDate;
 			if (updates.aspectRatio !== undefined) data.aspectRatio = updates.aspectRatio;
 			if (updates.updatedAt !== undefined) data.updatedAt = updates.updatedAt;
 			if (updates.locations !== undefined) {
@@ -168,8 +180,12 @@ function createTripsState() {
 					order: loc.order,
 					name: loc.name,
 					label: loc.label,
+					description: loc.description ?? null,
 					lat: loc.lat,
 					lng: loc.lng,
+					city: loc.city ?? null,
+					state: loc.state ?? null,
+					country: loc.country ?? null,
 					clips: loc.clips.map((c) => ({
 						id: c.id,
 						order: c.order,
@@ -183,11 +199,24 @@ function createTripsState() {
 			await updateDoc(docRef, data);
 		},
 
-		async deleteTrip(id: string) {
+		async updateVideoLinks(id: string, videoLinks: VideoLinks) {
 			const uid = authState.user?.id;
 			if (!uid) return;
 			const docRef = doc(db, 'users', uid, 'trips', id);
-			await deleteDoc(docRef);
+			await updateDoc(docRef, { videoLinks });
+		},
+
+		async deleteTrip(id: string) {
+			const uid = authState.user?.id;
+			if (!uid) return;
+			// Delete from user's private collection
+			await deleteDoc(doc(db, 'users', uid, 'trips', id));
+			// Also delete from public shared collection
+			try {
+				await deleteDoc(doc(db, 'trips', id));
+			} catch {
+				// Ignore if public copy doesn't exist
+			}
 		}
 	};
 }

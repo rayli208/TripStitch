@@ -7,7 +7,6 @@
 
 	let {
 		locations,
-		keepOriginalAudio = $bindable(true),
 		mapStyle = 'streets',
 		titleColor = '#FFFFFF',
 		onremove,
@@ -18,7 +17,6 @@
 		onback
 	}: {
 		locations: Location[];
-		keepOriginalAudio?: boolean;
 		mapStyle?: MapStyle;
 		titleColor?: string;
 		onremove: (id: string) => void;
@@ -28,8 +26,6 @@
 		onnext: () => void;
 		onback: () => void;
 	} = $props();
-
-	const hasVideoWithAudio = $derived(locations.some((l) => l.clips.some((c) => c.type === 'video' && c.file)));
 
 	// Stats
 	let totalMiles = $derived(() => {
@@ -224,27 +220,6 @@
 			</div>
 		{/each}
 	</div>
-
-	<!-- Audio settings -->
-	{#if hasVideoWithAudio}
-		<div class="p-4 bg-card rounded-xl border border-border">
-			<label class="flex items-center justify-between cursor-pointer select-none">
-				<div>
-					<p class="text-sm font-medium text-text-primary">Keep original audio</p>
-					<p class="text-xs text-text-muted">Video audio will be dimmed during voice-over</p>
-				</div>
-				<div class="relative flex-shrink-0 ml-3">
-					<input
-						type="checkbox"
-						bind:checked={keepOriginalAudio}
-						class="sr-only"
-					/>
-					<div class="w-11 h-6 rounded-full transition-colors {keepOriginalAudio ? 'bg-accent' : 'bg-border'}"></div>
-					<div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform {keepOriginalAudio ? 'translate-x-5' : ''}"></div>
-				</div>
-			</label>
-		</div>
-	{/if}
 
 	<!-- Bottom nav -->
 	<div class="flex justify-between pt-2">

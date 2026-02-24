@@ -16,6 +16,7 @@
 		onmoveclip,
 		ontransport,
 		onlabel,
+		ondescription,
 		onrating,
 		onclipanimation,
 		onnext,
@@ -23,13 +24,14 @@
 	}: {
 		locations: Location[];
 		canAdd: boolean;
-		onadd: (loc: { name: string; lat: number; lng: number }) => void;
+		onadd: (loc: { name: string; lat: number; lng: number; city: string | null; state: string | null; country: string | null }) => void;
 		onremove: (id: string) => void;
 		onaddclip: (locationId: string, file: File) => void;
 		onremoveclip: (locationId: string, clipId: string) => void;
 		onmoveclip: (locationId: string, fromIndex: number, toIndex: number) => void;
 		ontransport: (id: string, mode: TransportMode) => void;
 		onlabel: (id: string, label: string) => void;
+		ondescription: (id: string, description: string) => void;
 		onrating: (id: string, rating: number | null) => void;
 		onclipanimation: (locationId: string, clipId: string, style: AnimationStyle) => void;
 		onnext: () => void;
@@ -214,6 +216,17 @@
 				<div class="flex items-center gap-2 mt-2">
 					<span class="text-xs text-text-muted">Rating</span>
 					<StarRating rating={activeLoc.rating} onchange={(r) => onrating(activeLoc!.id, r)} size="sm" />
+				</div>
+				<!-- Description -->
+				<div class="mt-2">
+					<textarea
+						class="w-full bg-transparent text-sm text-text-secondary border border-border rounded-lg px-3 py-2 outline-none focus:border-accent transition-colors resize-none"
+						placeholder="Add a note about this stop..."
+						rows="2"
+						value={activeLoc.description ?? ''}
+						oninput={(e) => ondescription(activeLoc!.id, (e.target as HTMLTextAreaElement).value)}
+					></textarea>
+					<p class="text-xs text-text-muted mt-0.5">Won't appear in the video — shows on your shared trip page.</p>
 				</div>
 			</div>
 

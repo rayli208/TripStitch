@@ -181,7 +181,8 @@ export async function renderFlyTo(
 	aspectRatio: AspectRatio,
 	mapStyle: MapStyle = 'streets',
 	titleColor: string = '#FFFFFF',
-	fontId: string = 'inter'
+	fontId: string = 'inter',
+	secondaryColor: string = '#0a0f1e'
 ): Promise<Blob> {
 	const { width, height } = getResolution(aspectRatio);
 	const displayName = location.label || location.name.split(',')[0];
@@ -209,8 +210,9 @@ export async function renderFlyTo(
 			(ctx, elapsed) => {
 				if (elapsed >= FLY_TO_DURATION) {
 					const point = map.project([location.lng, location.lat]);
-					drawPinOnCanvas(ctx, point.x, point.y, displayName, titleColor, ff, location.rating);
-					drawLocationTitleOnCanvas(ctx, displayName, width, titleColor, ff, location.rating);
+					// Pin is just a dot (showLabel=false) since the title bar shows the name
+					drawPinOnCanvas(ctx, point.x, point.y, displayName, titleColor, ff, location.rating, false);
+					drawLocationTitleOnCanvas(ctx, displayName, width, titleColor, ff, location.rating, secondaryColor);
 				}
 			}
 		);
@@ -235,8 +237,6 @@ export async function renderFlyTo(
 	const overviewZoom = Math.max(2, Math.min(cam?.zoom ?? 8, CLOSE_ZOOM - 2));
 	const boundsCenter = bounds.getCenter();
 	const overviewCenter: [number, number] = [boundsCenter.lng, boundsCenter.lat];
-
-	const prevDisplayName = prevLocation.label || prevLocation.name.split(',')[0];
 
 	// Phase timing
 	const ZOOM_OUT_MS = 1500;
@@ -270,21 +270,21 @@ export async function renderFlyTo(
 			}, zoomInAt);
 		},
 		(ctx, elapsed) => {
-			// Show previous location pin while still zoomed in on it (first 400ms)
+			// Show previous location as plain dot while zoomed in (first 400ms)
 			if (elapsed < 400) {
 				const prevPoint = map.project([prevLocation.lng, prevLocation.lat]);
-				// Only draw if within canvas bounds (pin may fly off-screen during zoom-out)
 				if (prevPoint.x > -50 && prevPoint.x < width + 50 && prevPoint.y > -50 && prevPoint.y < height + 50) {
-					drawPinOnCanvas(ctx, prevPoint.x, prevPoint.y, prevDisplayName, titleColor, ff, prevLocation.rating);
+					drawPinOnCanvas(ctx, prevPoint.x, prevPoint.y, '', titleColor, ff, null, false);
 				}
 			}
 			// After zoom-in completes, show new location overlays
 			if (elapsed >= overlayAt) {
 				const point = map.project([location.lng, location.lat]);
-				drawPinOnCanvas(ctx, point.x, point.y, displayName, titleColor, ff, location.rating);
-				drawLocationTitleOnCanvas(ctx, displayName, width, titleColor, ff, location.rating);
+				// Pin is just a dot (showLabel=false) since the title bar shows the name
+				drawPinOnCanvas(ctx, point.x, point.y, displayName, titleColor, ff, location.rating, false);
+				drawLocationTitleOnCanvas(ctx, displayName, width, titleColor, ff, location.rating, secondaryColor);
 				if (transportMode) {
-					drawTransportBadgeOnCanvas(ctx, transportMode, width, height, titleColor, ff);
+					drawTransportBadgeOnCanvas(ctx, transportMode, width, height, titleColor, ff, secondaryColor);
 				}
 			}
 		}
@@ -302,7 +302,8 @@ export async function renderFinalRoute(
 	routeGeometries?: ({ coordinates: [number, number][] } | null)[],
 	mapStyle: MapStyle = 'streets',
 	titleColor: string = '#FFFFFF',
-	fontId: string = 'inter'
+	fontId: string = 'inter',
+	secondaryColor: string = '#0a0f1e'
 ): Promise<Blob> {
 	const { width, height } = getResolution(aspectRatio);
 	const ff = fontFamily(fontId);
@@ -355,14 +356,14 @@ export async function renderFinalRoute(
 			}
 		},
 		(ctx, elapsed) => {
-			// Draw all pins on canvas every frame
+			// Draw all pins with labels on canvas every frame (final route shows labels)
 			for (const loc of locations) {
 				const point = map.project([loc.lng, loc.lat]);
 				const label = loc.label || loc.name.split(',')[0];
-				drawPinOnCanvas(ctx, point.x, point.y, label, titleColor, ff, loc.rating);
+				drawPinOnCanvas(ctx, point.x, point.y, label, titleColor, ff, loc.rating, true, hexToRgba(secondaryColor, 0.88));
 			}
 			// Stats visible the entire time
-			drawStatsOnCanvas(ctx, stats, width, height, titleColor, ff);
+			drawStatsOnCanvas(ctx, stats, width, height, titleColor, ff, secondaryColor);
 		}
 	);
 
@@ -400,6 +401,19 @@ function hexToRgba(hex: string, alpha: number): string {
 	return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+/** Compute perceived luminance (0–1) of a hex color */
+function luminance(hex: string): number {
+	const r = parseInt(hex.slice(1, 3), 16) / 255;
+	const g = parseInt(hex.slice(3, 5), 16) / 255;
+	const b = parseInt(hex.slice(5, 7), 16) / 255;
+	return 0.299 * r + 0.587 * g + 0.114 * b;
+}
+
+/** Return white or near-black text color that contrasts with the given background */
+function contrastTextColor(hex: string): string {
+	return luminance(hex) > 0.5 ? '#0a0f1e' : '#FFFFFF';
+}
+
 /** Draw a 5-point star path centered at (cx, cy) with given outer radius */
 function drawStar(ctx: CanvasRenderingContext2D, cx: number, cy: number, outerR: number) {
 	const innerR = outerR * 0.4;
@@ -416,7 +430,9 @@ function drawStar(ctx: CanvasRenderingContext2D, cx: number, cy: number, outerR:
 	ctx.closePath();
 }
 
-/** Draw a map pin with label directly on the canvas */
+/** Draw a map pin on the canvas.
+ *  When showLabel is true (default, used in final route), draws label pill + rating above the pin.
+ *  When showLabel is false (used during fly-to with title bar), draws only the colored dot. */
 function drawPinOnCanvas(
 	ctx: CanvasRenderingContext2D,
 	x: number,
@@ -424,11 +440,13 @@ function drawPinOnCanvas(
 	label: string,
 	accentColor: string = '#FFFFFF',
 	ff: string = 'Inter, system-ui, sans-serif',
-	rating: number | null = null
+	rating: number | null = null,
+	showLabel: boolean = true,
+	bgColor: string = 'rgba(10, 15, 30, 0.88)'
 ) {
 	ctx.save();
 
-	// Pin teardrop shape: outer glow + colored fill
+	// Pin dot: outer glow + colored fill
 	ctx.shadowColor = 'rgba(0,0,0,0.5)';
 	ctx.shadowBlur = 16;
 	ctx.shadowOffsetY = 4;
@@ -452,64 +470,39 @@ function drawPinOnCanvas(
 	ctx.fillStyle = 'rgba(255,255,255,0.7)';
 	ctx.fill();
 
-	// Label above pin — pill-shaped with dark frosted bg
-	const fontSize = 30;
-	ctx.font = `700 ${fontSize}px ${ff}`;
-	ctx.textAlign = 'center';
-	ctx.textBaseline = 'middle';
-	const metrics = ctx.measureText(label);
-	const padX = 20, padY = 12;
-	const bgW = metrics.width + padX * 2;
-	const bgH = fontSize + padY * 2;
-	const bgX = x - bgW / 2;
-	const bgY = y - 38 - bgH;
+	if (showLabel) {
+		const textColor = contrastTextColor(bgColor.startsWith('rgba') ? '#0a0f1e' : bgColor);
 
-	// Dark frosted background
-	ctx.shadowColor = 'rgba(0,0,0,0.4)';
-	ctx.shadowBlur = 14;
-	ctx.shadowOffsetY = 4;
-	ctx.fillStyle = 'rgba(10, 15, 30, 0.88)';
-	canvasRoundRect(ctx, bgX, bgY, bgW, bgH, bgH / 2);
-	ctx.fill();
+		// Label above pin — pill-shaped background
+		const fontSize = 30;
+		ctx.font = `700 ${fontSize}px ${ff}`;
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		const metrics = ctx.measureText(label);
+		const padX = 20, padY = 12;
+		const bgW = metrics.width + padX * 2;
+		const bgH = fontSize + padY * 2;
+		const bgX = x - bgW / 2;
+		const bgY = y - 38 - bgH;
 
-	// Accent-colored border
-	ctx.shadowColor = 'transparent';
-	ctx.strokeStyle = hexToRgba(accentColor, 0.6);
-	ctx.lineWidth = 2;
-	canvasRoundRect(ctx, bgX, bgY, bgW, bgH, bgH / 2);
-	ctx.stroke();
-
-	// Label text in white
-	ctx.fillStyle = 'white';
-	ctx.fillText(label, x, bgY + bgH / 2);
-
-	// Star rating below the label pill
-	if (rating && rating > 0) {
-		const starSize = 12;
-		const starGap = 4;
-		const totalStarsW = 5 * (starSize * 2) + 4 * starGap;
-		const starsX = x - totalStarsW / 2;
-		const starsY = bgY + bgH + 8 + starSize;
-
-		// Small dark pill behind stars
-		const starsPillW = totalStarsW + 16;
-		const starsPillH = starSize * 2 + 10;
-		const starsPillX = x - starsPillW / 2;
-		const starsPillY = starsY - starSize - 5;
-		ctx.fillStyle = 'rgba(10, 15, 30, 0.85)';
-		canvasRoundRect(ctx, starsPillX, starsPillY, starsPillW, starsPillH, starsPillH / 2);
+		// Background pill
+		ctx.shadowColor = 'rgba(0,0,0,0.4)';
+		ctx.shadowBlur = 14;
+		ctx.shadowOffsetY = 4;
+		ctx.fillStyle = bgColor;
+		canvasRoundRect(ctx, bgX, bgY, bgW, bgH, bgH / 2);
 		ctx.fill();
 
-		for (let i = 0; i < 5; i++) {
-			const cx = starsX + starSize + i * (starSize * 2 + starGap);
-			drawStar(ctx, cx, starsY, starSize);
-			if (i < rating) {
-				ctx.fillStyle = '#FBBF24'; // amber-400
-			} else {
-				ctx.fillStyle = 'rgba(255,255,255,0.2)';
-			}
-			ctx.fill();
-		}
+		// Accent-colored border
+		ctx.shadowColor = 'transparent';
+		ctx.strokeStyle = hexToRgba(accentColor, 0.6);
+		ctx.lineWidth = 2;
+		canvasRoundRect(ctx, bgX, bgY, bgW, bgH, bgH / 2);
+		ctx.stroke();
+
+		// Label text
+		ctx.fillStyle = textColor;
+		ctx.fillText(label, x, bgY + bgH / 2);
 	}
 
 	ctx.restore();
@@ -522,7 +515,8 @@ function drawLocationTitleOnCanvas(
 	width: number,
 	accentColor: string = '#FFFFFF',
 	ff: string = 'Inter, system-ui, sans-serif',
-	rating: number | null = null
+	rating: number | null = null,
+	secondaryColor: string = '#0a0f1e'
 ) {
 	ctx.save();
 	const fontSize = width > 1200 ? 56 : 46;
@@ -537,11 +531,13 @@ function drawLocationTitleOnCanvas(
 	const topOffset = width > 1200 ? 80 : 60;
 	const bgX = width / 2 - bgW / 2;
 
-	// Dark frosted background with stronger shadow
+	const textColor = contrastTextColor(secondaryColor);
+
+	// Secondary color background with stronger shadow
 	ctx.shadowColor = 'rgba(0,0,0,0.5)';
 	ctx.shadowBlur = 20;
 	ctx.shadowOffsetY = 6;
-	ctx.fillStyle = 'rgba(10, 15, 30, 0.9)';
+	ctx.fillStyle = hexToRgba(secondaryColor, 0.92);
 	canvasRoundRect(ctx, bgX, topOffset, bgW, bgH, 14);
 	ctx.fill();
 
@@ -552,8 +548,8 @@ function drawLocationTitleOnCanvas(
 	canvasRoundRect(ctx, bgX + 8, lineY, bgW - 16, 3, 1.5);
 	ctx.fill();
 
-	// Title text in accent color
-	ctx.fillStyle = accentColor;
+	// Title text with contrast color
+	ctx.fillStyle = textColor;
 	ctx.fillText(text, width / 2, topOffset + bgH / 2);
 
 	// Star rating below the title bar
@@ -563,12 +559,12 @@ function drawLocationTitleOnCanvas(
 		const totalStarsW = 5 * (starSize * 2) + 4 * starGap;
 		const starsY = topOffset + bgH + 20 + starSize;
 
-		// Dark pill behind stars
+		// Secondary color pill behind stars
 		const pillW = totalStarsW + 24;
 		const pillH = starSize * 2 + 14;
 		const pillX = width / 2 - pillW / 2;
 		const pillY = starsY - starSize - 7;
-		ctx.fillStyle = 'rgba(10, 15, 30, 0.85)';
+		ctx.fillStyle = hexToRgba(secondaryColor, 0.88);
 		canvasRoundRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
 		ctx.fill();
 
@@ -591,10 +587,12 @@ function drawTransportBadgeOnCanvas(
 	width: number,
 	height: number,
 	accentColor: string = '#FFFFFF',
-	ff: string = 'Inter, system-ui, sans-serif'
+	ff: string = 'Inter, system-ui, sans-serif',
+	secondaryColor: string = '#0a0f1e'
 ) {
 	const info = TRANSPORT_ICONS[mode];
 	const text = `${info.icon} ${info.label}`;
+	const textColor = contrastTextColor(secondaryColor);
 
 	ctx.save();
 	const fontSize = 32;
@@ -609,11 +607,11 @@ function drawTransportBadgeOnCanvas(
 	const bgX = width / 2 - bgW / 2;
 	const bgY = height - height * 0.12 - bgH;
 
-	// Dark frosted background
+	// Secondary color background
 	ctx.shadowColor = 'rgba(0,0,0,0.4)';
 	ctx.shadowBlur = 12;
 	ctx.shadowOffsetY = 3;
-	ctx.fillStyle = 'rgba(10, 15, 30, 0.88)';
+	ctx.fillStyle = hexToRgba(secondaryColor, 0.92);
 	canvasRoundRect(ctx, bgX, bgY, bgW, bgH, bgH / 2);
 	ctx.fill();
 
@@ -624,7 +622,7 @@ function drawTransportBadgeOnCanvas(
 	canvasRoundRect(ctx, bgX, bgY, bgW, bgH, bgH / 2);
 	ctx.stroke();
 
-	ctx.fillStyle = 'white';
+	ctx.fillStyle = textColor;
 	ctx.fillText(text, width / 2, bgY + bgH / 2);
 
 	ctx.restore();
@@ -637,11 +635,13 @@ function drawStatsOnCanvas(
 	width: number,
 	height: number,
 	accentColor: string = '#FFFFFF',
-	ff: string = 'Inter, system-ui, sans-serif'
+	ff: string = 'Inter, system-ui, sans-serif',
+	secondaryColor: string = '#0a0f1e'
 ) {
 	const milesStr = stats.miles < 10 ? stats.miles.toFixed(1) : Math.round(stats.miles).toString();
 	const minsStr = Math.round(stats.minutes).toString();
 	const text = `${stats.stops} stops \u00B7 ${milesStr} mi \u00B7 ~${minsStr} min`;
+	const textColor = contrastTextColor(secondaryColor);
 
 	ctx.save();
 	const fontSize = width > 1200 ? 44 : 36;
@@ -657,11 +657,11 @@ function drawStatsOnCanvas(
 	// Position well above the bottom edge so it's not hidden by video controls
 	const bgY = Math.round(height * 0.87 - bgH);
 
-	// Solid dark background for max contrast on any map style
+	// Secondary color background for max contrast
 	ctx.shadowColor = 'rgba(0,0,0,0.6)';
 	ctx.shadowBlur = 24;
 	ctx.shadowOffsetY = 4;
-	ctx.fillStyle = 'rgba(10, 15, 30, 0.95)';
+	ctx.fillStyle = hexToRgba(secondaryColor, 0.95);
 	canvasRoundRect(ctx, bgX, bgY, bgW, bgH, 14);
 	ctx.fill();
 
@@ -672,12 +672,12 @@ function drawStatsOnCanvas(
 	ctx.fill();
 
 	// Subtle outer border
-	ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+	ctx.strokeStyle = hexToRgba(contrastTextColor(secondaryColor), 0.1);
 	ctx.lineWidth = 1;
 	canvasRoundRect(ctx, bgX, bgY, bgW, bgH, 14);
 	ctx.stroke();
 
-	ctx.fillStyle = 'white';
+	ctx.fillStyle = textColor;
 	ctx.fillText(text, width / 2, bgY + bgH / 2);
 
 	ctx.restore();
@@ -774,7 +774,7 @@ function loadImageFromFile(file: File): Promise<HTMLImageElement> {
 }
 
 /** Load an image from a URL (for logos) */
-function loadImageFromUrl(url: string): Promise<HTMLImageElement> {
+export function loadImageFromUrl(url: string): Promise<HTMLImageElement> {
 	return new Promise((resolve, reject) => {
 		const img = new Image();
 		img.crossOrigin = 'anonymous';
@@ -806,6 +806,7 @@ export interface TitleCardOpts {
 	showLogo?: boolean;
 	durationSec?: number;
 	fontId?: string;
+	secondaryColor?: string;
 }
 
 /** Render a title card: trip title over photo background or dark gradient, with optional logo watermark */
@@ -861,12 +862,44 @@ export async function renderTitleCard(opts: TitleCardOpts): Promise<Blob> {
 	}
 
 	const durationSec = opts.durationSec ?? 2.5;
+	const secColor = opts.secondaryColor ?? '#0a0f1e';
+	const secTextColor = contrastTextColor(secColor);
 
 	function drawTextOverlay() {
+		ctx.save();
+
+		// Draw secondary color background pill behind the entire text block
+		const padX = Math.round(width * 0.06);
+		const padY = Math.round(fontSize * 0.6);
+
+		// Measure widest line for background width
+		ctx.font = `700 ${fontSize}px ${ff}`;
+		let maxLineW = 0;
+		for (const line of titleLines) {
+			maxLineW = Math.max(maxLineW, ctx.measureText(line).width);
+		}
+		if (descLines.length > 0) {
+			ctx.font = `400 ${descFontSize}px ${ff}`;
+			for (const line of descLines) {
+				maxLineW = Math.max(maxLineW, ctx.measureText(line).width);
+			}
+		}
+
+		const bgW = maxLineW + padX * 2;
+		const bgH = totalBlockHeight + padY * 2;
+		const bgX = width / 2 - bgW / 2;
+		const bgY = blockStartY - titleLineHeight / 2 - padY;
+
+		// Semi-transparent secondary color background
+		ctx.fillStyle = hexToRgba(secColor, 0.75);
+		canvasRoundRect(ctx, bgX, bgY, bgW, bgH, 16);
+		ctx.fill();
+
+		// Title text
 		ctx.font = `700 ${fontSize}px ${ff}`;
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
-		ctx.fillStyle = titleColor;
+		ctx.fillStyle = secTextColor;
 		for (let i = 0; i < titleLines.length; i++) {
 			ctx.fillText(titleLines[i], width / 2, blockStartY + i * titleLineHeight);
 		}
@@ -875,14 +908,14 @@ export async function renderTitleCard(opts: TitleCardOpts): Promise<Blob> {
 			const descStartY = blockStartY + totalTitleHeight + descGap;
 			ctx.font = `400 ${descFontSize}px ${ff}`;
 			ctx.globalAlpha = 0.7;
-			ctx.fillStyle = titleColor;
+			ctx.fillStyle = secTextColor;
 			for (let i = 0; i < descLines.length; i++) {
 				ctx.fillText(descLines[i], width / 2, descStartY + i * descLineHeight);
 			}
 			ctx.globalAlpha = 1;
 		} else {
 			const lineY = blockStartY + totalTitleHeight + fontSize * 0.4;
-			ctx.strokeStyle = titleColor;
+			ctx.strokeStyle = secTextColor;
 			ctx.globalAlpha = 0.4;
 			ctx.lineWidth = 2;
 			ctx.beginPath();
@@ -891,6 +924,8 @@ export async function renderTitleCard(opts: TitleCardOpts): Promise<Blob> {
 			ctx.stroke();
 			ctx.globalAlpha = 1;
 		}
+
+		ctx.restore();
 	}
 
 	function drawLogo() {

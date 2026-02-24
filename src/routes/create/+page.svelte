@@ -132,6 +132,7 @@
 			showLogoOnTitle: editor.showLogoOnTitle,
 			fontId: editor.fontId,
 			mapStyle: editor.mapStyle,
+			tripDate: editor.tripDate,
 			locations: editor.locations,
 			aspectRatio: editor.aspectRatio,
 			createdAt: new Date().toISOString(),
@@ -160,7 +161,8 @@
 				(p) => { progress = p; },
 				abortController.signal,
 				editor.mapStyle,
-				profileState.profile?.logoUrl
+				profileState.profile?.logoUrl,
+				profileState.profile?.secondaryColor ?? '#0a0f1e'
 			);
 
 			videoBlob = result.blob;
@@ -223,7 +225,7 @@
 		a.click();
 	}
 
-	function handleVoiceOverMerged(blob: Blob, url: string) {
+	function handleMusicMerged(blob: Blob, url: string) {
 		if (videoUrl) URL.revokeObjectURL(videoUrl);
 		videoBlob = blob;
 		videoUrl = url;
@@ -268,8 +270,10 @@
 			bind:titleColor={editor.titleColor}
 			bind:titleDescription={editor.titleDescription}
 			bind:fontId={editor.fontId}
+			bind:tripDate={editor.tripDate}
 			bind:showLogoOnTitle={editor.showLogoOnTitle}
 			{brandColors}
+			secondaryColor={profileState.profile?.secondaryColor ?? '#0a0f1e'}
 			titleMediaPreviewUrl={editor.titleMediaPreviewUrl}
 			logoUrl={profileState.profile?.logoUrl ?? null}
 			onmedia={(file) => editor.updateTitleMedia(file)}
@@ -280,13 +284,14 @@
 		<LocationsStep
 			locations={editor.locations}
 			canAdd={editor.canAddLocation}
-			onadd={(loc) => editor.addLocation(loc)}
+			onadd={(loc) => editor.addLocation({ name: loc.name, lat: loc.lat, lng: loc.lng, city: loc.city, state: loc.state, country: loc.country })}
 			onremove={(id) => editor.removeLocation(id)}
 			onaddclip={(locId, file) => editor.addClipToLocation(locId, file)}
 			onremoveclip={(locId, clipId) => editor.removeClip(locId, clipId)}
 			onmoveclip={(locId, from, to) => editor.moveClip(locId, from, to)}
 			ontransport={(id, mode) => editor.updateLocationTransport(id, mode)}
 			onlabel={(id, label) => editor.updateLocationLabel(id, label)}
+			ondescription={(id, desc) => editor.updateLocationDescription(id, desc)}
 			onrating={(id, rating) => editor.updateLocationRating(id, rating)}
 			onclipanimation={(locId, clipId, style) => editor.updateClipAnimation(locId, clipId, style)}
 			onnext={() => editor.nextStep()}
@@ -295,7 +300,6 @@
 	{:else if editor.currentStep === 2}
 		<ReviewStep
 			locations={editor.locations}
-			bind:keepOriginalAudio={editor.keepOriginalAudio}
 			mapStyle={editor.mapStyle}
 			titleColor={editor.titleColor}
 			onremove={(id) => editor.removeLocation(id)}
@@ -309,8 +313,12 @@
 		<ExportStep
 			bind:aspectRatio={editor.aspectRatio}
 			bind:mapStyle={editor.mapStyle}
+			bind:musicSelection={editor.musicSelection}
+			bind:musicVolume={editor.musicVolume}
+			bind:keepOriginalAudio={editor.keepOriginalAudio}
+			bind:voiceOverVolume={editor.voiceOverVolume}
 			canExport={editor.canExport && support.canExport}
-			keepOriginalAudio={editor.keepOriginalAudio}
+			locations={editor.locations}
 			{videoSegments}
 			{isExporting}
 			{exportDone}
@@ -330,7 +338,7 @@
 			onretry={handleRetry}
 			ondownload={handleDownload}
 			ondashboard={handleDashboard}
-			onvoiceovermerged={handleVoiceOverMerged}
+			onmusicmerged={handleMusicMerged}
 			onshare={typeof navigator !== 'undefined' && navigator.share ? handleShare : undefined}
 			{shareUrl}
 			oncopylink={handleCopyLink}

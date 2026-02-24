@@ -2,7 +2,7 @@ import type { UserProfile, SocialLinks } from '$lib/types';
 import { DEFAULT_FONT_ID } from '$lib/constants/fonts';
 import { db, storage } from '$lib/firebase';
 import authState from './auth.svelte';
-import { doc, getDoc, setDoc, deleteDoc, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, runTransaction, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { compressImage, imageExtension } from '$lib/utils/imageUtils';
 
@@ -39,6 +39,7 @@ function createProfileState() {
 					const data = snap.data() as UserProfile;
 					// Apply defaults for fields that may not exist on older profiles
 					data.brandColors = data.brandColors ?? [];
+					data.secondaryColor = data.secondaryColor ?? '#0a0f1e';
 					data.preferredFontId = data.preferredFontId ?? DEFAULT_FONT_ID;
 					profile = data;
 				} else {
@@ -58,6 +59,7 @@ function createProfileState() {
 			bio: string;
 			socialLinks: SocialLinks;
 			brandColors?: string[];
+			secondaryColor?: string;
 			preferredFontId?: string;
 		}): Promise<{ ok: boolean; error?: string }> {
 			const uid = authState.user?.id;
@@ -99,6 +101,7 @@ function createProfileState() {
 							logoUrl: profile?.logoUrl ?? null,
 							socialLinks: updates.socialLinks,
 							brandColors: updates.brandColors ?? profile?.brandColors ?? [],
+							secondaryColor: updates.secondaryColor ?? profile?.secondaryColor ?? '#0a0f1e',
 							preferredFontId: updates.preferredFontId ?? profile?.preferredFontId ?? DEFAULT_FONT_ID,
 							createdAt: profile?.createdAt ?? new Date().toISOString()
 						};
@@ -114,6 +117,7 @@ function createProfileState() {
 						logoUrl: profile?.logoUrl ?? null,
 						socialLinks: updates.socialLinks,
 						brandColors: updates.brandColors ?? profile?.brandColors ?? [],
+						secondaryColor: updates.secondaryColor ?? profile?.secondaryColor ?? '#0a0f1e',
 						preferredFontId: updates.preferredFontId ?? profile?.preferredFontId ?? DEFAULT_FONT_ID,
 						createdAt: profile?.createdAt ?? new Date().toISOString()
 					};
@@ -186,8 +190,29 @@ function createProfileState() {
 
 		/** Look up a username and return the uid */
 		async resolveUsername(username: string): Promise<string | null> {
-			const snap = await getDoc(doc(db, 'usernames', username.toLowerCase()));
-			if (snap.exists()) return snap.data().uid as string;
+			const lower = username.toLowerCase();
+
+			// Try the usernames index first
+			try {
+				const snap = await getDoc(doc(db, 'usernames', lower));
+				if (snap.exists()) return snap.data().uid as string;
+			} catch (err) {
+				console.warn('[Profile] usernames lookup failed, trying fallback:', err);
+			}
+
+			// Fallback: find a shared trip with this username (trips collection is public)
+			try {
+				const q = query(
+					collection(db, 'trips'),
+					where('username', '==', lower),
+					limit(1)
+				);
+				const snap = await getDocs(q);
+				if (!snap.empty) return snap.docs[0].data().userId as string;
+			} catch (err) {
+				console.warn('[Profile] trips username fallback failed:', err);
+			}
+
 			return null;
 		},
 

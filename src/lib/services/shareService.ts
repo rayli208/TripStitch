@@ -39,11 +39,20 @@ export async function publishTrip(
 		order: loc.order,
 		name: loc.name,
 		label: loc.label,
+		description: loc.description ?? null,
 		lat: loc.lat,
 		lng: loc.lng,
+		city: loc.city ?? null,
+		state: loc.state ?? null,
+		country: loc.country ?? null,
 		transportMode: loc.transportMode,
 		rating: loc.rating ?? null
 	}));
+
+	// Aggregate unique cities, states, countries for geographic querying
+	const cities = [...new Set(trip.locations.map((l) => l.city).filter((v): v is string => !!v))];
+	const states = [...new Set(trip.locations.map((l) => l.state).filter((v): v is string => !!v))];
+	const countries = [...new Set(trip.locations.map((l) => l.country).filter((v): v is string => !!v))];
 
 	// Compute stats
 	const miles = totalDistance(trip.locations);
@@ -68,6 +77,11 @@ export async function publishTrip(
 			miles: Math.round(miles * 10) / 10,
 			minutes: Math.round(minutes)
 		},
+		tripDate: trip.tripDate ?? '',
+		videoLinks: trip.videoLinks ?? undefined,
+		cities,
+		states,
+		countries,
 		createdAt: trip.createdAt,
 		sharedAt: new Date().toISOString()
 	};

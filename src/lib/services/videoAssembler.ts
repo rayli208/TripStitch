@@ -1,5 +1,5 @@
 import type { Trip, AspectRatio, MapStyle } from '$lib/types';
-import { getResolution, renderFlyTo, renderFinalRoute, renderTitleCard } from './mapRenderer';
+import { getResolution, renderFlyTo, renderFinalRoute, renderTitleCard, loadImageFromUrl } from './mapRenderer';
 import { normalizeVideo, createWhiteFlash, concatenateBlobs, renderPhotoAnimation } from './videoProcessor';
 import { totalDistance, totalTravelTime } from '$lib/utils/distance';
 import { suggestTransportMode } from '$lib/utils/distance';
@@ -53,7 +53,8 @@ export async function assembleVideo(
 	onProgress?: ProgressCallback,
 	abortSignal?: AbortSignal,
 	mapStyle: MapStyle = 'streets',
-	logoUrl?: string | null
+	logoUrl?: string | null,
+	secondaryColor: string = '#0a0f1e'
 ): Promise<AssemblyResult> {
 	console.log('[TripStitch] Starting video assembly', { tripId: trip.id, aspectRatio });
 	const { width, height } = getResolution(aspectRatio);
@@ -113,7 +114,8 @@ export async function assembleVideo(
 			mediaFile: trip.titleMediaFile,
 			logoUrl: logoUrl,
 			showLogo: trip.showLogoOnTitle,
-			fontId: tripFontId
+			fontId: tripFontId,
+			secondaryColor
 		});
 		console.log(`[TripStitch] Title card blob:`, titleBlob.size, 'bytes');
 		segments.push(titleBlob);
@@ -137,7 +139,7 @@ export async function assembleVideo(
 			// 1. Map fly-to animation
 			emit('map', `Rendering map for ${location.name}...`);
 			console.log(`[TripStitch] Rendering fly-to for "${location.name}" (${location.lat}, ${location.lng})`);
-			const flyToBlob = await renderFlyTo(location, prevLocation, transportMode, aspectRatio, mapStyle, trip.titleColor || '#FFFFFF', tripFontId);
+			const flyToBlob = await renderFlyTo(location, prevLocation, transportMode, aspectRatio, mapStyle, trip.titleColor || '#FFFFFF', tripFontId, secondaryColor);
 			console.log(`[TripStitch] Fly-to blob for "${location.name}":`, flyToBlob.size, 'bytes');
 			segments.push(flyToBlob);
 			const displayName = location.label || location.name.split(',')[0];
@@ -221,7 +223,8 @@ export async function assembleVideo(
 			routeGeometries,
 			mapStyle,
 			trip.titleColor || '#FFFFFF',
-			tripFontId
+			tripFontId,
+			secondaryColor
 		);
 		console.log(`[TripStitch] Final route blob:`, finalRouteBlob.size, 'bytes');
 		segments.push(finalRouteBlob);
@@ -229,12 +232,35 @@ export async function assembleVideo(
 
 		checkAbort();
 
-		// 4. Concatenate all segments
+		// 4. Load logo for watermark overlay if enabled
+		let logoOverlay: ((ctx: CanvasRenderingContext2D) => void) | undefined;
+		if (trip.showLogoOnTitle && logoUrl) {
+			try {
+				const logoImage = await loadImageFromUrl(logoUrl);
+				const logoSize = Math.round(width * 0.07);
+				const margin = Math.round(width * 0.04);
+				const scale = Math.min(logoSize / logoImage.naturalWidth, logoSize / logoImage.naturalHeight);
+				const drawW = logoImage.naturalWidth * scale;
+				const drawH = logoImage.naturalHeight * scale;
+				const lx = width - margin - drawW;
+				const ly = height - margin - drawH;
+				logoOverlay = (ctx) => {
+					ctx.save();
+					ctx.globalAlpha = 0.8;
+					ctx.drawImage(logoImage, lx, ly, drawW, drawH);
+					ctx.restore();
+				};
+			} catch {
+				console.warn('[TripStitch] Failed to load logo for watermark, skipping');
+			}
+		}
+
+		// 5. Concatenate all segments
 		console.log(`[TripStitch] Concatenating ${segments.length} segments`);
 		emit('finalize', `Stitching segment 1 of ${segments.length}...`);
 		const finalBlob = await concatenateBlobs(segments, width, height, (segIndex) => {
 			emit('finalize', `Stitching segment ${segIndex + 2} of ${segments.length}...`);
-		});
+		}, logoOverlay);
 		console.log(`[TripStitch] Final video blob:`, finalBlob.size, 'bytes', `(${(finalBlob.size / 1024 / 1024).toFixed(1)} MB)`);
 
 		const url = URL.createObjectURL(finalBlob);

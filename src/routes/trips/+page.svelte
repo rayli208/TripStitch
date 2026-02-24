@@ -4,6 +4,7 @@
 	import tripsState from '$lib/state/trips.svelte';
 	import profileState from '$lib/state/profile.svelte';
 	import toast from '$lib/state/toast.svelte';
+	import { getShareUrl } from '$lib/services/shareService';
 	import AppShell from '$lib/components/layout/AppShell.svelte';
 	import TripCard from '$lib/components/dashboard/TripCard.svelte';
 	import EmptyState from '$lib/components/dashboard/EmptyState.svelte';
@@ -33,6 +34,15 @@
 					Set up
 				</button>
 			</div>
+		{:else if profileState.hasProfile && profileState.profile}
+			<div class="flex justify-end">
+				<button
+					class="text-sm text-accent hover:text-accent-hover font-medium cursor-pointer transition-colors"
+					onclick={() => goto(`/u/${profileState.profile!.username}`)}
+				>
+					View My Profile
+				</button>
+			</div>
 		{/if}
 
 		{#if tripsState.loading}
@@ -44,7 +54,11 @@
 				{#each tripsState.trips as trip (trip.id)}
 					<TripCard
 						{trip}
-						onedit={() => goto(`/trip/${trip.id}/edit`)}
+						onlinks={() => goto(`/trip/${trip.id}/edit`)}
+						onshare={() => {
+							navigator.clipboard.writeText(getShareUrl(trip.id));
+							toast.success('Link copied!');
+						}}
 						ondelete={async () => {
 						try {
 							await tripsState.deleteTrip(trip.id);

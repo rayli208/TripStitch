@@ -1,4 +1,4 @@
-import type { Location, Clip, TransportMode, AspectRatio, AnimationStyle, MapStyle } from '$lib/types';
+import type { Location, Clip, TransportMode, AspectRatio, AnimationStyle, MapStyle, MusicSelection } from '$lib/types';
 
 export function createEditorState(initial?: {
 	title?: string;
@@ -6,6 +6,7 @@ export function createEditorState(initial?: {
 	titleDescription?: string;
 	fontId?: string;
 	mapStyle?: MapStyle;
+	tripDate?: string;
 	aspectRatio?: AspectRatio;
 	locations?: Location[];
 }) {
@@ -18,10 +19,17 @@ export function createEditorState(initial?: {
 	let titleMediaPreviewUrl = $state<string | null>(null);
 	let titleMediaType = $state<'photo' | 'video' | null>(null);
 	let showLogoOnTitle = $state(false);
-	let locations = $state<Location[]>(initial?.locations ? structuredClone(initial.locations) : []);
+	let locations = $state<Location[]>(initial?.locations ? initial.locations.map(l => ({
+		...l,
+		clips: l.clips.map(c => ({ ...c }))
+	})) : []);
 	let aspectRatio = $state<AspectRatio>(initial?.aspectRatio ?? '9:16');
 	let mapStyle = $state<MapStyle>(initial?.mapStyle ?? 'streets');
+	let tripDate = $state(initial?.tripDate ?? new Date().toISOString().slice(0, 10));
 	let keepOriginalAudio = $state(true);
+	let musicSelection = $state<MusicSelection | null>(null);
+	let musicVolume = $state(70);
+	let voiceOverVolume = $state(100);
 	let isExporting = $state(false);
 	let exportDone = $state(false);
 
@@ -91,11 +99,35 @@ export function createEditorState(initial?: {
 		set mapStyle(v: MapStyle) {
 			mapStyle = v;
 		},
+		get tripDate() {
+			return tripDate;
+		},
+		set tripDate(v: string) {
+			tripDate = v;
+		},
 		get keepOriginalAudio() {
 			return keepOriginalAudio;
 		},
 		set keepOriginalAudio(v: boolean) {
 			keepOriginalAudio = v;
+		},
+		get musicSelection() {
+			return musicSelection;
+		},
+		set musicSelection(v: MusicSelection | null) {
+			musicSelection = v;
+		},
+		get musicVolume() {
+			return musicVolume;
+		},
+		set musicVolume(v: number) {
+			musicVolume = v;
+		},
+		get voiceOverVolume() {
+			return voiceOverVolume;
+		},
+		set voiceOverVolume(v: number) {
+			voiceOverVolume = v;
 		},
 		get isExporting() {
 			return isExporting;
@@ -123,15 +155,19 @@ export function createEditorState(initial?: {
 			if (currentStep > 0) currentStep--;
 		},
 
-		addLocation(loc: { name: string; lat: number; lng: number }) {
+		addLocation(loc: { name: string; lat: number; lng: number; city: string | null; state: string | null; country: string | null }) {
 			if (!canAddLocation) return;
 			const newLoc: Location = {
 				id: crypto.randomUUID(),
 				order: locations.length,
 				name: loc.name,
 				label: loc.name.split(',')[0],
+				description: null,
 				lat: loc.lat,
 				lng: loc.lng,
+				city: loc.city ?? null,
+				state: loc.state ?? null,
+				country: loc.country ?? null,
 				clips: [],
 				transportMode: null,
 				rating: null
@@ -207,6 +243,13 @@ export function createEditorState(initial?: {
 			);
 		},
 
+		updateLocationDescription(id: string, description: string) {
+			const trimmed = description.trim();
+			locations = locations.map((l) =>
+				l.id === id ? { ...l, description: trimmed || null } : l
+			);
+		},
+
 		updateLocationRating(id: string, rating: number | null) {
 			locations = locations.map((l) =>
 				l.id === id ? { ...l, rating } : l
@@ -218,6 +261,12 @@ export function createEditorState(initial?: {
 			titleMediaFile = file;
 			titleMediaPreviewUrl = URL.createObjectURL(file);
 			titleMediaType = 'photo';
+		},
+
+		clearMusic() {
+			if (musicSelection?.previewUrl) URL.revokeObjectURL(musicSelection.previewUrl);
+			musicSelection = null;
+			musicVolume = 70;
 		},
 
 		removeTitleMedia() {

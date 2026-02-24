@@ -6,7 +6,7 @@
 	let {
 		onselect
 	}: {
-		onselect: (place: { name: string; lat: number; lng: number }) => void;
+		onselect: (place: { name: string; lat: number; lng: number; city: string | null; state: string | null; country: string | null }) => void;
 	} = $props();
 
 	let query = $state('');
@@ -57,15 +57,33 @@
 				{
 					headers: {
 						'X-Goog-Api-Key': PLACES_API_KEY,
-						'X-Goog-FieldMask': 'location,displayName'
+						'X-Goog-FieldMask': 'location,displayName,addressComponents'
 					}
 				}
 			);
 			const data = await res.json();
+
+			// Extract city, state, country from address components
+			let city: string | null = null;
+			let state: string | null = null;
+			let country: string | null = null;
+			if (data.addressComponents) {
+				for (const comp of data.addressComponents) {
+					const types: string[] = comp.types ?? [];
+					if (types.includes('locality')) city = comp.longText ?? comp.shortText;
+					else if (!city && types.includes('sublocality_level_1')) city = comp.longText ?? comp.shortText;
+					if (types.includes('administrative_area_level_1')) state = comp.longText ?? comp.shortText;
+					if (types.includes('country')) country = comp.longText ?? comp.shortText;
+				}
+			}
+
 			onselect({
 				name: suggestion.text,
 				lat: data.location.latitude,
-				lng: data.location.longitude
+				lng: data.location.longitude,
+				city,
+				state,
+				country
 			});
 			query = '';
 		} catch {
