@@ -24,6 +24,7 @@
 	},
 	"dependencies": {
 		"firebase": "^12.9.0",
+		"globe.gl": "^2.45.0",
 		"maplibre-gl": "^5.18.0"
 	}
 }

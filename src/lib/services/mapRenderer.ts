@@ -62,6 +62,7 @@ async function createOffscreenMap(
 		center,
 		zoom,
 		interactive: false,
+		pixelRatio: 1,
 		canvasContextAttributes: { antialias: true, preserveDrawingBuffer: true },
 		attributionControl: false
 	});
@@ -90,7 +91,7 @@ function destroyMap(map: maplibregl.Map, container: HTMLDivElement) {
 }
 
 /** Wait for all tiles to finish loading and rendering */
-function waitForIdle(map: maplibregl.Map, timeoutMs = 2000): Promise<void> {
+function waitForIdle(map: maplibregl.Map, timeoutMs = 4000): Promise<void> {
 	return new Promise((resolve) => {
 		const timeout = setTimeout(resolve, timeoutMs);
 		map.once('idle', () => {
@@ -240,7 +241,7 @@ export async function renderFlyTo(
 
 	// Phase timing
 	const ZOOM_OUT_MS = 1500;
-	const PAUSE_MS = 400;
+	const PAUSE_MS = 1200;
 	const ZOOM_IN_MS = 2000;
 	const HOLD_MS = 2000;
 	const zoomInAt = ZOOM_OUT_MS + PAUSE_MS;

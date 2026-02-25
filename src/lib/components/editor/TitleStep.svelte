@@ -44,7 +44,11 @@
 		onmedia?.(file);
 	}
 
-	const pickerColors = $derived(brandColors.length > 0 ? brandColors : DEFAULT_BRAND_COLORS);
+	const pickerColors = $derived(
+		brandColors.length > 0
+			? [...brandColors, ...DEFAULT_BRAND_COLORS.filter((c) => !brandColors.includes(c))]
+			: DEFAULT_BRAND_COLORS
+	);
 	const selectedFont = $derived(getFontById(fontId));
 </script>
 
@@ -87,15 +91,20 @@
 	<!-- Font Picker -->
 	<div>
 		<span class="block text-sm font-medium text-text-secondary mb-2">Font</span>
-		<div class="grid grid-cols-2 gap-2">
+		<div class="max-h-48 overflow-y-auto rounded-lg border border-border bg-card">
 			{#each FONTS as font (font.id)}
 				<button
-					class="px-3 py-2.5 rounded-lg border text-left transition-all cursor-pointer {fontId === font.id ? 'border-accent bg-accent-light' : 'border-border bg-card hover:border-primary-light'}"
+					class="w-full flex items-center justify-between px-3 py-2 text-left transition-colors cursor-pointer border-b border-border last:border-b-0 {fontId === font.id ? 'bg-accent-light' : 'hover:bg-card-hover'}"
 					style="font-family: {font.family}, system-ui, sans-serif"
 					onclick={() => (fontId = font.id)}
 					onmouseenter={() => preloadFont(font.id)}
 				>
 					<span class="text-sm text-text-primary">{font.name}</span>
+					{#if fontId === font.id}
+						<svg class="w-4 h-4 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+						</svg>
+					{/if}
 				</button>
 			{/each}
 		</div>
@@ -191,8 +200,12 @@
 	{/if}
 
 	<div class="flex justify-end pt-4">
-		<Button variant="primary" onclick={onnext}>
-			Next: Add Locations
+		<Button variant="primary" disabled={!title.trim()} onclick={onnext}>
+			{#if !title.trim()}
+				Enter a title to continue
+			{:else}
+				Next: Add Locations
+			{/if}
 		</Button>
 	</div>
 </div>

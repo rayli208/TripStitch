@@ -51,6 +51,7 @@
 
 	let canProceed = $derived(locations.length >= 2);
 	let activeLoc = $derived(locations[activeIndex] as Location | undefined);
+	let activeLocHasClips = $derived(activeLoc ? activeLoc.clips.length > 0 : false);
 
 	// Clip drag-and-drop state
 	let clipDragFromIndex: number | null = $state(null);
@@ -341,12 +342,21 @@
 
 		<!-- Add another stop button -->
 		{#if canAdd}
-			<button
-				class="w-full py-3 border-2 border-dashed border-border rounded-xl text-sm text-text-muted hover:border-primary-light hover:text-text-secondary transition-colors cursor-pointer"
-				onclick={addAnother}
-			>
-				+ Add another stop
-			</button>
+			{#if activeLocHasClips}
+				<button
+					class="w-full py-4 border-2 border-dashed border-accent/50 rounded-xl text-sm font-semibold text-accent hover:bg-accent/10 hover:border-accent transition-all cursor-pointer flex items-center justify-center gap-2"
+					onclick={addAnother}
+				>
+					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+					</svg>
+					Add another stop
+				</button>
+			{:else}
+				<div class="w-full py-3 border-2 border-dashed border-border rounded-xl text-sm text-text-muted text-center opacity-60">
+					Add a photo or video to this stop first
+				</div>
+			{/if}
 		{:else}
 			<p class="text-sm text-warning text-center">Maximum of 10 locations reached.</p>
 		{/if}

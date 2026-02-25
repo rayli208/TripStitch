@@ -1,5 +1,5 @@
 import type { Trip, VideoLinks } from '$lib/types';
-import { db } from '$lib/firebase';
+import { db, storage } from '$lib/firebase';
 import authState from './auth.svelte';
 import {
 	collection,
@@ -9,13 +9,19 @@ import {
 	deleteDoc,
 	onSnapshot,
 	query,
+	where,
 	orderBy,
 	type Unsubscribe
 } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { compressImage, imageExtension } from '$lib/utils/imageUtils';
+
+const tripsRef = collection(db, 'trips');
 
 /** Strip non-serializable fields (File objects, blob URLs) before saving to Firestore */
-function serializeTrip(trip: Trip) {
+function serializeTrip(trip: Trip, userId: string) {
 	return {
+		userId,
 		title: trip.title,
 		titleColor: trip.titleColor,
 		titleDescription: trip.titleDescription ?? '',
@@ -53,12 +59,6 @@ function createTripsState() {
 	let loading = $state(true);
 	let unsubscribe: Unsubscribe | null = null;
 
-	function getUserTripsRef() {
-		const uid = authState.user?.id;
-		if (!uid) return null;
-		return collection(db, 'users', uid, 'trips');
-	}
-
 	return {
 		get trips() {
 			return trips;
@@ -73,14 +73,14 @@ function createTripsState() {
 		/** Subscribe to real-time updates for the current user's trips */
 		subscribe() {
 			this.unsubscribe();
-			const ref = getUserTripsRef();
-			if (!ref) {
+			const uid = authState.user?.id;
+			if (!uid) {
 				trips = [];
 				loading = false;
 				return;
 			}
 			loading = true;
-			const q = query(ref, orderBy('createdAt', 'desc'));
+			const q = query(tripsRef, where('userId', '==', uid), orderBy('createdAt', 'desc'));
 			unsubscribe = onSnapshot(q, (snapshot) => {
 				trips = snapshot.docs.map((d) => {
 					const data = d.data();
@@ -151,9 +151,28 @@ function createTripsState() {
 		},
 
 		async addTrip(trip: Trip) {
-			const ref = getUserTripsRef();
-			if (!ref) return;
-			const docRef = await addDoc(ref, serializeTrip(trip));
+			const uid = authState.user?.id;
+			if (!uid) return;
+
+			const data = serializeTrip(trip, uid);
+
+			// Upload cover image to Storage if present
+			if (trip.titleMediaFile) {
+				try {
+					const compressed = await compressImage(trip.titleMediaFile, 1200, 0.8);
+					const ext = imageExtension(compressed);
+					const imgRef = storageRef(storage, `trips/${trip.id}/cover.${ext}`);
+					await uploadBytes(imgRef, compressed, {
+						contentType: compressed.type,
+						cacheControl: 'public, max-age=31536000'
+					});
+					(data as any).coverImageUrl = await getDownloadURL(imgRef);
+				} catch (err) {
+					console.warn('[Trips] Cover image upload failed:', err);
+				}
+			}
+
+			const docRef = await addDoc(tripsRef, data);
 			return docRef.id;
 		},
 
@@ -164,7 +183,7 @@ function createTripsState() {
 		async updateTrip(id: string, updates: Partial<Trip>) {
 			const uid = authState.user?.id;
 			if (!uid) return;
-			const docRef = doc(db, 'users', uid, 'trips', id);
+			const docRef = doc(db, 'trips', id);
 			const data: Record<string, unknown> = {};
 			if (updates.title !== undefined) data.title = updates.title;
 			if (updates.titleColor !== undefined) data.titleColor = updates.titleColor;
@@ -202,21 +221,14 @@ function createTripsState() {
 		async updateVideoLinks(id: string, videoLinks: VideoLinks) {
 			const uid = authState.user?.id;
 			if (!uid) return;
-			const docRef = doc(db, 'users', uid, 'trips', id);
+			const docRef = doc(db, 'trips', id);
 			await updateDoc(docRef, { videoLinks });
 		},
 
 		async deleteTrip(id: string) {
 			const uid = authState.user?.id;
 			if (!uid) return;
-			// Delete from user's private collection
-			await deleteDoc(doc(db, 'users', uid, 'trips', id));
-			// Also delete from public shared collection
-			try {
-				await deleteDoc(doc(db, 'trips', id));
-			} catch {
-				// Ignore if public copy doesn't exist
-			}
+			await deleteDoc(doc(db, 'trips', id));
 		}
 	};
 }

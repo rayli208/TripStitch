@@ -65,18 +65,15 @@ export async function assembleVideo(
 
 	const tripFontId = trip.fontId ?? 'inter';
 
-	// Calculate total steps for progress including finalize (concatenation) phase
-	let processSteps = locations.length + 2; // maps + title + route
-	let estimatedSegments = 2; // title blob + route blob
+	// Calculate total steps — one per export checklist item
+	let totalSteps = 1 + 1 + 1; // title + route + finalize
 	for (const loc of locations) {
-		estimatedSegments += 1; // fly-to blob
+		totalSteps += 1; // map fly-to
 		if (loc.clips.some((c) => c.file)) {
-			processSteps += 1; // clip processing step
-			estimatedSegments += 3; // flash + clip + flash
+			totalSteps += 1; // clip processing
 		}
 	}
-	let totalSteps = processSteps + estimatedSegments;
-	console.log('[TripStitch] Total steps:', totalSteps, `(${processSteps} process + ${estimatedSegments} finalize)`);
+	console.log('[TripStitch] Total steps:', totalSteps);
 
 	let currentStep = 0;
 	const segments: Blob[] = [];
@@ -137,7 +134,7 @@ export async function assembleVideo(
 			}
 
 			// 1. Map fly-to animation
-			emit('map', `Rendering map for ${location.name}...`);
+			emit(`map-${location.id}`, `Rendering map for ${location.name}...`);
 			console.log(`[TripStitch] Rendering fly-to for "${location.name}" (${location.lat}, ${location.lng})`);
 			const flyToBlob = await renderFlyTo(location, prevLocation, transportMode, aspectRatio, mapStyle, trip.titleColor || '#FFFFFF', tripFontId, secondaryColor);
 			console.log(`[TripStitch] Fly-to blob for "${location.name}":`, flyToBlob.size, 'bytes');
@@ -155,7 +152,7 @@ export async function assembleVideo(
 				.sort((a, b) => a.order - b.order);
 
 			if (clipsWithFiles.length > 0) {
-				emit('clip', `Processing ${clipsWithFiles.length} clip(s) from ${location.name}...`);
+				emit(`clip-${location.id}`, `Processing ${clipsWithFiles.length} clip(s) from ${location.name}...`);
 				const clipBlobs: Blob[] = [];
 				let combinedDuration = 0;
 
@@ -257,9 +254,10 @@ export async function assembleVideo(
 
 		// 5. Concatenate all segments
 		console.log(`[TripStitch] Concatenating ${segments.length} segments`);
-		emit('finalize', `Stitching segment 1 of ${segments.length}...`);
+		emit('finalize', `Stitching ${segments.length} segments together...`);
 		const finalBlob = await concatenateBlobs(segments, width, height, (segIndex) => {
-			emit('finalize', `Stitching segment ${segIndex + 2} of ${segments.length}...`);
+			// Update message without incrementing currentStep
+			onProgress?.({ step: 'finalize', message: `Stitching segment ${segIndex + 2} of ${segments.length}...`, current: currentStep, total: totalSteps });
 		}, logoOverlay);
 		console.log(`[TripStitch] Final video blob:`, finalBlob.size, 'bytes', `(${(finalBlob.size / 1024 / 1024).toFixed(1)} MB)`);
 

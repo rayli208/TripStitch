@@ -7,7 +7,7 @@
 	import type { AssemblyProgress, VideoSegmentInfo } from '$lib/services/videoAssembler';
 	import type { ExportStepItem } from '$lib/components/editor/ExportStep.svelte';
 	import { checkBrowserSupport, getSupportedMimeType, getFileExtension } from '$lib/utils/browserCompat';
-	import { publishTrip, getShareUrl } from '$lib/services/shareService';
+	import { getShareUrl } from '$lib/services/shareService';
 	import { estimateVideoDuration } from '$lib/utils/durationEstimate';
 	import toast from '$lib/state/toast.svelte';
 	import { DEFAULT_BRAND_COLORS } from '$lib/constants/fonts';
@@ -64,8 +64,9 @@
 
 	const durationEstimate = $derived(estimateVideoDuration(editor.locations, videoDurations));
 
-	// Export elapsed timer
+	// Export elapsed timer — uses wall-clock time so it doesn't drift when the main thread is blocked
 	let exportElapsed = $state<number | undefined>(undefined);
+	let exportStartTime = 0;
 	let elapsedInterval: ReturnType<typeof setInterval> | undefined;
 
 	// Navigation guards
@@ -119,6 +120,19 @@
 	});
 
 	async function handleExport() {
+		// Guard against double-clicks
+		if (isExporting) return;
+
+		isExporting = true;
+		exportDone = false;
+		error = null;
+		shareUrl = null;
+		progress = { step: 'init', message: 'Saving trip...', current: 0, total: 1 };
+		abortController = new AbortController();
+		exportElapsed = 0;
+		exportStartTime = Date.now();
+		elapsedInterval = setInterval(() => { exportElapsed = Math.floor((Date.now() - exportStartTime) / 1000); }, 500);
+
 		// Save trip to Firestore first
 		const tripId = crypto.randomUUID();
 		const tripData = {
@@ -141,14 +155,7 @@
 
 		await tripsState.addTrip(tripData);
 
-		isExporting = true;
-		exportDone = false;
-		error = null;
-		shareUrl = null;
 		progress = { step: 'init', message: 'Getting things ready...', current: 0, total: 1 };
-		abortController = new AbortController();
-		exportElapsed = 0;
-		elapsedInterval = setInterval(() => { exportElapsed = (exportElapsed ?? 0) + 1; }, 1000);
 
 		try {
 			const { assembleVideo } = await import('$lib/services/videoAssembler');
@@ -171,16 +178,7 @@
 			isExporting = false;
 			exportDone = true;
 			progress = { step: 'done', message: 'Your video is ready!', current: 1, total: 1 };
-
-			// Publish to public collection if user has a profile
-			if (profileState.hasProfile && authState.user) {
-				try {
-					await publishTrip(tripData, authState.user.id, profileState.profile!);
-					shareUrl = getShareUrl(tripId);
-				} catch (err) {
-					console.warn('[TripStitch] Failed to publish trip:', err);
-				}
-			}
+			shareUrl = getShareUrl(tripId);
 		} catch (err) {
 			isExporting = false;
 			if ((err as Error).message === 'Export cancelled') {

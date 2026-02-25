@@ -1,8 +1,8 @@
-import type { UserProfile, SocialLinks } from '$lib/types';
+import type { UserProfile, SocialLinks, GlobeStyle, MapDisplay } from '$lib/types';
 import { DEFAULT_FONT_ID } from '$lib/constants/fonts';
 import { db, storage } from '$lib/firebase';
 import authState from './auth.svelte';
-import { doc, getDoc, setDoc, deleteDoc, runTransaction, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, runTransaction } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { compressImage, imageExtension } from '$lib/utils/imageUtils';
 
@@ -41,6 +41,8 @@ function createProfileState() {
 					data.brandColors = data.brandColors ?? [];
 					data.secondaryColor = data.secondaryColor ?? '#0a0f1e';
 					data.preferredFontId = data.preferredFontId ?? DEFAULT_FONT_ID;
+					data.globeStyle = data.globeStyle ?? 'dark';
+					data.mapDisplay = data.mapDisplay ?? 'globe';
 					profile = data;
 				} else {
 					profile = null;
@@ -61,68 +63,57 @@ function createProfileState() {
 			brandColors?: string[];
 			secondaryColor?: string;
 			preferredFontId?: string;
+			globeStyle?: GlobeStyle;
+			mapDisplay?: MapDisplay;
 		}): Promise<{ ok: boolean; error?: string }> {
 			const uid = authState.user?.id;
 			if (!uid) return { ok: false, error: 'Not signed in' };
 
-			const newUsername = updates.username.toLowerCase().trim();
+			const newUsername = (updates.username ?? '').toLowerCase().trim();
 			if (!newUsername) return { ok: false, error: 'Username is required' };
 			if (!/^[a-z0-9_]{3,24}$/.test(newUsername)) {
 				return { ok: false, error: 'Username must be 3-24 chars: letters, numbers, underscores' };
 			}
 
 			const oldUsername = profile?.username;
-			const usernameChanged = oldUsername !== newUsername;
+
+			const profileData: UserProfile = {
+				username: newUsername,
+				displayName: updates.displayName,
+				bio: updates.bio,
+				avatarUrl: authState.user?.avatarUrl ?? '',
+				logoUrl: profile?.logoUrl ?? null,
+				socialLinks: updates.socialLinks,
+				brandColors: updates.brandColors ?? profile?.brandColors ?? [],
+				secondaryColor: updates.secondaryColor ?? profile?.secondaryColor ?? '#0a0f1e',
+				preferredFontId: updates.preferredFontId ?? profile?.preferredFontId ?? DEFAULT_FONT_ID,
+				globeStyle: updates.globeStyle ?? profile?.globeStyle ?? 'dark',
+				mapDisplay: updates.mapDisplay ?? profile?.mapDisplay ?? 'globe',
+				createdAt: profile?.createdAt ?? new Date().toISOString()
+			};
 
 			try {
-				if (usernameChanged) {
-					// Atomic transaction: claim new username, release old one
-					await runTransaction(db, async (tx) => {
-						const newUsernameRef = doc(db, 'usernames', newUsername);
-						const existing = await tx.get(newUsernameRef);
-						if (existing.exists() && existing.data()?.uid !== uid) {
-							throw new Error('Username is already taken');
-						}
+				// Always use a transaction to guarantee username uniqueness
+				await runTransaction(db, async (tx) => {
+					const newUsernameRef = doc(db, 'usernames', newUsername);
+					const existing = await tx.get(newUsernameRef);
 
-						// Claim new username
-						tx.set(newUsernameRef, { uid });
+					// Check if username is taken by someone else
+					if (existing.exists() && existing.data()?.uid !== uid) {
+						throw new Error('Username is already taken');
+					}
 
-						// Release old username
-						if (oldUsername && oldUsername !== newUsername) {
-							tx.delete(doc(db, 'usernames', oldUsername));
-						}
+					// Claim the username (idempotent if already ours)
+					tx.set(newUsernameRef, { uid });
 
-						// Update profile
-						const profileData: UserProfile = {
-							username: newUsername,
-							displayName: updates.displayName,
-							bio: updates.bio,
-							avatarUrl: authState.user?.avatarUrl ?? '',
-							logoUrl: profile?.logoUrl ?? null,
-							socialLinks: updates.socialLinks,
-							brandColors: updates.brandColors ?? profile?.brandColors ?? [],
-							secondaryColor: updates.secondaryColor ?? profile?.secondaryColor ?? '#0a0f1e',
-							preferredFontId: updates.preferredFontId ?? profile?.preferredFontId ?? DEFAULT_FONT_ID,
-							createdAt: profile?.createdAt ?? new Date().toISOString()
-						};
-						tx.set(doc(db, 'users', uid, 'profile', 'main'), profileData);
-					});
-				} else {
-					// No username change, simple update
-					const profileData: UserProfile = {
-						username: newUsername,
-						displayName: updates.displayName,
-						bio: updates.bio,
-						avatarUrl: authState.user?.avatarUrl ?? '',
-						logoUrl: profile?.logoUrl ?? null,
-						socialLinks: updates.socialLinks,
-						brandColors: updates.brandColors ?? profile?.brandColors ?? [],
-						secondaryColor: updates.secondaryColor ?? profile?.secondaryColor ?? '#0a0f1e',
-						preferredFontId: updates.preferredFontId ?? profile?.preferredFontId ?? DEFAULT_FONT_ID,
-						createdAt: profile?.createdAt ?? new Date().toISOString()
-					};
-					await setDoc(doc(db, 'users', uid, 'profile', 'main'), profileData);
-				}
+					// Release old username if it changed
+					if (oldUsername && oldUsername !== newUsername) {
+						tx.delete(doc(db, 'usernames', oldUsername));
+					}
+
+					// Write profile
+					tx.set(doc(db, 'users', uid, 'profile', 'main'), profileData);
+				});
 
 				// Reload
 				await this.load();
@@ -191,28 +182,12 @@ function createProfileState() {
 		/** Look up a username and return the uid */
 		async resolveUsername(username: string): Promise<string | null> {
 			const lower = username.toLowerCase();
-
-			// Try the usernames index first
 			try {
 				const snap = await getDoc(doc(db, 'usernames', lower));
 				if (snap.exists()) return snap.data().uid as string;
 			} catch (err) {
-				console.warn('[Profile] usernames lookup failed, trying fallback:', err);
+				console.warn('[Profile] username lookup failed:', err);
 			}
-
-			// Fallback: find a shared trip with this username (trips collection is public)
-			try {
-				const q = query(
-					collection(db, 'trips'),
-					where('username', '==', lower),
-					limit(1)
-				);
-				const snap = await getDocs(q);
-				if (!snap.empty) return snap.docs[0].data().userId as string;
-			} catch (err) {
-				console.warn('[Profile] trips username fallback failed:', err);
-			}
-
 			return null;
 		},
 

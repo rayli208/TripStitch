@@ -13,6 +13,10 @@ export type AnimationStyle = 'kenBurns' | 'zoomIn' | 'panHorizontal' | 'static';
 
 export type MapStyle = 'streets' | 'satellite' | 'outdoor' | 'topo' | 'dark' | 'light';
 
+export type GlobeStyle = MapStyle | 'custom';
+
+export type MapDisplay = 'globe' | 'map';
+
 export interface SocialLinks {
 	instagram?: string;
 	youtube?: string;
@@ -30,6 +34,8 @@ export interface UserProfile {
 	brandColors: string[];
 	secondaryColor: string;
 	preferredFontId: string;
+	globeStyle: GlobeStyle;
+	mapDisplay: MapDisplay;
 	createdAt: string;
 }
 
@@ -62,7 +68,6 @@ export interface VideoLinks {
 	youtube?: string;
 	instagram?: string;
 	tiktok?: string;
-	other?: string;
 }
 
 export interface Trip {

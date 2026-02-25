@@ -15,7 +15,23 @@ export const FONTS: FontDef[] = [
 	{ id: 'oswald', name: 'Oswald', family: 'Oswald', weights: [400, 700] },
 	{ id: 'poppins', name: 'Poppins', family: 'Poppins', weights: [400, 700, 800] },
 	{ id: 'raleway', name: 'Raleway', family: 'Raleway', weights: [400, 700, 800] },
-	{ id: 'bebas', name: 'Bebas Neue', family: 'Bebas Neue', weights: [400] }
+	{ id: 'bebas', name: 'Bebas Neue', family: 'Bebas Neue', weights: [400] },
+	{ id: 'dmserif', name: 'DM Serif Display', family: 'DM Serif Display', weights: [400] },
+	{ id: 'spacegrotesk', name: 'Space Grotesk', family: 'Space Grotesk', weights: [400, 700] },
+	{ id: 'archivo', name: 'Archivo', family: 'Archivo', weights: [400, 700, 800] },
+	{ id: 'sourceserif', name: 'Source Serif 4', family: 'Source Serif 4', weights: [400, 700] },
+	{ id: 'spacemono', name: 'Space Mono', family: 'Space Mono', weights: [400, 700] },
+	{ id: 'crimsontext', name: 'Crimson Text', family: 'Crimson Text', weights: [400, 700] },
+	{ id: 'bitter', name: 'Bitter', family: 'Bitter', weights: [400, 700, 800] },
+	{ id: 'cabin', name: 'Cabin', family: 'Cabin', weights: [400, 700] },
+	{ id: 'kanit', name: 'Kanit', family: 'Kanit', weights: [400, 700] },
+	{ id: 'archivo-narrow', name: 'Archivo Narrow', family: 'Archivo Narrow', weights: [400, 700] },
+	{ id: 'librebaskerville', name: 'Libre Baskerville', family: 'Libre Baskerville', weights: [400, 700] },
+	{ id: 'josefinsans', name: 'Josefin Sans', family: 'Josefin Sans', weights: [400, 700] },
+	{ id: 'anton', name: 'Anton', family: 'Anton', weights: [400] },
+	{ id: 'righteous', name: 'Righteous', family: 'Righteous', weights: [400] },
+	{ id: 'permanentmarker', name: 'Permanent Marker', family: 'Permanent Marker', weights: [400] },
+	{ id: 'satisfy', name: 'Satisfy', family: 'Satisfy', weights: [400] }
 ];
 
 export const DEFAULT_FONT_ID = 'inter';

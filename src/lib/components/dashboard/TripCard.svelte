@@ -16,8 +16,8 @@
 	let confirmingDelete = $state(false);
 
 	let locationCount = $derived(trip.locations.length);
-	let linkCount = $derived(
-		Object.values(trip.videoLinks ?? {}).filter(v => v).length
+	let hasLinks = $derived(
+		Object.values(trip.videoLinks ?? {}).some(v => v)
 	);
 	let dateLabel = $derived(
 		new Date(trip.tripDate || trip.createdAt).toLocaleDateString('en-US', {
@@ -75,7 +75,7 @@
 				class="flex-1 text-sm py-2 rounded-lg bg-accent hover:bg-accent-hover text-white transition-colors cursor-pointer"
 				onclick={onlinks}
 			>
-				{linkCount > 0 ? `Links (${linkCount})` : 'Add Links'}
+				{hasLinks ? 'Edit Link' : 'Add Link'}
 			</button>
 			{#if onshare}
 				<button
