@@ -56,6 +56,7 @@
 	];
 
 	let fontSearch = $state('');
+	const selectedFontDef = $derived(FONTS.find(f => f.id === preferredFontId) ?? FONTS[0]);
 	let saving = $state(false);
 	let errorMsg = $state<string | null>(null);
 	let logoUploading = $state(false);
@@ -357,6 +358,18 @@
 						<!-- Font -->
 						<div>
 							<span class="block text-sm font-medium text-text-secondary mb-1.5">Default Font</span>
+							<div
+								class="flex items-center justify-between px-3 py-2.5 rounded-lg border border-accent bg-accent-light mb-2"
+								style="font-family: {selectedFontDef.family}, system-ui, sans-serif"
+							>
+								<div class="flex items-center gap-2">
+									<span class="text-sm font-medium text-text-primary">{selectedFontDef.name}</span>
+									<span class="text-[10px] text-text-muted px-1.5 py-0.5 rounded bg-border/60">Selected</span>
+								</div>
+								<svg class="w-4 h-4 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+								</svg>
+							</div>
 							<input
 								type="text"
 								placeholder="Search fonts..."
@@ -364,19 +377,14 @@
 								class="w-full rounded-lg border border-border bg-page px-3 py-1.5 text-sm text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent mb-2"
 							/>
 							<div class="max-h-40 overflow-y-auto rounded-lg border border-border bg-page">
-								{#each FONTS.filter(f => f.name.toLowerCase().includes(fontSearch.toLowerCase())) as font (font.id)}
+								{#each FONTS.filter(f => f.id !== preferredFontId && f.name.toLowerCase().includes(fontSearch.toLowerCase())) as font (font.id)}
 									<button
-										class="w-full flex items-center justify-between px-3 py-1.5 text-left transition-colors cursor-pointer border-b border-border last:border-b-0 {preferredFontId === font.id ? 'bg-accent-light' : 'hover:bg-card-hover'}"
+										class="w-full flex items-center justify-between px-3 py-1.5 text-left transition-colors cursor-pointer border-b border-border last:border-b-0 hover:bg-card-hover"
 										style="font-family: {font.family}, system-ui, sans-serif"
 										onclick={() => (preferredFontId = font.id)}
 										onmouseenter={() => preloadFont(font.id)}
 									>
 										<span class="text-sm text-text-primary">{font.name}</span>
-										{#if preferredFontId === font.id}
-											<svg class="w-4 h-4 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-											</svg>
-										{/if}
 									</button>
 								{/each}
 							</div>
