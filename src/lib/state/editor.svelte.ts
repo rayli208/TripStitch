@@ -5,6 +5,7 @@ export function createEditorState(initial?: {
 	titleColor?: string;
 	titleDescription?: string;
 	fontId?: string;
+	secondaryColor?: string;
 	mapStyle?: MapStyle;
 	tripDate?: string;
 	aspectRatio?: AspectRatio;
@@ -15,6 +16,7 @@ export function createEditorState(initial?: {
 	let titleColor = $state(initial?.titleColor ?? '#FFFFFF');
 	let titleDescription = $state(initial?.titleDescription ?? '');
 	let fontId = $state(initial?.fontId ?? 'inter');
+	let secondaryColor = $state(initial?.secondaryColor ?? '#0a0f1e');
 	let titleMediaFile = $state<File | null>(null);
 	let titleMediaPreviewUrl = $state<string | null>(null);
 	let titleMediaType = $state<'photo' | 'video' | null>(null);
@@ -68,6 +70,12 @@ export function createEditorState(initial?: {
 		},
 		set fontId(v: string) {
 			fontId = v;
+		},
+		get secondaryColor() {
+			return secondaryColor;
+		},
+		set secondaryColor(v: string) {
+			secondaryColor = v;
 		},
 		get titleMediaFile() {
 			return titleMediaFile;

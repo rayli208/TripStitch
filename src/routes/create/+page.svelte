@@ -28,10 +28,13 @@
 		fontId: profileState.profile?.preferredFontId ?? 'inter'
 	});
 
-	// Update font from profile once it loads
+	// Update font + secondary color from profile once it loads
 	$effect(() => {
 		if (profileState.profile?.preferredFontId && editor.fontId === 'inter') {
 			editor.fontId = profileState.profile.preferredFontId;
+		}
+		if (profileState.profile?.secondaryColor && editor.secondaryColor === '#0a0f1e') {
+			editor.secondaryColor = profileState.profile.secondaryColor;
 		}
 	});
 
@@ -169,7 +172,7 @@
 				abortController.signal,
 				editor.mapStyle,
 				profileState.profile?.logoUrl,
-				profileState.profile?.secondaryColor ?? '#0a0f1e'
+				editor.secondaryColor
 			);
 
 			videoBlob = result.blob;
@@ -271,7 +274,9 @@
 			bind:tripDate={editor.tripDate}
 			bind:showLogoOnTitle={editor.showLogoOnTitle}
 			{brandColors}
-			secondaryColor={profileState.profile?.secondaryColor ?? '#0a0f1e'}
+			bind:secondaryColor={editor.secondaryColor}
+			profileSecondaryColor={profileState.profile?.secondaryColor ?? '#0a0f1e'}
+			preferredFontId={profileState.profile?.preferredFontId}
 			titleMediaPreviewUrl={editor.titleMediaPreviewUrl}
 			logoUrl={profileState.profile?.logoUrl ?? null}
 			onmedia={(file) => editor.updateTitleMedia(file)}

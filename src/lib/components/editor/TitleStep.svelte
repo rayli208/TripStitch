@@ -13,7 +13,9 @@
 		tripDate = $bindable(''),
 		showLogoOnTitle = $bindable(false),
 		brandColors = [],
-		secondaryColor = '#0a0f1e',
+		secondaryColor = $bindable('#0a0f1e'),
+		profileSecondaryColor = '#0a0f1e',
+		preferredFontId = undefined,
 		titleMediaPreviewUrl = null,
 		logoUrl = null,
 		onmedia,
@@ -28,6 +30,8 @@
 		showLogoOnTitle?: boolean;
 		brandColors?: string[];
 		secondaryColor?: string;
+		profileSecondaryColor?: string;
+		preferredFontId?: string;
 		titleMediaPreviewUrl?: string | null;
 		logoUrl?: string | null;
 		onmedia?: (file: File) => void;
@@ -44,12 +48,25 @@
 		onmedia?.(file);
 	}
 
+	const primaryBrandColor = $derived(brandColors.length > 0 ? brandColors[0] : undefined);
 	const pickerColors = $derived(
 		brandColors.length > 0
 			? [...brandColors, ...DEFAULT_BRAND_COLORS.filter((c) => !brandColors.includes(c))]
 			: DEFAULT_BRAND_COLORS
 	);
+	const SECONDARY_COLORS = ['#0a0f1e', '#1a1a2e', '#0f172a', '#1e293b', '#18181b', '#27272a', '#1c1917', '#172554', '#14532d', '#4c0519'];
+	const secondaryPickerColors = $derived(
+		profileSecondaryColor && !SECONDARY_COLORS.includes(profileSecondaryColor)
+			? [profileSecondaryColor, ...SECONDARY_COLORS]
+			: SECONDARY_COLORS
+	);
+	const primarySecondaryColor = $derived(profileSecondaryColor !== '#0a0f1e' ? profileSecondaryColor : undefined);
+
 	const selectedFont = $derived(getFontById(fontId));
+	const preferredFont = $derived(preferredFontId ? getFontById(preferredFontId) : null);
+	const otherFonts = $derived(
+		preferredFontId ? FONTS.filter((f) => f.id !== preferredFontId) : FONTS
+	);
 </script>
 
 <svelte:head>
@@ -85,14 +102,36 @@
 
 	<div>
 		<span class="block text-sm font-medium text-text-secondary mb-2">Title Color</span>
-		<ColorPicker bind:selected={titleColor} colors={pickerColors} />
+		<ColorPicker bind:selected={titleColor} colors={pickerColors} primaryColor={primaryBrandColor} />
+	</div>
+
+	<div>
+		<span class="block text-sm font-medium text-text-secondary mb-2">Background Color</span>
+		<ColorPicker bind:selected={secondaryColor} colors={secondaryPickerColors} primaryColor={primarySecondaryColor} />
 	</div>
 
 	<!-- Font Picker -->
 	<div>
 		<span class="block text-sm font-medium text-text-secondary mb-2">Font</span>
+		{#if preferredFont}
+			<button
+				class="w-full flex items-center justify-between px-3 py-2 text-left transition-colors cursor-pointer rounded-lg border mb-2 {fontId === preferredFont.id ? 'border-accent bg-accent-light' : 'border-border bg-card hover:bg-card-hover'}"
+				style="font-family: {preferredFont.family}, system-ui, sans-serif"
+				onclick={() => (fontId = preferredFont.id)}
+			>
+				<div class="flex items-center gap-2">
+					<span class="text-sm text-text-primary">{preferredFont.name}</span>
+					<span class="text-[10px] text-text-muted px-1.5 py-0.5 rounded bg-border/60">Your font</span>
+				</div>
+				{#if fontId === preferredFont.id}
+					<svg class="w-4 h-4 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+					</svg>
+				{/if}
+			</button>
+		{/if}
 		<div class="max-h-48 overflow-y-auto rounded-lg border border-border bg-card">
-			{#each FONTS as font (font.id)}
+			{#each otherFonts as font (font.id)}
 				<button
 					class="w-full flex items-center justify-between px-3 py-2 text-left transition-colors cursor-pointer border-b border-border last:border-b-0 {fontId === font.id ? 'bg-accent-light' : 'hover:bg-card-hover'}"
 					style="font-family: {font.family}, system-ui, sans-serif"
@@ -166,9 +205,9 @@
 					<img src={titleMediaPreviewUrl} alt="Cover" class="absolute inset-0 w-full h-full object-cover" />
 					<div class="absolute inset-0 bg-overlay/40"></div>
 					<div class="relative text-center px-6 py-4 rounded-xl" style="background: {secondaryColor}bf">
-						<p class="text-2xl font-bold" style="color: {secondaryColor < '#808080' ? '#FFFFFF' : '#0a0f1e'}; font-family: {fontFamily(fontId)}">{title}</p>
+						<p class="text-2xl font-bold" style="color: {titleColor}; font-family: {fontFamily(fontId)}">{title}</p>
 						{#if titleDescription}
-							<p class="text-sm mt-1 opacity-70" style="color: {secondaryColor < '#808080' ? '#FFFFFF' : '#0a0f1e'}; font-family: {fontFamily(fontId)}">{titleDescription}</p>
+							<p class="text-sm mt-1 opacity-70" style="color: {titleColor}; font-family: {fontFamily(fontId)}">{titleDescription}</p>
 						{/if}
 					</div>
 					{#if showLogoOnTitle && logoUrl}
@@ -182,9 +221,9 @@
 			{:else}
 				<div class="relative h-40 flex items-center justify-center" style="background: linear-gradient(to bottom, #0a0a0a, #1a1a2e, #0a0a0a)">
 					<div class="relative text-center px-6 py-4 rounded-xl" style="background: {secondaryColor}bf">
-						<p class="text-2xl font-bold" style="color: {secondaryColor < '#808080' ? '#FFFFFF' : '#0a0f1e'}; font-family: {fontFamily(fontId)}">{title}</p>
+						<p class="text-2xl font-bold" style="color: {titleColor}; font-family: {fontFamily(fontId)}">{title}</p>
 						{#if titleDescription}
-							<p class="text-sm mt-1 opacity-70" style="color: {secondaryColor < '#808080' ? '#FFFFFF' : '#0a0f1e'}; font-family: {fontFamily(fontId)}">{titleDescription}</p>
+							<p class="text-sm mt-1 opacity-70" style="color: {titleColor}; font-family: {fontFamily(fontId)}">{titleDescription}</p>
 						{/if}
 					</div>
 					{#if showLogoOnTitle && logoUrl}
