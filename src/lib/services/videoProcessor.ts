@@ -398,6 +398,149 @@ function buildAnimationDrawFn(
 	}
 }
 
+// ─── Direct-draw functions for single-pass recording ───
+// These draw directly to a provided master canvas context,
+// without creating internal MediaRecorder sessions.
+
+type FrameCallback = (ctx: CanvasRenderingContext2D) => void;
+
+/** Play a video file directly to a provided canvas context (no internal recorder).
+ *  Returns the actual duration played in seconds. */
+export async function playVideoToCanvas(
+	file: File,
+	ctx: CanvasRenderingContext2D,
+	width: number,
+	height: number,
+	maxDurationSec = 30,
+	frameCallback?: FrameCallback
+): Promise<number> {
+	console.log(`[VideoProcessor] playVideoToCanvas: ${file.name}, ${(file.size / 1024 / 1024).toFixed(1)}MB`);
+	const video = document.createElement('video');
+	video.muted = true;
+	video.playsInline = true;
+	video.src = URL.createObjectURL(file);
+
+	await new Promise<void>((resolve, reject) => {
+		video.onloadedmetadata = () => resolve();
+		video.onerror = () => reject(new Error('Failed to load video'));
+	});
+
+	const duration = Math.min(video.duration, maxDurationSec);
+	console.log(`[VideoProcessor] Video loaded: ${video.videoWidth}x${video.videoHeight}, duration: ${video.duration.toFixed(1)}s (using ${duration.toFixed(1)}s)`);
+
+	video.currentTime = 0;
+	await video.play();
+
+	const startTime = performance.now();
+	await new Promise<void>((resolve) => {
+		const drawFrame = () => {
+			if (video.ended || video.currentTime >= duration) {
+				resolve();
+				return;
+			}
+			drawCover(ctx, video, width, height);
+			frameCallback?.(ctx);
+			requestAnimationFrame(drawFrame);
+		};
+		drawFrame();
+	});
+
+	video.pause();
+	const actualDuration = (performance.now() - startTime) / 1000;
+	URL.revokeObjectURL(video.src);
+	console.log(`[VideoProcessor] Video played to canvas: ${actualDuration.toFixed(1)}s`);
+	return actualDuration;
+}
+
+/** Draw a photo animation directly to a provided canvas context (no internal recorder).
+ *  Reuses buildAnimationDrawFn for the animation logic. */
+export async function drawPhotoAnimationToCanvas(
+	file: File,
+	ctx: CanvasRenderingContext2D,
+	width: number,
+	height: number,
+	style: AnimationStyle = 'kenBurns',
+	durationSec = 3,
+	frameCallback?: FrameCallback
+): Promise<void> {
+	const img = new Image();
+	const imgUrl = URL.createObjectURL(file);
+	img.src = imgUrl;
+
+	await new Promise<void>((resolve, reject) => {
+		img.onload = () => resolve();
+		img.onerror = () => reject(new Error('Failed to load photo'));
+	});
+
+	const srcW = img.naturalWidth;
+	const srcH = img.naturalHeight;
+	const srcAspect = srcW / srcH;
+	const tgtAspect = width / height;
+
+	let cropW: number, cropH: number, baseSx: number, baseSy: number;
+	if (srcAspect > tgtAspect) {
+		cropH = srcH;
+		cropW = srcH * tgtAspect;
+		baseSx = (srcW - cropW) / 2;
+		baseSy = 0;
+	} else {
+		cropW = srcW;
+		cropH = srcW / tgtAspect;
+		baseSx = 0;
+		baseSy = (srcH - cropH) / 2;
+	}
+
+	const drawAnimatedFrame = buildAnimationDrawFn(style, {
+		ctx, img, width, height,
+		cropW, cropH, baseSx, baseSy
+	});
+
+	const startTime = performance.now();
+	const durationMs = durationSec * 1000;
+
+	await new Promise<void>((resolve) => {
+		const drawFrame = () => {
+			const elapsed = performance.now() - startTime;
+			if (elapsed >= durationMs) {
+				resolve();
+				return;
+			}
+			const t = elapsed / durationMs;
+			drawAnimatedFrame(t);
+			frameCallback?.(ctx);
+			requestAnimationFrame(drawFrame);
+		};
+		drawFrame();
+	});
+
+	URL.revokeObjectURL(imgUrl);
+	console.log(`[VideoProcessor] Photo animation (${style}) drawn to canvas`);
+}
+
+/** Draw white flash frames directly to a provided canvas context (no internal recorder). */
+export async function drawWhiteFlashToCanvas(
+	ctx: CanvasRenderingContext2D,
+	width: number,
+	height: number,
+	durationMs = 200,
+	frameCallback?: FrameCallback
+): Promise<void> {
+	const startTime = performance.now();
+	await new Promise<void>((resolve) => {
+		const drawFrame = () => {
+			if (performance.now() - startTime >= durationMs) {
+				resolve();
+				return;
+			}
+			ctx.fillStyle = '#FFFFFF';
+			ctx.fillRect(0, 0, width, height);
+			frameCallback?.(ctx);
+			requestAnimationFrame(drawFrame);
+		};
+		drawFrame();
+	});
+}
+
 function sleep(ms: number): Promise<void> {
 	return new Promise((r) => setTimeout(r, ms));
 }

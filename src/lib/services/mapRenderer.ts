@@ -40,7 +40,7 @@ const LINE_DASH_PATTERN: Record<TransportMode, number[]> = {
 };
 
 /** Create an offscreen map in a container, wait for it to load, then return it */
-async function createOffscreenMap(
+export async function createOffscreenMap(
 	width: number,
 	height: number,
 	center: [number, number],
@@ -85,13 +85,13 @@ async function createOffscreenMap(
 }
 
 /** Clean up an offscreen map */
-function destroyMap(map: maplibregl.Map, container: HTMLDivElement) {
+export function destroyMap(map: maplibregl.Map, container: HTMLDivElement) {
 	map.remove();
 	container.remove();
 }
 
 /** Wait for all tiles to finish loading and rendering */
-function waitForIdle(map: maplibregl.Map, timeoutMs = 4000): Promise<void> {
+export function waitForIdle(map: maplibregl.Map, timeoutMs = 4000): Promise<void> {
 	return new Promise((resolve) => {
 		const timeout = setTimeout(resolve, timeoutMs);
 		map.once('idle', () => {
@@ -994,6 +994,384 @@ export async function renderTitleCard(opts: TitleCardOpts): Promise<Blob> {
 
 	console.log('[MapRenderer] Title card rendered');
 	return done;
+}
+
+// ─── Direct-draw functions for single-pass recording ───
+// These draw directly to a provided master canvas context,
+// without creating internal MediaRecorder sessions.
+
+type FrameCallback = (ctx: CanvasRenderingContext2D) => void;
+
+/** Draw a title card directly to a provided canvas context for the given duration.
+ *  Draws background, text overlay, and logo each frame via rAF loop. */
+export async function drawTitleCardToCanvas(
+	ctx: CanvasRenderingContext2D,
+	opts: TitleCardOpts,
+	frameCallback?: FrameCallback
+): Promise<void> {
+	const { title, titleColor, aspectRatio, description, mediaFile } = opts;
+	const { width, height } = getResolution(aspectRatio);
+	const fId = opts.fontId ?? 'inter';
+	const ff = fontFamily(fId);
+	await loadFont(fId);
+
+	// Pre-compute word-wrapped title lines
+	const fontSize = Math.round(width * 0.06);
+	ctx.font = `700 ${fontSize}px ${ff}`;
+	const maxWidth = width * 0.8;
+	const titleLines = wrapText(ctx, title, maxWidth);
+
+	// Pre-compute description lines
+	const descFontSize = Math.round(fontSize * 0.6);
+	let descLines: string[] = [];
+	if (description) {
+		ctx.font = `400 ${descFontSize}px ${ff}`;
+		descLines = wrapText(ctx, description, maxWidth);
+	}
+
+	const titleLineHeight = fontSize * 1.3;
+	const descLineHeight = descFontSize * 1.4;
+	const totalTitleHeight = titleLines.length * titleLineHeight;
+	const descGap = description ? fontSize * 0.5 : 0;
+	const totalDescHeight = descLines.length * descLineHeight;
+	const totalBlockHeight = totalTitleHeight + descGap + totalDescHeight;
+	const blockStartY = (height - totalBlockHeight) / 2 + titleLineHeight / 2;
+
+	// Load cover photo if present
+	let bgImage: HTMLImageElement | null = null;
+	if (mediaFile) {
+		bgImage = await loadImageFromFile(mediaFile);
+	}
+
+	// Load logo if requested
+	let logoImage: HTMLImageElement | null = null;
+	if (opts.showLogo && opts.logoUrl) {
+		try {
+			logoImage = await loadImageFromUrl(opts.logoUrl);
+		} catch {
+			console.warn('[MapRenderer] Failed to load logo, skipping watermark');
+		}
+	}
+
+	const durationSec = opts.durationSec ?? 2.5;
+	const secColor = opts.secondaryColor ?? '#0a0f1e';
+	const secTextColor = contrastTextColor(secColor);
+
+	function drawTextOverlay() {
+		ctx.save();
+		const padX = Math.round(width * 0.06);
+		const padY = Math.round(fontSize * 0.6);
+
+		ctx.font = `700 ${fontSize}px ${ff}`;
+		let maxLineW = 0;
+		for (const line of titleLines) {
+			maxLineW = Math.max(maxLineW, ctx.measureText(line).width);
+		}
+		if (descLines.length > 0) {
+			ctx.font = `400 ${descFontSize}px ${ff}`;
+			for (const line of descLines) {
+				maxLineW = Math.max(maxLineW, ctx.measureText(line).width);
+			}
+		}
+
+		const bgW = maxLineW + padX * 2;
+		const bgH = totalBlockHeight + padY * 2;
+		const bgX = width / 2 - bgW / 2;
+		const bgY = blockStartY - titleLineHeight / 2 - padY;
+
+		ctx.fillStyle = hexToRgba(secColor, 0.75);
+		canvasRoundRect(ctx, bgX, bgY, bgW, bgH, 16);
+		ctx.fill();
+
+		ctx.font = `700 ${fontSize}px ${ff}`;
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		ctx.fillStyle = secTextColor;
+		for (let i = 0; i < titleLines.length; i++) {
+			ctx.fillText(titleLines[i], width / 2, blockStartY + i * titleLineHeight);
+		}
+
+		if (descLines.length > 0) {
+			const descStartY = blockStartY + totalTitleHeight + descGap;
+			ctx.font = `400 ${descFontSize}px ${ff}`;
+			ctx.globalAlpha = 0.7;
+			ctx.fillStyle = secTextColor;
+			for (let i = 0; i < descLines.length; i++) {
+				ctx.fillText(descLines[i], width / 2, descStartY + i * descLineHeight);
+			}
+			ctx.globalAlpha = 1;
+		} else {
+			const lineY = blockStartY + totalTitleHeight + fontSize * 0.4;
+			ctx.strokeStyle = secTextColor;
+			ctx.globalAlpha = 0.4;
+			ctx.lineWidth = 2;
+			ctx.beginPath();
+			ctx.moveTo(width * 0.35, lineY);
+			ctx.lineTo(width * 0.65, lineY);
+			ctx.stroke();
+			ctx.globalAlpha = 1;
+		}
+
+		ctx.restore();
+	}
+
+	function drawLogo() {
+		if (!logoImage) return;
+		const logoSize = Math.round(width * 0.07);
+		const margin = Math.round(width * 0.04);
+		const scale = Math.min(logoSize / logoImage.naturalWidth, logoSize / logoImage.naturalHeight);
+		const drawW = logoImage.naturalWidth * scale;
+		const drawH = logoImage.naturalHeight * scale;
+		const x = width - margin - drawW;
+		const y = height - margin - drawH;
+		ctx.save();
+		ctx.globalAlpha = 0.8;
+		ctx.drawImage(logoImage, x, y, drawW, drawH);
+		ctx.restore();
+	}
+
+	function drawFrame() {
+		ctx.clearRect(0, 0, width, height);
+		if (bgImage) {
+			drawCoverFit(ctx, bgImage, width, height);
+			ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+			ctx.fillRect(0, 0, width, height);
+		} else {
+			const gradient = ctx.createLinearGradient(0, 0, 0, height);
+			gradient.addColorStop(0, '#0a0a0a');
+			gradient.addColorStop(0.5, '#1a1a2e');
+			gradient.addColorStop(1, '#0a0a0a');
+			ctx.fillStyle = gradient;
+			ctx.fillRect(0, 0, width, height);
+		}
+		drawTextOverlay();
+		drawLogo();
+		frameCallback?.(ctx);
+	}
+
+	const durationMs = durationSec * 1000;
+	const startTime = performance.now();
+	await new Promise<void>((resolve) => {
+		const frame = () => {
+			if (performance.now() - startTime >= durationMs) { resolve(); return; }
+			drawFrame();
+			requestAnimationFrame(frame);
+		};
+		frame();
+	});
+	drawFrame(); // final frame
+
+	console.log('[MapRenderer] Title card drawn to canvas');
+}
+
+/** Draw a fly-to animation directly to a provided canvas context using a reusable map.
+ *  For the first location (prevLocation=null): map should already be at zoom 10 on the location.
+ *  For subsequent locations: map should be at CLOSE_ZOOM on prevLocation. */
+export async function drawFlyToToCanvas(
+	map: maplibregl.Map,
+	ctx: CanvasRenderingContext2D,
+	location: Location,
+	prevLocation: Location | null,
+	transportMode: TransportMode | null,
+	width: number,
+	height: number,
+	titleColor: string = '#FFFFFF',
+	fontId: string = 'inter',
+	secondaryColor: string = '#0a0f1e',
+	frameCallback?: FrameCallback
+): Promise<void> {
+	const displayName = location.label || location.name.split(',')[0];
+	const ff = fontFamily(fontId);
+	await loadFont(fontId);
+
+	const mapCanvas = map.getCanvas();
+
+	function drawMapFrame(elapsed: number, overlayFn: (ctx: CanvasRenderingContext2D, elapsed: number) => void) {
+		ctx.clearRect(0, 0, width, height);
+		ctx.drawImage(mapCanvas, 0, 0, width, height);
+		overlayFn(ctx, elapsed);
+		frameCallback?.(ctx);
+	}
+
+	if (!prevLocation) {
+		// First location: fly in from zoom 10 → CLOSE_ZOOM
+		console.log(`[MapRenderer] drawFlyToToCanvas (first): "${location.name}"`);
+		const HOLD = 2000;
+		const totalMs = FLY_TO_DURATION + HOLD;
+
+		map.flyTo({
+			center: [location.lng, location.lat],
+			zoom: CLOSE_ZOOM,
+			duration: FLY_TO_DURATION,
+			essential: true
+		});
+
+		const startTime = performance.now();
+		await new Promise<void>((resolve) => {
+			const frame = () => {
+				const elapsed = performance.now() - startTime;
+				if (elapsed >= totalMs) { resolve(); return; }
+				drawMapFrame(elapsed, (ctx2, el) => {
+					if (el >= FLY_TO_DURATION) {
+						const point = map.project([location.lng, location.lat]);
+						drawPinOnCanvas(ctx2, point.x, point.y, displayName, titleColor, ff, location.rating, false);
+						drawLocationTitleOnCanvas(ctx2, displayName, width, titleColor, ff, location.rating, secondaryColor);
+					}
+				});
+				requestAnimationFrame(frame);
+			};
+			frame();
+		});
+		// Draw final frame
+		drawMapFrame(totalMs, (ctx2) => {
+			const point = map.project([location.lng, location.lat]);
+			drawPinOnCanvas(ctx2, point.x, point.y, displayName, titleColor, ff, location.rating, false);
+			drawLocationTitleOnCanvas(ctx2, displayName, width, titleColor, ff, location.rating, secondaryColor);
+		});
+		return;
+	}
+
+	// Subsequent location: zoom out from prev → overview → zoom into new
+	console.log(`[MapRenderer] drawFlyToToCanvas (transition): "${prevLocation.name}" → "${location.name}"`);
+
+	const bounds = new maplibregl.LngLatBounds();
+	bounds.extend([prevLocation.lng, prevLocation.lat]);
+	bounds.extend([location.lng, location.lat]);
+	const padding = Math.min(width, height) * 0.2;
+	const cam = map.cameraForBounds(bounds, { padding });
+	const overviewZoom = Math.max(2, Math.min(cam?.zoom ?? 8, CLOSE_ZOOM - 2));
+	const boundsCenter = bounds.getCenter();
+	const overviewCenter: [number, number] = [boundsCenter.lng, boundsCenter.lat];
+
+	const ZOOM_OUT_MS = 1500;
+	const PAUSE_MS = 1200;
+	const ZOOM_IN_MS = 2000;
+	const HOLD_MS = 2000;
+	const zoomInAt = ZOOM_OUT_MS + PAUSE_MS;
+	const overlayAt = zoomInAt + ZOOM_IN_MS;
+	const totalMs = overlayAt + HOLD_MS;
+
+	console.log(`[MapRenderer] Overview zoom: ${overviewZoom.toFixed(1)}, phases: out=${ZOOM_OUT_MS} pause=${PAUSE_MS} in=${ZOOM_IN_MS} hold=${HOLD_MS}`);
+
+	// Start phase 1: zoom out
+	map.flyTo({
+		center: overviewCenter,
+		zoom: overviewZoom,
+		duration: ZOOM_OUT_MS,
+		essential: true
+	});
+	// Schedule phase 2: zoom in
+	setTimeout(() => {
+		map.flyTo({
+			center: [location.lng, location.lat],
+			zoom: CLOSE_ZOOM,
+			duration: ZOOM_IN_MS,
+			essential: true
+		});
+	}, zoomInAt);
+
+	const startTime = performance.now();
+	await new Promise<void>((resolve) => {
+		const frame = () => {
+			const elapsed = performance.now() - startTime;
+			if (elapsed >= totalMs) { resolve(); return; }
+			drawMapFrame(elapsed, (ctx2, el) => {
+				if (el < 400) {
+					const prevPoint = map.project([prevLocation.lng, prevLocation.lat]);
+					if (prevPoint.x > -50 && prevPoint.x < width + 50 && prevPoint.y > -50 && prevPoint.y < height + 50) {
+						drawPinOnCanvas(ctx2, prevPoint.x, prevPoint.y, '', titleColor, ff, null, false);
+					}
+				}
+				if (el >= overlayAt) {
+					const point = map.project([location.lng, location.lat]);
+					drawPinOnCanvas(ctx2, point.x, point.y, displayName, titleColor, ff, location.rating, false);
+					drawLocationTitleOnCanvas(ctx2, displayName, width, titleColor, ff, location.rating, secondaryColor);
+					if (transportMode) {
+						drawTransportBadgeOnCanvas(ctx2, transportMode, width, height, titleColor, ff, secondaryColor);
+					}
+				}
+			});
+			requestAnimationFrame(frame);
+		};
+		frame();
+	});
+	// Draw final frame
+	drawMapFrame(totalMs, (ctx2) => {
+		const point = map.project([location.lng, location.lat]);
+		drawPinOnCanvas(ctx2, point.x, point.y, displayName, titleColor, ff, location.rating, false);
+		drawLocationTitleOnCanvas(ctx2, displayName, width, titleColor, ff, location.rating, secondaryColor);
+		if (transportMode) {
+			drawTransportBadgeOnCanvas(ctx2, transportMode, width, height, titleColor, ff, secondaryColor);
+		}
+	});
+}
+
+/** Draw the final route map animation directly to a provided canvas context using a reusable map.
+ *  The map should already be positioned (fitBounds + idle) before calling this. */
+export async function drawFinalRouteToCanvas(
+	map: maplibregl.Map,
+	ctx: CanvasRenderingContext2D,
+	locations: Location[],
+	stats: { stops: number; miles: number; minutes: number },
+	width: number,
+	height: number,
+	routeGeometries: ({ coordinates: [number, number][] } | null)[] | undefined,
+	titleColor: string = '#FFFFFF',
+	fontId: string = 'inter',
+	secondaryColor: string = '#0a0f1e',
+	frameCallback?: FrameCallback
+): Promise<void> {
+	if (locations.length === 0) throw new Error('No locations for final route');
+
+	const ff = fontFamily(fontId);
+	await loadFont(fontId);
+
+	const mapCanvas = map.getCanvas();
+	const totalSegments = locations.length - 1;
+	const segmentDuration = totalSegments > 0 ? 2000 / totalSegments : 0;
+
+	// Start adding route line segments with staggered timing
+	for (let i = 0; i < totalSegments; i++) {
+		setTimeout(() => {
+			const from = locations[i];
+			const to = locations[i + 1];
+			const mode = to.transportMode ?? 'drove';
+			const geom = routeGeometries?.[i];
+			addRouteLine(map, from, to, mode, `route-${i}`, geom?.coordinates, titleColor);
+		}, i * segmentDuration);
+	}
+
+	const startTime = performance.now();
+	await new Promise<void>((resolve) => {
+		const frame = () => {
+			const elapsed = performance.now() - startTime;
+			if (elapsed >= FINAL_MAP_DURATION) { resolve(); return; }
+			ctx.clearRect(0, 0, width, height);
+			ctx.drawImage(mapCanvas, 0, 0, width, height);
+			// Draw pins with labels
+			for (const loc of locations) {
+				const point = map.project([loc.lng, loc.lat]);
+				const label = loc.label || loc.name.split(',')[0];
+				drawPinOnCanvas(ctx, point.x, point.y, label, titleColor, ff, loc.rating, true, hexToRgba(secondaryColor, 0.88));
+			}
+			drawStatsOnCanvas(ctx, stats, width, height, titleColor, ff, secondaryColor);
+			frameCallback?.(ctx);
+			requestAnimationFrame(frame);
+		};
+		frame();
+	});
+	// Draw final frame
+	ctx.clearRect(0, 0, width, height);
+	ctx.drawImage(mapCanvas, 0, 0, width, height);
+	for (const loc of locations) {
+		const point = map.project([loc.lng, loc.lat]);
+		const label = loc.label || loc.name.split(',')[0];
+		drawPinOnCanvas(ctx, point.x, point.y, label, titleColor, ff, loc.rating, true, hexToRgba(secondaryColor, 0.88));
+	}
+	drawStatsOnCanvas(ctx, stats, width, height, titleColor, ff, secondaryColor);
+	frameCallback?.(ctx);
+
+	console.log('[MapRenderer] Final route drawn to canvas');
 }
 
 function sleep(ms: number): Promise<void> {

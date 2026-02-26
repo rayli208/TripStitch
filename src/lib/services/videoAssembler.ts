@@ -1,9 +1,24 @@
 import type { Trip, AspectRatio, MapStyle } from '$lib/types';
-import { getResolution, renderFlyTo, renderFinalRoute, renderTitleCard, loadImageFromUrl } from './mapRenderer';
-import { normalizeVideo, createWhiteFlash, concatenateBlobs, renderPhotoAnimation } from './videoProcessor';
+import {
+	getResolution,
+	loadImageFromUrl,
+	createOffscreenMap,
+	destroyMap,
+	waitForIdle,
+	drawTitleCardToCanvas,
+	drawFlyToToCanvas,
+	drawFinalRouteToCanvas
+} from './mapRenderer';
+import {
+	playVideoToCanvas,
+	drawPhotoAnimationToCanvas,
+	drawWhiteFlashToCanvas
+} from './videoProcessor';
 import { totalDistance, totalTravelTime } from '$lib/utils/distance';
 import { suggestTransportMode } from '$lib/utils/distance';
 import { fetchAllRouteGeometries } from './routeService';
+import { getSupportedMimeType } from '$lib/utils/browserCompat';
+import maplibregl from 'maplibre-gl';
 
 export interface AssemblyProgress {
 	step: string;
@@ -28,25 +43,7 @@ export interface AssemblyResult {
 
 export type ProgressCallback = (progress: AssemblyProgress) => void;
 
-/** Get the duration of a video File in seconds */
-async function getVideoDuration(file: File): Promise<number> {
-	return new Promise((resolve) => {
-		const video = document.createElement('video');
-		video.preload = 'metadata';
-		video.onloadedmetadata = () => {
-			const dur = video.duration;
-			URL.revokeObjectURL(video.src);
-			resolve(isFinite(dur) ? dur : 5);
-		};
-		video.onerror = () => {
-			URL.revokeObjectURL(video.src);
-			resolve(5); // fallback
-		};
-		video.src = URL.createObjectURL(file);
-	});
-}
-
-/** Main pipeline: assembles the full TripStitch video */
+/** Main pipeline: assembles the full TripStitch video using single-pass recording */
 export async function assembleVideo(
 	trip: Trip,
 	aspectRatio: AspectRatio,
@@ -56,7 +53,7 @@ export async function assembleVideo(
 	logoUrl?: string | null,
 	secondaryColor: string = '#0a0f1e'
 ): Promise<AssemblyResult> {
-	console.log('[TripStitch] Starting video assembly', { tripId: trip.id, aspectRatio });
+	console.log('[TripStitch] Starting single-pass video assembly', { tripId: trip.id, aspectRatio });
 	const { width, height } = getResolution(aspectRatio);
 	console.log('[TripStitch] Target resolution:', width, 'x', height);
 
@@ -65,7 +62,7 @@ export async function assembleVideo(
 
 	const tripFontId = trip.fontId ?? 'inter';
 
-	// Calculate total steps — one per export checklist item
+	// Calculate total steps
 	let totalSteps = 1 + 1 + 1; // title + route + finalize
 	for (const loc of locations) {
 		totalSteps += 1; // map fly-to
@@ -76,9 +73,8 @@ export async function assembleVideo(
 	console.log('[TripStitch] Total steps:', totalSteps);
 
 	let currentStep = 0;
-	const segments: Blob[] = [];
 	const timeline: VideoSegmentInfo[] = [];
-	let timelineCursor = 0; // cumulative seconds
+	let timelineCursor = 0;
 
 	function addToTimeline(id: string, label: string, durationSec: number, type: VideoSegmentInfo['type']) {
 		timeline.push({ id, label, startSec: timelineCursor, durationSec, type });
@@ -98,139 +94,31 @@ export async function assembleVideo(
 		}
 	}
 
+	// --- Single-pass setup ---
+	const mimeType = getSupportedMimeType();
+	const canvas = document.createElement('canvas');
+	canvas.width = width;
+	canvas.height = height;
+	const ctx = canvas.getContext('2d')!;
+
+	const stream = canvas.captureStream(30);
+	const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5_000_000 });
+	const chunks: Blob[] = [];
+	recorder.ondataavailable = (e) => {
+		if (e.data.size > 0) chunks.push(e.data);
+	};
+
+	const done = new Promise<Blob>((resolve) => {
+		recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
+	});
+
+	// Create reusable map + load logo upfront
+	let map: maplibregl.Map | null = null;
+	let mapContainer: HTMLDivElement | null = null;
+
 	try {
-		// 0. Title card intro
-		checkAbort();
-		emit('title', `Creating title card...`);
-
-		const titleBlob = await renderTitleCard({
-			title: trip.title || 'My Trip',
-			titleColor: trip.titleColor || '#FFFFFF',
-			aspectRatio,
-			description: trip.titleDescription || undefined,
-			mediaFile: trip.titleMediaFile,
-			logoUrl: logoUrl,
-			showLogo: trip.showLogoOnTitle,
-			fontId: tripFontId,
-			secondaryColor
-		});
-		console.log(`[TripStitch] Title card blob:`, titleBlob.size, 'bytes');
-		segments.push(titleBlob);
-		addToTimeline('title', trip.title || 'Title', 2.5, 'title');
-
-		// Process each location
-		for (let i = 0; i < locations.length; i++) {
-			checkAbort();
-			const location = locations[i];
-			const prevLocation = i > 0 ? locations[i - 1] : null;
-
-			// Auto-suggest transport mode if not set
-			let transportMode = location.transportMode;
-			if (!transportMode && prevLocation) {
-				transportMode = suggestTransportMode(
-					prevLocation.lat, prevLocation.lng,
-					location.lat, location.lng
-				);
-			}
-
-			// 1. Map fly-to animation
-			emit(`map-${location.id}`, `Rendering map for ${location.name}...`);
-			console.log(`[TripStitch] Rendering fly-to for "${location.name}" (${location.lat}, ${location.lng})`);
-			const flyToBlob = await renderFlyTo(location, prevLocation, transportMode, aspectRatio, mapStyle, trip.titleColor || '#FFFFFF', tripFontId, secondaryColor);
-			console.log(`[TripStitch] Fly-to blob for "${location.name}":`, flyToBlob.size, 'bytes');
-			segments.push(flyToBlob);
-			const displayName = location.label || location.name.split(',')[0];
-			// First fly-to: 4s (fly 2s + hold 2s); subsequent: ~5.9s
-			const flyDuration = !prevLocation ? 4.0 : 5.9;
-			addToTimeline(`map-${location.id}`, displayName, flyDuration, 'map');
-
-			checkAbort();
-
-			// 2. Multi-clip pre-stitch: process all clips for this location
-			const clipsWithFiles = [...location.clips]
-				.filter((c) => c.file)
-				.sort((a, b) => a.order - b.order);
-
-			if (clipsWithFiles.length > 0) {
-				emit(`clip-${location.id}`, `Processing ${clipsWithFiles.length} clip(s) from ${location.name}...`);
-				const clipBlobs: Blob[] = [];
-				let combinedDuration = 0;
-
-				for (const clip of clipsWithFiles) {
-					checkAbort();
-					if (clip.type === 'video' && clip.file) {
-						console.log(`[TripStitch] Processing video clip for "${location.name}", file size:`, clip.file.size);
-						const dur = await getVideoDuration(clip.file);
-						const normalized = await normalizeVideo(clip.file, width, height);
-						clipBlobs.push(normalized);
-						combinedDuration += dur;
-					} else if (clip.type === 'photo' && clip.file) {
-						console.log(`[TripStitch] Processing photo for "${location.name}" (animation: ${clip.animationStyle})`);
-						const photoBlob = await renderPhotoAnimation(clip.file, width, height, clip.animationStyle, 3);
-						clipBlobs.push(photoBlob);
-						combinedDuration += 3;
-					}
-				}
-
-				// Flash before
-				const flashBefore = await createWhiteFlash(0.2, width, height);
-				segments.push(flashBefore);
-				timelineCursor += 0.2;
-
-				// Combine clips: if single, use directly; if multiple, concatenate
-				let combinedBlob: Blob;
-				if (clipBlobs.length === 1) {
-					combinedBlob = clipBlobs[0];
-				} else {
-					console.log(`[TripStitch] Concatenating ${clipBlobs.length} clips for "${location.name}"`);
-					combinedBlob = await concatenateBlobs(clipBlobs, width, height);
-				}
-				segments.push(combinedBlob);
-				addToTimeline(`clip-${location.id}`, displayName, combinedDuration, 'clip');
-
-				// Flash after
-				const flashAfter = await createWhiteFlash(0.2, width, height);
-				segments.push(flashAfter);
-				timelineCursor += 0.2;
-			} else {
-				console.log(`[TripStitch] No media for "${location.name}", skipping clip`);
-			}
-		}
-
-		checkAbort();
-
-		// 3. Final route map — fetch real road geometries first
-		emit('route', 'Fetching road routes...');
-		let routeGeometries: Awaited<ReturnType<typeof fetchAllRouteGeometries>> | undefined;
-		try {
-			routeGeometries = await fetchAllRouteGeometries(locations);
-			console.log(`[TripStitch] Fetched ${routeGeometries.filter(Boolean).length}/${locations.length - 1} route geometries`);
-		} catch (err) {
-			console.warn('[TripStitch] Route geometry fetch failed, falling back to straight lines:', err);
-			routeGeometries = undefined;
-		}
-
-		const miles = totalDistance(locations);
-		const minutes = totalTravelTime(locations);
-		console.log(`[TripStitch] Route stats: ${locations.length} stops, ${miles.toFixed(1)} miles, ${Math.round(minutes)} min`);
-		const finalRouteBlob = await renderFinalRoute(
-			locations,
-			{ stops: locations.length, miles, minutes },
-			aspectRatio,
-			routeGeometries,
-			mapStyle,
-			trip.titleColor || '#FFFFFF',
-			tripFontId,
-			secondaryColor
-		);
-		console.log(`[TripStitch] Final route blob:`, finalRouteBlob.size, 'bytes');
-		segments.push(finalRouteBlob);
-		addToTimeline('route', 'Final Route', 6, 'route');
-
-		checkAbort();
-
-		// 4. Load logo for watermark overlay if enabled
-		let logoOverlay: ((ctx: CanvasRenderingContext2D) => void) | undefined;
+		// Load logo overlay function if enabled
+		let frameOverlay: ((ctx: CanvasRenderingContext2D) => void) | undefined;
 		if (trip.showLogoOnTitle && logoUrl) {
 			try {
 				const logoImage = await loadImageFromUrl(logoUrl);
@@ -241,7 +129,7 @@ export async function assembleVideo(
 				const drawH = logoImage.naturalHeight * scale;
 				const lx = width - margin - drawW;
 				const ly = height - margin - drawH;
-				logoOverlay = (ctx) => {
+				frameOverlay = (ctx) => {
 					ctx.save();
 					ctx.globalAlpha = 0.8;
 					ctx.drawImage(logoImage, lx, ly, drawW, drawH);
@@ -252,14 +140,198 @@ export async function assembleVideo(
 			}
 		}
 
-		// 5. Concatenate all segments
-		console.log(`[TripStitch] Concatenating ${segments.length} segments`);
-		emit('finalize', `Stitching ${segments.length} segments together...`);
-		const finalBlob = await concatenateBlobs(segments, width, height, (segIndex) => {
-			// Update message without incrementing currentStep
-			onProgress?.({ step: 'finalize', message: `Stitching segment ${segIndex + 2} of ${segments.length}...`, current: currentStep, total: totalSteps });
-		}, logoOverlay);
+		// Start recorder
+		recorder.start();
+		console.log('[TripStitch] Single-pass recorder started');
+
+		// ── 1. TITLE CARD ──
+		checkAbort();
+		emit('title', 'Creating title card...');
+		await drawTitleCardToCanvas(ctx, {
+			title: trip.title || 'My Trip',
+			titleColor: trip.titleColor || '#FFFFFF',
+			aspectRatio,
+			description: trip.titleDescription || undefined,
+			mediaFile: trip.titleMediaFile,
+			logoUrl: logoUrl,
+			showLogo: trip.showLogoOnTitle,
+			fontId: tripFontId,
+			secondaryColor
+		}, frameOverlay);
+		addToTimeline('title', trip.title || 'Title', 2.5, 'title');
+
+		// ── 2. CREATE REUSABLE MAP ──
+		// Pause recorder while we set up the map
+		recorder.pause();
+		console.log('[TripStitch] Recorder paused for map creation');
+
+		const firstLoc = locations[0];
+		const result = await createOffscreenMap(
+			width, height,
+			[firstLoc.lng, firstLoc.lat], 10,
+			mapStyle
+		);
+		map = result.map;
+		mapContainer = result.container;
+		console.log('[TripStitch] Reusable map created');
+
+		recorder.resume();
+		console.log('[TripStitch] Recorder resumed');
+
+		// ── 3. PROCESS EACH LOCATION ──
+		for (let i = 0; i < locations.length; i++) {
+			checkAbort();
+			const location = locations[i];
+			const prevLocation = i > 0 ? locations[i - 1] : null;
+
+			let transportMode = location.transportMode;
+			if (!transportMode && prevLocation) {
+				transportMode = suggestTransportMode(
+					prevLocation.lat, prevLocation.lng,
+					location.lat, location.lng
+				);
+			}
+
+			// ── 3a. PREPARE MAP (paused) ──
+			if (i > 0) {
+				// For subsequent locations, pause to let the map transition to starting position
+				recorder.pause();
+				// Map is already at CLOSE_ZOOM on prev location from the last fly-to,
+				// so no extra setup needed — drawFlyToToCanvas handles the zoom-out animation.
+				// But we do want tiles loaded. Give map a moment to settle.
+				await waitForIdle(map);
+				recorder.resume();
+			}
+
+			// ── 3b. FLY-TO ANIMATION ──
+			emit(`map-${location.id}`, `Rendering map for ${location.name}...`);
+			console.log(`[TripStitch] Fly-to for "${location.name}"`);
+
+			await drawFlyToToCanvas(
+				map, ctx, location, prevLocation, transportMode,
+				width, height,
+				trip.titleColor || '#FFFFFF', tripFontId, secondaryColor,
+				frameOverlay
+			);
+
+			const displayName = location.label || location.name.split(',')[0];
+			const flyDuration = !prevLocation ? 4.0 : 5.9;
+			addToTimeline(`map-${location.id}`, displayName, flyDuration, 'map');
+
+			checkAbort();
+
+			// ── 3c. CLIPS ──
+			const clipsWithFiles = [...location.clips]
+				.filter((c) => c.file)
+				.sort((a, b) => a.order - b.order);
+
+			if (clipsWithFiles.length > 0) {
+				emit(`clip-${location.id}`, `Processing ${clipsWithFiles.length} clip(s) from ${location.name}...`);
+				let combinedDuration = 0;
+
+				// White flash before clips
+				await drawWhiteFlashToCanvas(ctx, width, height, 200, frameOverlay);
+				timelineCursor += 0.2;
+
+				for (const clip of clipsWithFiles) {
+					checkAbort();
+					if (clip.type === 'video' && clip.file) {
+						console.log(`[TripStitch] Playing video clip for "${location.name}"`);
+						const dur = await playVideoToCanvas(clip.file, ctx, width, height, 30, frameOverlay);
+						combinedDuration += dur;
+					} else if (clip.type === 'photo' && clip.file) {
+						console.log(`[TripStitch] Photo animation for "${location.name}" (${clip.animationStyle})`);
+						await drawPhotoAnimationToCanvas(clip.file, ctx, width, height, clip.animationStyle, 3, frameOverlay);
+						combinedDuration += 3;
+					}
+				}
+
+				addToTimeline(`clip-${location.id}`, displayName, combinedDuration, 'clip');
+
+				// White flash after clips
+				await drawWhiteFlashToCanvas(ctx, width, height, 200, frameOverlay);
+				timelineCursor += 0.2;
+			} else {
+				console.log(`[TripStitch] No media for "${location.name}", skipping clip`);
+			}
+		}
+
+		checkAbort();
+
+		// ── 4. FINAL ROUTE MAP ──
+		// Pause recorder before network fetch + map setup to avoid frozen frames
+		recorder.pause();
+		console.log('[TripStitch] Paused for route fetch + final route setup');
+
+		emit('route', 'Fetching road routes...');
+		let routeGeometries: Awaited<ReturnType<typeof fetchAllRouteGeometries>> | undefined;
+		try {
+			routeGeometries = await fetchAllRouteGeometries(locations);
+			console.log(`[TripStitch] Fetched ${routeGeometries.filter(Boolean).length}/${locations.length - 1} route geometries`);
+		} catch (err) {
+			console.warn('[TripStitch] Route geometry fetch failed, falling back to straight lines:', err);
+			routeGeometries = undefined;
+		}
+
+		// Remove any existing route sources/layers from fly-to usage
+		// Set up bounds and fit
+		const bounds = new maplibregl.LngLatBounds();
+		for (const loc of locations) {
+			bounds.extend([loc.lng, loc.lat]);
+		}
+		if (routeGeometries) {
+			for (const geom of routeGeometries) {
+				if (geom) {
+					for (const coord of geom.coordinates) {
+						bounds.extend(coord);
+					}
+				}
+			}
+		}
+
+		const pad = Math.min(width, height) * 0.14;
+		const topPad = pad + 100;
+		const bottomPad = pad + Math.round(height * 0.20);
+		map.fitBounds(bounds, { padding: { top: topPad, bottom: bottomPad, left: pad, right: pad }, duration: 0 });
+		await sleep(500);
+		await waitForIdle(map);
+
+		recorder.resume();
+		console.log('[TripStitch] Resumed for final route');
+
+		const miles = totalDistance(locations);
+		const minutes = totalTravelTime(locations);
+		console.log(`[TripStitch] Route stats: ${locations.length} stops, ${miles.toFixed(1)} miles, ${Math.round(minutes)} min`);
+
+		await drawFinalRouteToCanvas(
+			map, ctx, locations,
+			{ stops: locations.length, miles, minutes },
+			width, height,
+			routeGeometries,
+			trip.titleColor || '#FFFFFF', tripFontId, secondaryColor,
+			frameOverlay
+		);
+		addToTimeline('route', 'Final Route', 6, 'route');
+
+		checkAbort();
+
+		// ── 5. FINALIZE ──
+		emit('finalize', 'Finalizing video...');
+		// Small delay to ensure final frame is captured
+		await sleep(100);
+		recorder.stop();
+		stream.getTracks().forEach((t) => t.stop());
+		console.log('[TripStitch] Single-pass recorder stopped');
+
+		const finalBlob = await done;
 		console.log(`[TripStitch] Final video blob:`, finalBlob.size, 'bytes', `(${(finalBlob.size / 1024 / 1024).toFixed(1)} MB)`);
+
+		// Clean up map
+		if (map && mapContainer) {
+			destroyMap(map, mapContainer);
+			map = null;
+			mapContainer = null;
+		}
 
 		const url = URL.createObjectURL(finalBlob);
 		console.log('[TripStitch] Video assembly complete! Blob URL:', url);
@@ -267,6 +339,20 @@ export async function assembleVideo(
 		return { blob: finalBlob, url, segments: timeline };
 	} catch (err) {
 		console.error('[TripStitch] Assembly failed:', err);
+		// Clean up on error
+		try {
+			if (recorder.state !== 'inactive') {
+				recorder.stop();
+			}
+			stream.getTracks().forEach((t) => t.stop());
+		} catch { /* ignore cleanup errors */ }
+		if (map && mapContainer) {
+			try { destroyMap(map, mapContainer); } catch { /* ignore */ }
+		}
 		throw err;
 	}
+}
+
+function sleep(ms: number): Promise<void> {
+	return new Promise((r) => setTimeout(r, ms));
 }
