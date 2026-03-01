@@ -28,13 +28,16 @@
 		fontId: profileState.profile?.preferredFontId ?? 'inter'
 	});
 
-	// Update font + secondary color from profile once it loads
+	// Update font, colors from profile once it loads
 	$effect(() => {
 		if (profileState.profile?.preferredFontId && editor.fontId === 'inter') {
 			editor.fontId = profileState.profile.preferredFontId;
 		}
 		if (profileState.profile?.secondaryColor && editor.secondaryColor === '#0a0f1e') {
 			editor.secondaryColor = profileState.profile.secondaryColor;
+		}
+		if (profileState.profile?.brandColors?.length && editor.titleColor === '#FFFFFF') {
+			editor.titleColor = profileState.profile.brandColors[0];
 		}
 	});
 
@@ -67,10 +70,14 @@
 
 	const durationEstimate = $derived(estimateVideoDuration(editor.locations, videoDurations));
 
-	// Export elapsed timer — uses wall-clock time so it doesn't drift when the main thread is blocked
+	// Export elapsed timer — pauses when tab is hidden so it only counts active stitching time
 	let exportElapsed = $state<number | undefined>(undefined);
 	let exportStartTime = 0;
+	let exportPausedTotal = 0; // total ms the tab was hidden during export
+	let exportHiddenAt = 0; // timestamp when tab was last hidden (0 = not hidden)
+	let exportPaused = $state(false); // whether the export is currently paused (tab hidden)
 	let elapsedInterval: ReturnType<typeof setInterval> | undefined;
+	let visibilityHandler: (() => void) | undefined;
 
 	// Navigation guards
 	$effect(() => {
@@ -134,7 +141,24 @@
 		abortController = new AbortController();
 		exportElapsed = 0;
 		exportStartTime = Date.now();
-		elapsedInterval = setInterval(() => { exportElapsed = Math.floor((Date.now() - exportStartTime) / 1000); }, 500);
+		exportPausedTotal = 0;
+		exportHiddenAt = 0;
+		exportPaused = false;
+		visibilityHandler = () => {
+			if (document.hidden) {
+				exportHiddenAt = Date.now();
+				exportPaused = true;
+			} else if (exportHiddenAt > 0) {
+				exportPausedTotal += Date.now() - exportHiddenAt;
+				exportHiddenAt = 0;
+				exportPaused = false;
+			}
+		};
+		document.addEventListener('visibilitychange', visibilityHandler);
+		elapsedInterval = setInterval(() => {
+			const paused = exportHiddenAt > 0 ? Date.now() - exportHiddenAt : 0;
+			exportElapsed = Math.floor((Date.now() - exportStartTime - exportPausedTotal - paused) / 1000);
+		}, 500);
 
 		// Save trip to Firestore first
 		const tripId = crypto.randomUUID();
@@ -196,6 +220,11 @@
 		} finally {
 			abortController = null;
 			clearInterval(elapsedInterval);
+			if (visibilityHandler) {
+				document.removeEventListener('visibilitychange', visibilityHandler);
+				visibilityHandler = undefined;
+			}
+			exportPaused = false;
 		}
 	}
 
@@ -279,6 +308,8 @@
 			preferredFontId={profileState.profile?.preferredFontId}
 			titleMediaPreviewUrl={editor.titleMediaPreviewUrl}
 			logoUrl={profileState.profile?.logoUrl ?? null}
+			bind:aspectRatio={editor.aspectRatio}
+			bind:mapStyle={editor.mapStyle}
 			onmedia={(file) => editor.updateTitleMedia(file)}
 			onremovemedia={() => editor.removeTitleMedia()}
 			onnext={() => editor.nextStep()}
@@ -335,6 +366,7 @@
 			exportSteps={exportSteps}
 			estimatedDuration={durationEstimate.formatted}
 			{exportElapsed}
+			{exportPaused}
 			onexport={handleExport}
 			onback={() => editor.prevStep()}
 			oncancel={handleCancel}

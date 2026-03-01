@@ -9,24 +9,36 @@ const blobCache = new Map<string, Blob>();
 /** Get a Firebase Storage download URL for a track (cached). */
 export async function getTrackUrl(track: MusicTrackDef): Promise<string> {
 	const cached = urlCache.get(track.id);
-	if (cached) return cached;
+	if (cached) {
+		console.log(`[MusicService] getTrackUrl: cache hit for "${track.id}"`);
+		return cached;
+	}
 
+	console.log(`[MusicService] getTrackUrl: fetching URL for "${track.id}" (path: ${track.storagePath})`);
+	const fetchStart = performance.now();
 	const storageRef = ref(storage, track.storagePath);
 	const url = await getDownloadURL(storageRef);
 	urlCache.set(track.id, url);
+	console.log(`[MusicService] getTrackUrl: got URL for "${track.id}" in ${((performance.now() - fetchStart) / 1000).toFixed(1)}s`);
 	return url;
 }
 
 /** Fetch a track's audio as a Blob (cached). Requires CORS configured on the storage bucket. */
 export async function fetchTrackBlob(track: MusicTrackDef): Promise<Blob> {
 	const cached = blobCache.get(track.id);
-	if (cached) return cached;
+	if (cached) {
+		console.log(`[MusicService] fetchTrackBlob: cache hit for "${track.id}" (${(cached.size / 1024 / 1024).toFixed(1)}MB)`);
+		return cached;
+	}
 
+	console.log(`[MusicService] fetchTrackBlob: downloading "${track.id}"...`);
+	const fetchStart = performance.now();
 	const url = await getTrackUrl(track);
 	const res = await fetch(url);
 	if (!res.ok) throw new Error('Failed to fetch audio');
 	const blob = await res.blob();
 	blobCache.set(track.id, blob);
+	console.log(`[MusicService] fetchTrackBlob: downloaded "${track.id}" — ${(blob.size / 1024 / 1024).toFixed(1)}MB in ${((performance.now() - fetchStart) / 1000).toFixed(1)}s`);
 	return blob;
 }
 

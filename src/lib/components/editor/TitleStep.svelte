@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { AspectRatio, MapStyle } from '$lib/types';
 	import Input from '$lib/components/ui/Input.svelte';
 	import ColorPicker from '$lib/components/ui/ColorPicker.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -18,6 +19,8 @@
 		preferredFontId = undefined,
 		titleMediaPreviewUrl = null,
 		logoUrl = null,
+		aspectRatio = $bindable<AspectRatio>('9:16'),
+		mapStyle = $bindable<MapStyle>('streets'),
 		onmedia,
 		onremovemedia,
 		onnext
@@ -34,10 +37,27 @@
 		preferredFontId?: string;
 		titleMediaPreviewUrl?: string | null;
 		logoUrl?: string | null;
+		aspectRatio?: AspectRatio;
+		mapStyle?: MapStyle;
 		onmedia?: (file: File) => void;
 		onremovemedia?: () => void;
 		onnext: () => void;
 	} = $props();
+
+	const ratios: { value: AspectRatio; label: string; width: string; height: string }[] = [
+		{ value: '9:16', label: 'Vertical', width: 'w-12', height: 'h-20' },
+		{ value: '1:1', label: 'Square', width: 'w-16', height: 'h-16' },
+		{ value: '16:9', label: 'Horizontal', width: 'w-20', height: 'h-12' }
+	];
+
+	const mapStyles: { value: MapStyle; label: string; icon: string }[] = [
+		{ value: 'streets', label: 'Streets', icon: '🗺️' },
+		{ value: 'satellite', label: 'Satellite', icon: '🛰️' },
+		{ value: 'outdoor', label: 'Outdoor', icon: '🏔️' },
+		{ value: 'topo', label: 'Topo', icon: '🧭' },
+		{ value: 'dark', label: 'Dark', icon: '🌙' },
+		{ value: 'light', label: 'Light', icon: '☀️' }
+	];
 
 	let fileInput: HTMLInputElement;
 
@@ -73,16 +93,16 @@
 	<link rel="stylesheet" href={googleFontsUrl()} />
 </svelte:head>
 
-<div class="space-y-6">
+<div class="space-y-4">
 	<div>
-		<h2 class="text-xl font-semibold mb-1">Trip Details</h2>
+		<h2 class="text-xl font-semibold mb-0.5">Trip Details</h2>
 		<p class="text-sm text-text-muted">Give your trip a name and pick a title color.</p>
 	</div>
 
 	<Input label="Trip Title" placeholder="e.g. Weekend in Paris" bind:value={title} />
 
 	<div>
-		<label class="block text-sm font-medium text-text-secondary mb-1.5">Description</label>
+		<label class="block text-sm font-medium text-text-secondary mb-1">Description</label>
 		<textarea
 			bind:value={titleDescription}
 			placeholder="Optional subtitle or description"
@@ -92,7 +112,7 @@
 	</div>
 
 	<div>
-		<label class="block text-sm font-medium text-text-secondary mb-1.5">Trip Date</label>
+		<label class="block text-sm font-medium text-text-secondary mb-1">Trip Date</label>
 		<input
 			type="date"
 			bind:value={tripDate}
@@ -100,14 +120,64 @@
 		/>
 	</div>
 
-	<div>
-		<span class="block text-sm font-medium text-text-secondary mb-2">Title Color</span>
-		<ColorPicker bind:selected={titleColor} colors={pickerColors} primaryColor={primaryBrandColor} />
+	<!-- Colors side by side -->
+	<div class="grid grid-cols-2 gap-4">
+		<div>
+			<span class="block text-sm font-medium text-text-secondary mb-1.5">Title Color</span>
+			<ColorPicker bind:selected={titleColor} colors={pickerColors} primaryColor={primaryBrandColor} />
+		</div>
+		<div>
+			<span class="block text-sm font-medium text-text-secondary mb-1.5">Background</span>
+			<ColorPicker bind:selected={secondaryColor} colors={secondaryPickerColors} primaryColor={primarySecondaryColor} />
+		</div>
 	</div>
 
-	<div>
-		<span class="block text-sm font-medium text-text-secondary mb-2">Background Color</span>
-		<ColorPicker bind:selected={secondaryColor} colors={secondaryPickerColors} primaryColor={primarySecondaryColor} />
+	<!-- Aspect Ratio + Map Style side by side -->
+	<div class="grid grid-cols-2 gap-4">
+		<!-- Aspect Ratio -->
+		<div>
+			<span class="block text-sm font-medium text-text-secondary mb-2">Aspect Ratio</span>
+			<div class="flex flex-col gap-1.5">
+				{#each ratios as ratio}
+					<button
+						class="flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 transition-all cursor-pointer
+							{aspectRatio === ratio.value
+							? 'border-accent bg-accent-light'
+							: 'border-border bg-card hover:border-primary-light'}"
+						onclick={() => (aspectRatio = ratio.value)}
+					>
+						<div
+							class="rounded border {aspectRatio === ratio.value ? 'border-accent' : 'border-border'}
+								{ratio.value === '9:16' ? 'w-4 h-6' : ratio.value === '1:1' ? 'w-5 h-5' : 'w-6 h-4'}"
+						></div>
+						<span class="text-xs font-medium {aspectRatio === ratio.value ? 'text-text-primary' : 'text-text-muted'}">
+							{ratio.label}
+						</span>
+					</button>
+				{/each}
+			</div>
+		</div>
+
+		<!-- Map Style -->
+		<div>
+			<span class="block text-sm font-medium text-text-secondary mb-2">Map Style</span>
+			<div class="grid grid-cols-2 gap-1.5">
+				{#each mapStyles as style}
+					<button
+						class="flex items-center gap-1 px-2 py-1.5 rounded-lg border-2 transition-all cursor-pointer
+							{mapStyle === style.value
+							? 'border-accent bg-accent-light'
+							: 'border-border bg-card hover:border-primary-light'}"
+						onclick={() => (mapStyle = style.value)}
+					>
+						<span class="text-sm">{style.icon}</span>
+						<span class="text-xs font-medium {mapStyle === style.value ? 'text-text-primary' : 'text-text-muted'}">
+							{style.label}
+						</span>
+					</button>
+				{/each}
+			</div>
+		</div>
 	</div>
 
 	<!-- Font Picker -->

@@ -1,4 +1,5 @@
 import type { AnimationStyle } from '$lib/types';
+import type { PauseClock } from './exportGuard';
 import { getSupportedMimeType } from '$lib/utils/browserCompat';
 
 const TARGET_FPS = 30;
@@ -48,7 +49,9 @@ export async function normalizeVideo(
 	recorder.start();
 	video.currentTime = 0;
 	await video.play();
+	console.log(`[VideoProcessor] normalizeVideo: recording started, playing video...`);
 
+	let frameCount = 0;
 	await new Promise<void>((resolve) => {
 		const drawFrame = () => {
 			if (video.ended || video.currentTime >= duration) {
@@ -57,6 +60,7 @@ export async function normalizeVideo(
 			}
 			// Draw video centered/covering the canvas (cover fit)
 			drawCover(ctx, video, targetWidth, targetHeight);
+			frameCount++;
 			requestAnimationFrame(drawFrame);
 		};
 		drawFrame();
@@ -65,6 +69,7 @@ export async function normalizeVideo(
 	video.pause();
 	recorder.stop();
 	URL.revokeObjectURL(video.src);
+	console.log(`[VideoProcessor] normalizeVideo: done, ${frameCount} frames drawn`);
 
 	return done;
 }
@@ -288,7 +293,9 @@ export async function renderPhotoAnimation(
 	recorder.start();
 	const startTime = performance.now();
 	const durationMs = durationSec * 1000;
+	console.log(`[VideoProcessor] renderPhotoAnimation: recording started (${style}, ${durationSec}s, ${width}x${height})`);
 
+	let frameCount = 0;
 	await new Promise<void>((resolve) => {
 		const drawFrame = () => {
 			const elapsed = performance.now() - startTime;
@@ -298,6 +305,7 @@ export async function renderPhotoAnimation(
 			}
 			const t = elapsed / durationMs; // 0 → 1
 			drawAnimatedFrame(t);
+			frameCount++;
 			requestAnimationFrame(drawFrame);
 		};
 		drawFrame();
@@ -307,7 +315,8 @@ export async function renderPhotoAnimation(
 	stream.getTracks().forEach((t) => t.stop());
 	URL.revokeObjectURL(imgUrl);
 
-	console.log(`[VideoProcessor] Photo animation (${style}) rendered`);
+	const actualDuration = ((performance.now() - startTime) / 1000).toFixed(1);
+	console.log(`[VideoProcessor] renderPhotoAnimation (${style}) done: ${frameCount} frames in ${actualDuration}s`);
 	return done;
 }
 
@@ -412,7 +421,8 @@ export async function playVideoToCanvas(
 	width: number,
 	height: number,
 	maxDurationSec = 30,
-	frameCallback?: FrameCallback
+	frameCallback?: FrameCallback,
+	pauseClock?: PauseClock
 ): Promise<number> {
 	console.log(`[VideoProcessor] playVideoToCanvas: ${file.name}, ${(file.size / 1024 / 1024).toFixed(1)}MB`);
 	const video = document.createElement('video');
@@ -430,25 +440,32 @@ export async function playVideoToCanvas(
 
 	video.currentTime = 0;
 	await video.play();
+	console.log(`[VideoProcessor] playVideoToCanvas: playback started (duration target: ${duration.toFixed(1)}s)`);
 
 	const startTime = performance.now();
+	let frameCount = 0;
+	let hiddenFrames = 0;
 	await new Promise<void>((resolve) => {
 		const drawFrame = () => {
 			if (video.ended || video.currentTime >= duration) {
 				resolve();
 				return;
 			}
+			if (document.hidden) { hiddenFrames++; requestAnimationFrame(drawFrame); return; }
 			drawCover(ctx, video, width, height);
 			frameCallback?.(ctx);
+			frameCount++;
 			requestAnimationFrame(drawFrame);
 		};
 		drawFrame();
 	});
 
 	video.pause();
-	const actualDuration = (performance.now() - startTime) / 1000;
+	const wallTime = performance.now() - startTime;
+	const pausedTime = pauseClock?.get() ?? 0;
+	const actualDuration = (wallTime - pausedTime) / 1000;
 	URL.revokeObjectURL(video.src);
-	console.log(`[VideoProcessor] Video played to canvas: ${actualDuration.toFixed(1)}s`);
+	console.log(`[VideoProcessor] playVideoToCanvas done: ${frameCount} frames drawn, ${hiddenFrames} hidden skips, wall=${(wallTime/1000).toFixed(1)}s, paused=${(pausedTime/1000).toFixed(1)}s, effective=${actualDuration.toFixed(1)}s`);
 	return actualDuration;
 }
 
@@ -461,7 +478,8 @@ export async function drawPhotoAnimationToCanvas(
 	height: number,
 	style: AnimationStyle = 'kenBurns',
 	durationSec = 3,
-	frameCallback?: FrameCallback
+	frameCallback?: FrameCallback,
+	pauseClock?: PauseClock
 ): Promise<void> {
 	const img = new Image();
 	const imgUrl = URL.createObjectURL(file);
@@ -495,26 +513,32 @@ export async function drawPhotoAnimationToCanvas(
 		cropW, cropH, baseSx, baseSy
 	});
 
+	console.log(`[VideoProcessor] drawPhotoAnimationToCanvas: starting (${style}, ${durationSec}s, img: ${srcW}x${srcH})`);
 	const startTime = performance.now();
 	const durationMs = durationSec * 1000;
 
+	let frameCount = 0;
+	let hiddenFrames = 0;
 	await new Promise<void>((resolve) => {
 		const drawFrame = () => {
-			const elapsed = performance.now() - startTime;
+			const elapsed = performance.now() - startTime - (pauseClock?.get() ?? 0);
 			if (elapsed >= durationMs) {
 				resolve();
 				return;
 			}
+			if (document.hidden) { hiddenFrames++; requestAnimationFrame(drawFrame); return; }
 			const t = elapsed / durationMs;
 			drawAnimatedFrame(t);
 			frameCallback?.(ctx);
+			frameCount++;
 			requestAnimationFrame(drawFrame);
 		};
 		drawFrame();
 	});
 
+	const wallTime = ((performance.now() - startTime) / 1000).toFixed(1);
 	URL.revokeObjectURL(imgUrl);
-	console.log(`[VideoProcessor] Photo animation (${style}) drawn to canvas`);
+	console.log(`[VideoProcessor] drawPhotoAnimationToCanvas (${style}) done: ${frameCount} frames, ${hiddenFrames} hidden skips, wall=${wallTime}s`);
 }
 
 /** Draw white flash frames directly to a provided canvas context (no internal recorder). */
@@ -523,22 +547,28 @@ export async function drawWhiteFlashToCanvas(
 	width: number,
 	height: number,
 	durationMs = 200,
-	frameCallback?: FrameCallback
+	frameCallback?: FrameCallback,
+	pauseClock?: PauseClock
 ): Promise<void> {
 	const startTime = performance.now();
+	let frameCount = 0;
 	await new Promise<void>((resolve) => {
 		const drawFrame = () => {
-			if (performance.now() - startTime >= durationMs) {
+			const elapsed = performance.now() - startTime - (pauseClock?.get() ?? 0);
+			if (elapsed >= durationMs) {
 				resolve();
 				return;
 			}
+			if (document.hidden) { requestAnimationFrame(drawFrame); return; }
 			ctx.fillStyle = '#FFFFFF';
 			ctx.fillRect(0, 0, width, height);
 			frameCallback?.(ctx);
+			frameCount++;
 			requestAnimationFrame(drawFrame);
 		};
 		drawFrame();
 	});
+	console.log(`[VideoProcessor] White flash: ${frameCount} frames in ${durationMs}ms`);
 }
 
 function sleep(ms: number): Promise<void> {

@@ -34,16 +34,16 @@ export function checkBrowserSupport(): BrowserSupport {
 }
 
 export function getSupportedMimeType(): string {
-	// Safari prefers mp4
-	if (MediaRecorder.isTypeSupported('video/mp4')) {
-		return 'video/mp4';
-	}
-	// Chrome/Firefox prefer webm
+	// Prefer WebM for better compression
 	if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
 		return 'video/webm;codecs=vp9';
 	}
 	if (MediaRecorder.isTypeSupported('video/webm')) {
 		return 'video/webm';
+	}
+	// Safari only supports mp4
+	if (MediaRecorder.isTypeSupported('video/mp4')) {
+		return 'video/mp4';
 	}
 	throw new Error('No supported video format');
 }

@@ -1,5 +1,6 @@
 import maplibregl from 'maplibre-gl';
 import type { Location, TransportMode, AspectRatio, MapStyle } from '$lib/types';
+import type { PauseClock } from './exportGuard';
 import { getSupportedMimeType } from '$lib/utils/browserCompat';
 import { fontFamily } from '$lib/constants/fonts';
 import { loadFont } from '$lib/utils/fontLoader';
@@ -93,9 +94,21 @@ export function destroyMap(map: maplibregl.Map, container: HTMLDivElement) {
 /** Wait for all tiles to finish loading and rendering */
 export function waitForIdle(map: maplibregl.Map, timeoutMs = 4000): Promise<void> {
 	return new Promise((resolve) => {
-		const timeout = setTimeout(resolve, timeoutMs);
+		// If the map is already fully loaded and idle, resolve immediately
+		if (map.loaded() && !map.isMoving()) {
+			console.log('[MapRenderer] waitForIdle: map already idle, resolving immediately');
+			resolve();
+			return;
+		}
+
+		const start = performance.now();
+		const timeout = setTimeout(() => {
+			console.log(`[MapRenderer] waitForIdle: timeout after ${timeoutMs}ms (tiles may still be loading)`);
+			resolve();
+		}, timeoutMs);
 		map.once('idle', () => {
 			clearTimeout(timeout);
+			console.log(`[MapRenderer] waitForIdle: idle event fired after ${((performance.now() - start) / 1000).toFixed(1)}s`);
 			resolve();
 		});
 	});
@@ -864,7 +877,7 @@ export async function renderTitleCard(opts: TitleCardOpts): Promise<Blob> {
 
 	const durationSec = opts.durationSec ?? 2.5;
 	const secColor = opts.secondaryColor ?? '#0a0f1e';
-	const secTextColor = contrastTextColor(secColor);
+	// titleColor is used directly for text (user's chosen color)
 
 	function drawTextOverlay() {
 		ctx.save();
@@ -900,7 +913,7 @@ export async function renderTitleCard(opts: TitleCardOpts): Promise<Blob> {
 		ctx.font = `700 ${fontSize}px ${ff}`;
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
-		ctx.fillStyle = secTextColor;
+		ctx.fillStyle = titleColor;
 		for (let i = 0; i < titleLines.length; i++) {
 			ctx.fillText(titleLines[i], width / 2, blockStartY + i * titleLineHeight);
 		}
@@ -909,14 +922,14 @@ export async function renderTitleCard(opts: TitleCardOpts): Promise<Blob> {
 			const descStartY = blockStartY + totalTitleHeight + descGap;
 			ctx.font = `400 ${descFontSize}px ${ff}`;
 			ctx.globalAlpha = 0.7;
-			ctx.fillStyle = secTextColor;
+			ctx.fillStyle = titleColor;
 			for (let i = 0; i < descLines.length; i++) {
 				ctx.fillText(descLines[i], width / 2, descStartY + i * descLineHeight);
 			}
 			ctx.globalAlpha = 1;
 		} else {
 			const lineY = blockStartY + totalTitleHeight + fontSize * 0.4;
-			ctx.strokeStyle = secTextColor;
+			ctx.strokeStyle = titleColor;
 			ctx.globalAlpha = 0.4;
 			ctx.lineWidth = 2;
 			ctx.beginPath();
@@ -931,7 +944,7 @@ export async function renderTitleCard(opts: TitleCardOpts): Promise<Blob> {
 
 	function drawLogo() {
 		if (!logoImage) return;
-		const logoSize = Math.round(width * 0.07);
+		const logoSize = Math.round(width * 0.12);
 		const margin = Math.round(width * 0.04);
 		// Maintain aspect ratio
 		const scale = Math.min(logoSize / logoImage.naturalWidth, logoSize / logoImage.naturalHeight);
@@ -1007,7 +1020,8 @@ type FrameCallback = (ctx: CanvasRenderingContext2D) => void;
 export async function drawTitleCardToCanvas(
 	ctx: CanvasRenderingContext2D,
 	opts: TitleCardOpts,
-	frameCallback?: FrameCallback
+	frameCallback?: FrameCallback,
+	pauseClock?: PauseClock
 ): Promise<void> {
 	const { title, titleColor, aspectRatio, description, mediaFile } = opts;
 	const { width, height } = getResolution(aspectRatio);
@@ -1055,7 +1069,7 @@ export async function drawTitleCardToCanvas(
 
 	const durationSec = opts.durationSec ?? 2.5;
 	const secColor = opts.secondaryColor ?? '#0a0f1e';
-	const secTextColor = contrastTextColor(secColor);
+	// titleColor is used directly for text (user's chosen color)
 
 	function drawTextOverlay() {
 		ctx.save();
@@ -1086,7 +1100,7 @@ export async function drawTitleCardToCanvas(
 		ctx.font = `700 ${fontSize}px ${ff}`;
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
-		ctx.fillStyle = secTextColor;
+		ctx.fillStyle = titleColor;
 		for (let i = 0; i < titleLines.length; i++) {
 			ctx.fillText(titleLines[i], width / 2, blockStartY + i * titleLineHeight);
 		}
@@ -1095,14 +1109,14 @@ export async function drawTitleCardToCanvas(
 			const descStartY = blockStartY + totalTitleHeight + descGap;
 			ctx.font = `400 ${descFontSize}px ${ff}`;
 			ctx.globalAlpha = 0.7;
-			ctx.fillStyle = secTextColor;
+			ctx.fillStyle = titleColor;
 			for (let i = 0; i < descLines.length; i++) {
 				ctx.fillText(descLines[i], width / 2, descStartY + i * descLineHeight);
 			}
 			ctx.globalAlpha = 1;
 		} else {
 			const lineY = blockStartY + totalTitleHeight + fontSize * 0.4;
-			ctx.strokeStyle = secTextColor;
+			ctx.strokeStyle = titleColor;
 			ctx.globalAlpha = 0.4;
 			ctx.lineWidth = 2;
 			ctx.beginPath();
@@ -1117,7 +1131,7 @@ export async function drawTitleCardToCanvas(
 
 	function drawLogo() {
 		if (!logoImage) return;
-		const logoSize = Math.round(width * 0.07);
+		const logoSize = Math.round(width * 0.12);
 		const margin = Math.round(width * 0.04);
 		const scale = Math.min(logoSize / logoImage.naturalWidth, logoSize / logoImage.naturalHeight);
 		const drawW = logoImage.naturalWidth * scale;
@@ -1151,17 +1165,24 @@ export async function drawTitleCardToCanvas(
 
 	const durationMs = durationSec * 1000;
 	const startTime = performance.now();
+	let frameCount = 0;
+	console.log(`[MapRenderer] drawTitleCardToCanvas: starting (${durationSec}s, bg=${bgImage ? 'media' : 'gradient'}, logo=${!!logoImage})`);
 	await new Promise<void>((resolve) => {
 		const frame = () => {
-			if (performance.now() - startTime >= durationMs) { resolve(); return; }
+			const elapsed = performance.now() - startTime - (pauseClock?.get() ?? 0);
+			if (elapsed >= durationMs) { resolve(); return; }
+			if (document.hidden) { requestAnimationFrame(frame); return; }
 			drawFrame();
+			frameCount++;
 			requestAnimationFrame(frame);
 		};
 		frame();
 	});
 	drawFrame(); // final frame
+	frameCount++;
 
-	console.log('[MapRenderer] Title card drawn to canvas');
+	const wallTime = ((performance.now() - startTime) / 1000).toFixed(1);
+	console.log(`[MapRenderer] drawTitleCardToCanvas done: ${frameCount} frames, wall=${wallTime}s`);
 }
 
 /** Draw a fly-to animation directly to a provided canvas context using a reusable map.
@@ -1178,7 +1199,8 @@ export async function drawFlyToToCanvas(
 	titleColor: string = '#FFFFFF',
 	fontId: string = 'inter',
 	secondaryColor: string = '#0a0f1e',
-	frameCallback?: FrameCallback
+	frameCallback?: FrameCallback,
+	pauseClock?: PauseClock
 ): Promise<void> {
 	const displayName = location.label || location.name.split(',')[0];
 	const ff = fontFamily(fontId);
@@ -1195,7 +1217,7 @@ export async function drawFlyToToCanvas(
 
 	if (!prevLocation) {
 		// First location: fly in from zoom 10 → CLOSE_ZOOM
-		console.log(`[MapRenderer] drawFlyToToCanvas (first): "${location.name}"`);
+		console.log(`[MapRenderer] drawFlyToToCanvas (first): "${location.name}" — flyTo=${FLY_TO_DURATION}ms + hold=2000ms`);
 		const HOLD = 2000;
 		const totalMs = FLY_TO_DURATION + HOLD;
 
@@ -1207,10 +1229,12 @@ export async function drawFlyToToCanvas(
 		});
 
 		const startTime = performance.now();
+		let frameCount = 0;
 		await new Promise<void>((resolve) => {
 			const frame = () => {
-				const elapsed = performance.now() - startTime;
+				const elapsed = performance.now() - startTime - (pauseClock?.get() ?? 0);
 				if (elapsed >= totalMs) { resolve(); return; }
+				if (document.hidden) { requestAnimationFrame(frame); return; }
 				drawMapFrame(elapsed, (ctx2, el) => {
 					if (el >= FLY_TO_DURATION) {
 						const point = map.project([location.lng, location.lat]);
@@ -1218,6 +1242,7 @@ export async function drawFlyToToCanvas(
 						drawLocationTitleOnCanvas(ctx2, displayName, width, titleColor, ff, location.rating, secondaryColor);
 					}
 				});
+				frameCount++;
 				requestAnimationFrame(frame);
 			};
 			frame();
@@ -1228,6 +1253,9 @@ export async function drawFlyToToCanvas(
 			drawPinOnCanvas(ctx2, point.x, point.y, displayName, titleColor, ff, location.rating, false);
 			drawLocationTitleOnCanvas(ctx2, displayName, width, titleColor, ff, location.rating, secondaryColor);
 		});
+		frameCount++;
+		const wallTime = ((performance.now() - startTime) / 1000).toFixed(1);
+		console.log(`[MapRenderer] drawFlyToToCanvas (first) done: ${frameCount} frames, wall=${wallTime}s`);
 		return;
 	}
 
@@ -1260,21 +1288,30 @@ export async function drawFlyToToCanvas(
 		duration: ZOOM_OUT_MS,
 		essential: true
 	});
-	// Schedule phase 2: zoom in
-	setTimeout(() => {
-		map.flyTo({
-			center: [location.lng, location.lat],
-			zoom: CLOSE_ZOOM,
-			duration: ZOOM_IN_MS,
-			essential: true
-		});
-	}, zoomInAt);
+
+	// Phase 2 (zoom in) triggered by elapsed time instead of setTimeout
+	let phase2Started = false;
 
 	const startTime = performance.now();
+	let frameCount = 0;
 	await new Promise<void>((resolve) => {
 		const frame = () => {
-			const elapsed = performance.now() - startTime;
+			const elapsed = performance.now() - startTime - (pauseClock?.get() ?? 0);
 			if (elapsed >= totalMs) { resolve(); return; }
+			if (document.hidden) { requestAnimationFrame(frame); return; }
+
+			// Trigger phase 2 zoom-in at the right elapsed time
+			if (elapsed >= zoomInAt && !phase2Started) {
+				phase2Started = true;
+				console.log(`[MapRenderer] drawFlyToToCanvas: phase 2 zoom-in triggered at elapsed=${elapsed.toFixed(0)}ms (target: ${zoomInAt}ms)`);
+				map.flyTo({
+					center: [location.lng, location.lat],
+					zoom: CLOSE_ZOOM,
+					duration: ZOOM_IN_MS,
+					essential: true
+				});
+			}
+
 			drawMapFrame(elapsed, (ctx2, el) => {
 				if (el < 400) {
 					const prevPoint = map.project([prevLocation.lng, prevLocation.lat]);
@@ -1291,6 +1328,7 @@ export async function drawFlyToToCanvas(
 					}
 				}
 			});
+			frameCount++;
 			requestAnimationFrame(frame);
 		};
 		frame();
@@ -1304,6 +1342,9 @@ export async function drawFlyToToCanvas(
 			drawTransportBadgeOnCanvas(ctx2, transportMode, width, height, titleColor, ff, secondaryColor);
 		}
 	});
+	frameCount++;
+	const wallTime = ((performance.now() - startTime) / 1000).toFixed(1);
+	console.log(`[MapRenderer] drawFlyToToCanvas (transition) done: "${prevLocation.name}" → "${location.name}", ${frameCount} frames, wall=${wallTime}s`);
 }
 
 /** Draw the final route map animation directly to a provided canvas context using a reusable map.
@@ -1319,7 +1360,8 @@ export async function drawFinalRouteToCanvas(
 	titleColor: string = '#FFFFFF',
 	fontId: string = 'inter',
 	secondaryColor: string = '#0a0f1e',
-	frameCallback?: FrameCallback
+	frameCallback?: FrameCallback,
+	pauseClock?: PauseClock
 ): Promise<void> {
 	if (locations.length === 0) throw new Error('No locations for final route');
 
@@ -1330,22 +1372,30 @@ export async function drawFinalRouteToCanvas(
 	const totalSegments = locations.length - 1;
 	const segmentDuration = totalSegments > 0 ? 2000 / totalSegments : 0;
 
-	// Start adding route line segments with staggered timing
-	for (let i = 0; i < totalSegments; i++) {
-		setTimeout(() => {
-			const from = locations[i];
-			const to = locations[i + 1];
-			const mode = to.transportMode ?? 'drove';
-			const geom = routeGeometries?.[i];
-			addRouteLine(map, from, to, mode, `route-${i}`, geom?.coordinates, titleColor);
-		}, i * segmentDuration);
-	}
+	console.log(`[MapRenderer] drawFinalRouteToCanvas: starting (${locations.length} locations, ${totalSegments} segments, segmentDur=${segmentDuration.toFixed(0)}ms, totalDur=${FINAL_MAP_DURATION}ms)`);
+
+	// Track which segments have been added (elapsed-time based instead of setTimeout)
+	let segmentsAdded = 0;
 
 	const startTime = performance.now();
+	let frameCount = 0;
 	await new Promise<void>((resolve) => {
 		const frame = () => {
-			const elapsed = performance.now() - startTime;
+			const elapsed = performance.now() - startTime - (pauseClock?.get() ?? 0);
 			if (elapsed >= FINAL_MAP_DURATION) { resolve(); return; }
+			if (document.hidden) { requestAnimationFrame(frame); return; }
+
+			// Add route segments based on elapsed time
+			while (segmentsAdded < totalSegments && elapsed >= segmentsAdded * segmentDuration) {
+				const from = locations[segmentsAdded];
+				const to = locations[segmentsAdded + 1];
+				const mode = to.transportMode ?? 'drove';
+				const geom = routeGeometries?.[segmentsAdded];
+				addRouteLine(map, from, to, mode, `route-${segmentsAdded}`, geom?.coordinates, titleColor);
+				console.log(`[MapRenderer] drawFinalRouteToCanvas: added segment ${segmentsAdded + 1}/${totalSegments} at elapsed=${elapsed.toFixed(0)}ms`);
+				segmentsAdded++;
+			}
+
 			ctx.clearRect(0, 0, width, height);
 			ctx.drawImage(mapCanvas, 0, 0, width, height);
 			// Draw pins with labels
@@ -1356,6 +1406,7 @@ export async function drawFinalRouteToCanvas(
 			}
 			drawStatsOnCanvas(ctx, stats, width, height, titleColor, ff, secondaryColor);
 			frameCallback?.(ctx);
+			frameCount++;
 			requestAnimationFrame(frame);
 		};
 		frame();
@@ -1370,8 +1421,10 @@ export async function drawFinalRouteToCanvas(
 	}
 	drawStatsOnCanvas(ctx, stats, width, height, titleColor, ff, secondaryColor);
 	frameCallback?.(ctx);
+	frameCount++;
 
-	console.log('[MapRenderer] Final route drawn to canvas');
+	const wallTime = ((performance.now() - startTime) / 1000).toFixed(1);
+	console.log(`[MapRenderer] drawFinalRouteToCanvas done: ${frameCount} frames, ${segmentsAdded}/${totalSegments} segments drawn, wall=${wallTime}s`);
 }
 
 function sleep(ms: number): Promise<void> {

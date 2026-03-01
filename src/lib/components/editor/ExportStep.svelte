@@ -35,6 +35,7 @@
 		shareUrl = null,
 		estimatedDuration,
 		exportElapsed,
+		exportPaused = false,
 		onexport,
 		onback,
 		oncancel,
@@ -67,6 +68,7 @@
 		shareUrl?: string | null;
 		estimatedDuration?: string;
 		exportElapsed?: number;
+		exportPaused?: boolean;
 		onexport: () => void;
 		onback: () => void;
 		oncancel?: () => void;
@@ -77,21 +79,6 @@
 		onshare?: () => void;
 		onmusicmerged?: (blob: Blob, url: string) => void;
 	} = $props();
-
-	const ratios: { value: AspectRatio; label: string; width: string; height: string }[] = [
-		{ value: '9:16', label: 'Vertical', width: 'w-12', height: 'h-20' },
-		{ value: '1:1', label: 'Square', width: 'w-16', height: 'h-16' },
-		{ value: '16:9', label: 'Horizontal', width: 'w-20', height: 'h-12' }
-	];
-
-	const mapStyles: { value: MapStyle; label: string; icon: string }[] = [
-		{ value: 'streets', label: 'Streets', icon: '🗺️' },
-		{ value: 'satellite', label: 'Satellite', icon: '🛰️' },
-		{ value: 'outdoor', label: 'Outdoor', icon: '🏔️' },
-		{ value: 'topo', label: 'Topo', icon: '🧭' },
-		{ value: 'dark', label: 'Dark', icon: '🌙' },
-		{ value: 'light', label: 'Light', icon: '☀️' }
-	];
 
 	const supportsVoiceOver = canRecordVoiceOver();
 	const hasVideoWithAudio = $derived(locations.some((l) => l.clips.some((c) => c.type === 'video' && c.file)));
@@ -339,7 +326,7 @@
 <div class="space-y-6">
 	<div>
 		<h2 class="text-xl font-semibold mb-1">Export</h2>
-		<p class="text-sm text-text-muted">Choose your aspect ratio and export your TripStitch.</p>
+		<p class="text-sm text-text-muted">Export your TripStitch.</p>
 	</div>
 
 	{#if !browserSupported}
@@ -373,9 +360,18 @@
 	{:else if isExporting}
 		<!-- Exporting with step checklist -->
 		<div class="flex flex-col items-center py-6 gap-5">
-			<p class="text-base font-medium text-text-primary">
-				{progress?.message ?? 'Getting things ready...'}
-			</p>
+			{#if exportPaused}
+				<div class="flex items-center gap-2 px-4 py-2 rounded-lg bg-warning/10 border border-warning/30">
+					<svg class="w-4 h-4 text-warning flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+					</svg>
+					<p class="text-sm font-medium text-warning">Stitching paused — switch back to continue</p>
+				</div>
+			{:else}
+				<p class="text-base font-medium text-text-primary">
+					{progress?.message ?? 'Getting things ready...'}
+				</p>
+			{/if}
 
 			{#if exportSteps.length > 0}
 				<div class="w-full max-w-xs space-y-2">
@@ -410,9 +406,13 @@
 				</div>
 				<p class="text-xs text-text-muted text-center mt-1.5">{progressPercent}%</p>
 				{#if exportElapsed != null}
-					<p class="text-xs text-text-muted text-center mt-1">Elapsed: {Math.floor(exportElapsed / 60)}:{String(exportElapsed % 60).padStart(2, '0')}</p>
+					<p class="text-xs text-text-muted text-center mt-1">
+						Elapsed: {Math.floor(exportElapsed / 60)}:{String(exportElapsed % 60).padStart(2, '0')}{exportPaused ? ' (paused)' : ''}
+					</p>
 				{/if}
 			</div>
+
+			<p class="text-xs text-text-muted text-center px-4">Keep this tab open and active while your video is being stitched together</p>
 
 			{#if oncancel}
 				<button
@@ -700,53 +700,7 @@
 			{/if}
 		</div>
 	{:else}
-		<!-- Pre-export: aspect ratio + map style selection -->
-		<div>
-			<span class="block text-sm font-medium text-text-secondary mb-3">Aspect Ratio</span>
-			<div class="grid grid-cols-3 gap-3">
-				{#each ratios as ratio}
-					<button
-						class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all cursor-pointer
-							{aspectRatio === ratio.value
-							? 'border-accent bg-accent-light'
-							: 'border-border bg-card hover:border-primary-light'}"
-						onclick={() => (aspectRatio = ratio.value)}
-					>
-						<div
-							class="{ratio.width} {ratio.height} rounded border-2
-								{aspectRatio === ratio.value ? 'border-accent' : 'border-border'}"
-						></div>
-						<div class="text-center">
-							<p class="text-xs font-medium {aspectRatio === ratio.value ? 'text-text-primary' : 'text-text-muted'}">
-								{ratio.label}
-							</p>
-							<p class="text-xs text-text-muted">{ratio.value}</p>
-						</div>
-					</button>
-				{/each}
-			</div>
-		</div>
-
-		<div>
-			<span class="block text-sm font-medium text-text-secondary mb-3">Map Style</span>
-			<div class="grid grid-cols-3 gap-2">
-				{#each mapStyles as style}
-					<button
-						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all cursor-pointer
-							{mapStyle === style.value
-							? 'border-accent bg-accent-light'
-							: 'border-border bg-card hover:border-primary-light'}"
-						onclick={() => (mapStyle = style.value)}
-					>
-						<span class="text-xl">{style.icon}</span>
-						<span class="text-xs font-medium {mapStyle === style.value ? 'text-text-primary' : 'text-text-muted'}">
-							{style.label}
-						</span>
-					</button>
-				{/each}
-			</div>
-		</div>
-
+		<!-- Pre-export -->
 		{#if estimatedDuration}
 			<p class="text-sm text-text-muted text-center">Estimated duration: {estimatedDuration}</p>
 		{/if}

@@ -267,20 +267,35 @@ export async function mergeVoiceOver(
 	musicGain?: number,
 	musicStartOffset?: number
 ): Promise<{ blob: Blob; url: string }> {
+	const mergeStart = performance.now();
+	console.log('[AudioMerge] ═══════════════════════════════════════════════════════');
+	console.log(`[AudioMerge] Starting audio merge:`);
+	console.log(`[AudioMerge]   Video: ${(videoBlob.size / 1024 / 1024).toFixed(1)}MB`);
+	console.log(`[AudioMerge]   Voice-over: ${voiceOverBlob ? (voiceOverBlob.size / 1024 / 1024).toFixed(1) + 'MB' : 'none'}`);
+	console.log(`[AudioMerge]   Music: ${musicBlob ? (musicBlob.size / 1024 / 1024).toFixed(1) + 'MB' : 'none'}`);
+	console.log(`[AudioMerge]   Keep original audio: ${keepOriginalAudio}`);
+	console.log(`[AudioMerge]   Gains: voiceOver=${voiceOverGain ?? 1.0}, original=${originalGain ?? 0.2}, music=${musicGain ?? 0.7}`);
+	console.log(`[AudioMerge]   Music start offset: ${musicStartOffset ?? 0}s`);
+
 	const audioCtx = new AudioContext();
+	console.log(`[AudioMerge] AudioContext created (sampleRate: ${audioCtx.sampleRate}Hz)`);
 
 	// Decode voice-over if provided
 	let voiceOverBuffer: AudioBuffer | null = null;
 	if (voiceOverBlob) {
 		onProgress?.(5, 'Decoding voice-over audio...');
+		const decStart = performance.now();
 		voiceOverBuffer = await audioCtx.decodeAudioData(await voiceOverBlob.arrayBuffer());
+		console.log(`[AudioMerge] Voice-over decoded: ${voiceOverBuffer.duration.toFixed(1)}s, ${voiceOverBuffer.numberOfChannels}ch, ${voiceOverBuffer.sampleRate}Hz (took ${((performance.now() - decStart) / 1000).toFixed(1)}s)`);
 	}
 
 	// Decode music if provided
 	let musicBuffer: AudioBuffer | null = null;
 	if (musicBlob) {
 		onProgress?.(voiceOverBuffer ? 8 : 5, 'Decoding music...');
+		const decStart = performance.now();
 		musicBuffer = await audioCtx.decodeAudioData(await musicBlob.arrayBuffer());
+		console.log(`[AudioMerge] Music decoded: ${musicBuffer.duration.toFixed(1)}s, ${musicBuffer.numberOfChannels}ch, ${musicBuffer.sampleRate}Hz (took ${((performance.now() - decStart) / 1000).toFixed(1)}s)`);
 	}
 
 	// Try to decode original audio from the video
@@ -288,10 +303,12 @@ export async function mergeVoiceOver(
 	if (keepOriginalAudio) {
 		try {
 			onProgress?.(10, 'Decoding original audio...');
+			const decStart = performance.now();
 			originalBuffer = await audioCtx.decodeAudioData(await videoBlob.arrayBuffer());
+			console.log(`[AudioMerge] Original audio decoded: ${originalBuffer.duration.toFixed(1)}s, ${originalBuffer.numberOfChannels}ch, ${originalBuffer.sampleRate}Hz (took ${((performance.now() - decStart) / 1000).toFixed(1)}s)`);
 		} catch {
 			// Video has no audio track or can't decode — that's fine
-			console.log('[VoiceOver] No decodable audio in original video');
+			console.log('[AudioMerge] No decodable audio in original video');
 		}
 	}
 
@@ -311,6 +328,7 @@ export async function mergeVoiceOver(
 	onProgress?.(20, 'Mixing audio tracks...');
 
 	const videoDuration = video.duration || 1;
+	console.log(`[AudioMerge] Video loaded: ${video.videoWidth}x${video.videoHeight}, duration=${videoDuration.toFixed(1)}s`);
 
 	// Set up audio mixing destination
 	const dest = audioCtx.createMediaStreamDestination();
@@ -343,7 +361,8 @@ export async function mergeVoiceOver(
 		musicSource.buffer = musicBuffer;
 		// If the remaining audio from offset to end isn't enough, loop the full song
 		const remaining = musicBuffer.duration - offset;
-		if (remaining < videoDuration) {
+		const willLoop = remaining < videoDuration;
+		if (willLoop) {
 			musicSource.loop = true;
 			musicSource.loopStart = 0;
 			musicSource.loopEnd = musicBuffer.duration;
@@ -356,6 +375,7 @@ export async function mergeVoiceOver(
 		musicGainNode.gain.setValueAtTime(gain, fadeStart);
 		musicGainNode.gain.linearRampToValueAtTime(0, videoDuration);
 		musicSource.connect(musicGainNode).connect(dest);
+		console.log(`[AudioMerge] Music source: offset=${offset.toFixed(1)}s, remaining=${remaining.toFixed(1)}s, loop=${willLoop}, fadeStart=${fadeStart.toFixed(1)}s, gain=${gain}`);
 	}
 
 	// Get video track from captureStream (no audio since video is muted)
@@ -367,7 +387,9 @@ export async function mergeVoiceOver(
 	const combinedStream = new MediaStream([videoTrack, audioTrack]);
 
 	const mimeType = getSupportedMimeType();
+	console.log(`[AudioMerge] Combined stream: ${combinedStream.getTracks().length} tracks (video: ${videoTrack?.readyState ?? 'none'}, audio: ${audioTrack?.readyState ?? 'none'})`);
 	const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: 5_000_000 });
+	console.log(`[AudioMerge] Merge recorder created: mimeType=${recorder.mimeType}`);
 	const chunks: Blob[] = [];
 	recorder.ondataavailable = (e) => {
 		if (e.data.size > 0) chunks.push(e.data);
@@ -389,6 +411,7 @@ export async function mergeVoiceOver(
 	origSource?.start();
 	musicSource?.start(0, offset);
 	await video.play();
+	console.log(`[AudioMerge] Merge playback started (videoDuration: ${videoDuration.toFixed(1)}s)`);
 
 	// Wait for video to finish
 	await new Promise<void>((resolve) => {
@@ -412,8 +435,15 @@ export async function mergeVoiceOver(
 	const mergedBlob = await done;
 	const mergedUrl = URL.createObjectURL(mergedBlob);
 
+	const totalTime = ((performance.now() - mergeStart) / 1000).toFixed(1);
 	onProgress?.(100, 'Done!');
-	console.log(`[VoiceOver] Merge complete: ${mergedBlob.size} bytes`);
+	console.log('[AudioMerge] ═══════════════════════════════════════════════════════');
+	console.log(`[AudioMerge] MERGE COMPLETE`);
+	console.log(`[AudioMerge]   Total wall time: ${totalTime}s`);
+	console.log(`[AudioMerge]   Input video: ${(videoBlob.size / 1024 / 1024).toFixed(1)}MB`);
+	console.log(`[AudioMerge]   Output: ${(mergedBlob.size / 1024 / 1024).toFixed(1)}MB`);
+	console.log(`[AudioMerge]   Tracks mixed: ${[voiceOverBuffer && 'voiceover', originalBuffer && 'original', musicBuffer && 'music'].filter(Boolean).join(', ') || 'none'}`);
+	console.log('[AudioMerge] ═══════════════════════════════════════════════════════');
 	return { blob: mergedBlob, url: mergedUrl };
 }
 
@@ -427,6 +457,7 @@ export async function mergeMusic(
 	originalGain?: number,
 	musicStartOffset?: number
 ): Promise<{ blob: Blob; url: string }> {
+	console.log(`[AudioMerge] mergeMusic called: video=${(videoBlob.size / 1024 / 1024).toFixed(1)}MB, music=${(musicBlob.size / 1024 / 1024).toFixed(1)}MB, keepOriginal=${keepOriginalAudio}, musicGain=${musicGain ?? 0.7}, offset=${musicStartOffset ?? 0}s`);
 	return mergeVoiceOver(
 		videoBlob,
 		null,

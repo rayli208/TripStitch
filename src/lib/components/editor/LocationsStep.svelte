@@ -3,6 +3,7 @@
 	import { suggestTransportMode } from '$lib/utils/distance';
 	import LocationSearch from './LocationSearch.svelte';
 	import MediaUpload from './MediaUpload.svelte';
+	import TransportPicker from './TransportPicker.svelte';
 	import StarRating from '$lib/components/ui/StarRating.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 
@@ -230,6 +231,17 @@
 					<p class="text-xs text-text-muted mt-0.5">Won't appear in the video — shows on your shared trip page.</p>
 				</div>
 			</div>
+
+			<!-- Transport mode (not shown for first location) -->
+			{#if activeIndex > 0}
+				<div class="px-4 py-3 border-b border-border">
+					<span class="text-xs text-text-muted block mb-1.5">How did you get here?</span>
+					<TransportPicker
+						mode={activeLoc.transportMode}
+						onchange={(mode) => ontransport(activeLoc!.id, mode)}
+					/>
+				</div>
+			{/if}
 
 			<!-- Clips list -->
 			<div class="p-4">
