@@ -244,15 +244,36 @@
 		handleExport();
 	}
 
-	function handleDownload() {
+	async function handleDownload() {
 		if (!videoBlob || !videoUrl) return;
-		const mimeType = getSupportedMimeType();
+		const mimeType = videoBlob.type || getSupportedMimeType();
 		const ext = getFileExtension(mimeType);
 		const filename = `${editor.title || 'tripstitch'}-${Date.now()}.${ext}`;
+
+		// On mobile / devices with native share: use share sheet so users can Save to Camera Roll
+		if (navigator.share && navigator.canShare) {
+			try {
+				const file = new File([videoBlob], filename, { type: mimeType });
+				if (navigator.canShare({ files: [file] })) {
+					await navigator.share({ files: [file] });
+					return;
+				}
+			} catch (err) {
+				// User cancelled share — that's fine, don't fall through to download
+				if ((err as Error).name === 'AbortError') return;
+				// Other error — fall through to anchor download
+			}
+		}
+
+		// Standard download via anchor tag (Chrome, Firefox, desktop Safari 14.5+)
+		const url = URL.createObjectURL(new Blob([videoBlob], { type: mimeType }));
 		const a = document.createElement('a');
-		a.href = videoUrl;
+		a.href = url;
 		a.download = filename;
+		document.body.appendChild(a);
 		a.click();
+		document.body.removeChild(a);
+		setTimeout(() => URL.revokeObjectURL(url), 10000);
 	}
 
 	function handleMusicMerged(blob: Blob, url: string) {
@@ -276,7 +297,7 @@
 		if (!navigator.share) return;
 		try {
 			if (videoBlob) {
-				const mimeType = getSupportedMimeType();
+				const mimeType = videoBlob.type || getSupportedMimeType();
 				const ext = getFileExtension(mimeType);
 				const file = new File([videoBlob], `${editor.title || 'tripstitch'}.${ext}`, { type: mimeType });
 				await navigator.share({ files: [file] });
@@ -340,7 +361,7 @@
 			onmove={(from, to) => editor.moveLocation(from, to)}
 			ontransport={(id, mode) => editor.updateLocationTransport(id, mode)}
 			onlabel={(id, label) => editor.updateLocationLabel(id, label)}
-			onnext={() => editor.nextStep()}
+			onnext={() => { editor.nextStep(); handleExport(); }}
 			onback={() => editor.prevStep()}
 		/>
 	{:else}

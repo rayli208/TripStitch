@@ -38,7 +38,7 @@ export function createEditorState(initial?: {
 	let canAddLocation = $derived(locations.length < 10);
 	let canExport = $derived(locations.length >= 2);
 	let hasContent = $derived(title.trim().length > 0 || locations.length > 0);
-	const stepLabels = ['Details', 'Locations', 'Review', 'Export'];
+	const stepLabels = ['Details', 'Locations', 'Review', 'Stitch'];
 
 	return {
 		get currentStep() {

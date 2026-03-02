@@ -223,9 +223,9 @@
 
 	<!-- Bottom nav -->
 	<div class="flex justify-between pt-2">
-		<Button variant="ghost" onclick={onback}>Back</Button>
+		<Button variant="ghost" onclick={onback}>Locations</Button>
 		<Button variant="primary" onclick={onnext}>
-			Next: Export
+			Stitch Video
 		</Button>
 	</div>
 </div>

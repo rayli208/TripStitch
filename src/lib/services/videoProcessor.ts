@@ -192,7 +192,7 @@ async function playBlobOnCanvas(
 }
 
 /** Draw a video/image centered on a canvas using "cover" fitting */
-function drawCover(
+export function drawCover(
 	ctx: CanvasRenderingContext2D,
 	source: HTMLVideoElement | HTMLImageElement,
 	targetW: number,
@@ -330,7 +330,7 @@ export async function renderKenBurnsPhoto(
 	return renderPhotoAnimation(file, width, height, 'kenBurns', durationSec);
 }
 
-interface AnimationContext {
+export interface AnimationContext {
 	ctx: CanvasRenderingContext2D;
 	img: HTMLImageElement;
 	width: number;
@@ -342,7 +342,7 @@ interface AnimationContext {
 }
 
 /** Returns a (t: 0→1) => void draw function for the selected animation style */
-function buildAnimationDrawFn(
+export function buildAnimationDrawFn(
 	style: AnimationStyle,
 	a: AnimationContext
 ): (t: number) => void {
@@ -569,6 +569,175 @@ export async function drawWhiteFlashToCanvas(
 		drawFrame();
 	});
 	console.log(`[VideoProcessor] White flash: ${frameCount} frames in ${durationMs}ms`);
+}
+
+// ─── Offline frame generators for WebCodecs path ───
+// These produce frames in tight loops (no rAF), calling onFrame() for each.
+
+/** Generate photo animation frames offline (tight for-loop, no rAF). */
+export async function generatePhotoAnimationFrames(
+	file: File,
+	canvas: HTMLCanvasElement,
+	w: number,
+	h: number,
+	style: AnimationStyle,
+	durationSec: number,
+	fps: number,
+	onFrame: (canvas: HTMLCanvasElement) => void,
+	frameOverlay?: FrameCallback
+): Promise<void> {
+	const ctx = canvas.getContext('2d')!;
+	const img = new Image();
+	const imgUrl = URL.createObjectURL(file);
+	img.src = imgUrl;
+
+	await new Promise<void>((resolve, reject) => {
+		img.onload = () => resolve();
+		img.onerror = () => reject(new Error('Failed to load photo'));
+	});
+
+	const srcW = img.naturalWidth;
+	const srcH = img.naturalHeight;
+	const srcAspect = srcW / srcH;
+	const tgtAspect = w / h;
+
+	let cropW: number, cropH: number, baseSx: number, baseSy: number;
+	if (srcAspect > tgtAspect) {
+		cropH = srcH;
+		cropW = srcH * tgtAspect;
+		baseSx = (srcW - cropW) / 2;
+		baseSy = 0;
+	} else {
+		cropW = srcW;
+		cropH = srcW / tgtAspect;
+		baseSx = 0;
+		baseSy = (srcH - cropH) / 2;
+	}
+
+	const drawAnimatedFrame = buildAnimationDrawFn(style, {
+		ctx, img, width: w, height: h,
+		cropW, cropH, baseSx, baseSy
+	});
+
+	const totalFrames = Math.round(durationSec * fps);
+	console.log(`[VideoProcessor] generatePhotoAnimationFrames: ${style}, ${totalFrames} frames`);
+
+	for (let i = 0; i < totalFrames; i++) {
+		const t = totalFrames > 1 ? i / (totalFrames - 1) : 0;
+		drawAnimatedFrame(t);
+		frameOverlay?.(ctx);
+		onFrame(canvas);
+	}
+
+	URL.revokeObjectURL(imgUrl);
+}
+
+/** Generate white flash frames offline (tight for-loop, no rAF). */
+export function generateWhiteFlashFrames(
+	canvas: HTMLCanvasElement,
+	w: number,
+	h: number,
+	durationSec: number,
+	fps: number,
+	onFrame: (canvas: HTMLCanvasElement) => void,
+	frameOverlay?: FrameCallback
+): void {
+	const ctx = canvas.getContext('2d')!;
+	const totalFrames = Math.max(1, Math.round(durationSec * fps));
+	console.log(`[VideoProcessor] generateWhiteFlashFrames: ${totalFrames} frames`);
+	for (let i = 0; i < totalFrames; i++) {
+		ctx.fillStyle = '#FFFFFF';
+		ctx.fillRect(0, 0, w, h);
+		frameOverlay?.(ctx);
+		onFrame(canvas);
+	}
+}
+
+/** Play a video at accelerated speed using requestVideoFrameCallback.
+ *  Returns actual video duration consumed (in seconds). */
+export async function playVideoAccelerated(
+	file: File,
+	canvas: HTMLCanvasElement,
+	w: number,
+	h: number,
+	maxDurationSec: number,
+	fps: number,
+	playbackRate: number,
+	onFrame: (canvas: HTMLCanvasElement) => void,
+	frameOverlay?: FrameCallback
+): Promise<number> {
+	const ctx = canvas.getContext('2d')!;
+	const video = document.createElement('video');
+	video.muted = true;
+	video.playsInline = true;
+	video.src = URL.createObjectURL(file);
+
+	await new Promise<void>((resolve, reject) => {
+		video.onloadedmetadata = () => resolve();
+		video.onerror = () => reject(new Error('Failed to load video'));
+	});
+
+	const duration = Math.min(video.duration, maxDurationSec);
+
+	console.log(`[VideoProcessor] playVideoAccelerated: ${file.name}, duration=${duration.toFixed(1)}s, rate=${playbackRate}x`);
+
+	video.currentTime = 0;
+	video.playbackRate = playbackRate;
+	await video.play();
+
+	let frameCount = 0;
+	const frameInterval = 1 / fps; // seconds of video time per output frame
+	let nextFrameVideoTime = 0; // next video timestamp to encode at
+
+	const hasRVFC = 'requestVideoFrameCallback' in video;
+
+	await new Promise<void>((resolve) => {
+		if (hasRVFC) {
+			// Use requestVideoFrameCallback for precise frame capture.
+			// At 4x playback, each callback may need to emit multiple output
+			// frames so the output duration matches the source video duration.
+			const onVideoFrame = (_now: DOMHighResTimeStamp, _metadata: { mediaTime: number }) => {
+				if (video.ended || video.currentTime >= duration) {
+					resolve();
+					return;
+				}
+				// Draw current decoded frame to canvas
+				drawCover(ctx, video, w, h);
+				frameOverlay?.(ctx);
+				// Encode frames to catch up with video time
+				while (nextFrameVideoTime <= video.currentTime && nextFrameVideoTime < duration) {
+					onFrame(canvas);
+					frameCount++;
+					nextFrameVideoTime += frameInterval;
+				}
+				(video as any).requestVideoFrameCallback(onVideoFrame);
+			};
+			(video as any).requestVideoFrameCallback(onVideoFrame);
+		} else {
+			// Fallback: rAF loop at 1x speed (no acceleration)
+			console.warn('[VideoProcessor] requestVideoFrameCallback not available, falling back to rAF');
+			video.playbackRate = 1;
+			const drawFrame = () => {
+				if (video.ended || video.currentTime >= duration) {
+					resolve();
+					return;
+				}
+				drawCover(ctx, video, w, h);
+				frameOverlay?.(ctx);
+				onFrame(canvas);
+				frameCount++;
+				requestAnimationFrame(drawFrame);
+			};
+			drawFrame();
+		}
+
+		video.onended = () => resolve();
+	});
+
+	video.pause();
+	URL.revokeObjectURL(video.src);
+	console.log(`[VideoProcessor] playVideoAccelerated done: ${frameCount} frames encoded, ${duration.toFixed(1)}s of video`);
+	return duration;
 }
 
 function sleep(ms: number): Promise<void> {

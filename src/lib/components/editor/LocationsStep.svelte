@@ -50,9 +50,54 @@
 	let wizardPhase = $state<'search' | 'card'>(locations.length === 0 ? 'search' : 'card');
 	let activeIndex = $state(Math.max(0, locations.length - 1));
 
-	let canProceed = $derived(locations.length >= 2);
+	let allLocsHaveClips = $derived(locations.every(l => l.clips.length > 0));
+	let canProceed = $derived(locations.length >= 2 && allLocsHaveClips);
 	let activeLoc = $derived(locations[activeIndex] as Location | undefined);
 	let activeLocHasClips = $derived(activeLoc ? activeLoc.clips.length > 0 : false);
+
+	// Video duration validation
+	let clipError = $state<string | null>(null);
+	let clipErrorTimeout: ReturnType<typeof setTimeout> | undefined;
+
+	function showClipError(msg: string) {
+		clipError = msg;
+		if (clipErrorTimeout) clearTimeout(clipErrorTimeout);
+		clipErrorTimeout = setTimeout(() => { clipError = null; }, 5000);
+	}
+
+	async function handleAddClip(locationId: string, file: File) {
+		if (file.type.startsWith('video/')) {
+			try {
+				const duration = await getVideoDuration(file);
+				if (duration > 30) {
+					showClipError(`Video is ${Math.round(duration)}s long. Maximum is 30 seconds.`);
+					return;
+				}
+			} catch {
+				// Can't read duration — allow it through
+			}
+		}
+		clipError = null;
+		onaddclip(locationId, file);
+	}
+
+	function getVideoDuration(file: File): Promise<number> {
+		return new Promise((resolve, reject) => {
+			const video = document.createElement('video');
+			video.preload = 'metadata';
+			video.onloadedmetadata = () => {
+				const dur = video.duration;
+				URL.revokeObjectURL(video.src);
+				if (isFinite(dur)) resolve(dur);
+				else reject(new Error('Could not read duration'));
+			};
+			video.onerror = () => {
+				URL.revokeObjectURL(video.src);
+				reject(new Error('Could not load video'));
+			};
+			video.src = URL.createObjectURL(file);
+		});
+	}
 
 	// Clip drag-and-drop state
 	let clipDragFromIndex: number | null = $state(null);
@@ -321,8 +366,13 @@
 				<!-- Add clip button (always present) -->
 				<MediaUpload
 					previewUrl={null}
-					onfile={(file) => onaddclip(activeLoc!.id, file)}
+					onfile={(file) => handleAddClip(activeLoc!.id, file)}
 				/>
+				{#if clipError}
+					<div class="mt-2 p-3 bg-error/10 border border-error/30 rounded-lg">
+						<p class="text-sm text-error">{clipError}</p>
+					</div>
+				{/if}
 			</div>
 
 			<!-- Prev / Next within locations -->
@@ -381,10 +431,12 @@
 
 	<!-- Bottom nav -->
 	<div class="flex justify-between pt-2">
-		<Button variant="ghost" onclick={onback}>Back</Button>
+		<Button variant="ghost" onclick={onback}>Details</Button>
 		<Button variant="primary" disabled={!canProceed} onclick={onnext}>
-			{#if !canProceed}
+			{#if locations.length < 2}
 				Add at least 2 stops
+			{:else if !allLocsHaveClips}
+				Each stop needs a clip
 			{:else}
 				Next: Review
 			{/if}

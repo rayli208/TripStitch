@@ -18,7 +18,7 @@ import { createExportGuard, type ExportGuard } from './exportGuard';
 import { totalDistance, totalTravelTime } from '$lib/utils/distance';
 import { suggestTransportMode } from '$lib/utils/distance';
 import { fetchAllRouteGeometries } from './routeService';
-import { getSupportedMimeType } from '$lib/utils/browserCompat';
+import { getSupportedMimeType, canUseWebCodecs } from '$lib/utils/browserCompat';
 import maplibregl from 'maplibre-gl';
 
 export interface AssemblyProgress {
@@ -44,8 +44,28 @@ export interface AssemblyResult {
 
 export type ProgressCallback = (progress: AssemblyProgress) => void;
 
-/** Main pipeline: assembles the full TripStitch video using single-pass recording */
+/** Main pipeline: routes to WebCodecs (fast) or MediaRecorder (fallback) path */
 export async function assembleVideo(
+	trip: Trip,
+	aspectRatio: AspectRatio,
+	onProgress?: ProgressCallback,
+	abortSignal?: AbortSignal,
+	mapStyle: MapStyle = 'streets',
+	logoUrl?: string | null,
+	secondaryColor: string = '#0a0f1e'
+): Promise<AssemblyResult> {
+	const { width, height } = getResolution(aspectRatio);
+	if (await canUseWebCodecs(width, height)) {
+		console.log('[TripStitch] WebCodecs supported — using fast pipeline');
+		const { assembleVideoWebCodecs } = await import('./videoAssemblerWebCodecs');
+		return assembleVideoWebCodecs(trip, aspectRatio, onProgress, abortSignal, mapStyle, logoUrl, secondaryColor);
+	}
+	console.log('[TripStitch] WebCodecs not available — using MediaRecorder fallback');
+	return assembleVideoMediaRecorder(trip, aspectRatio, onProgress, abortSignal, mapStyle, logoUrl, secondaryColor);
+}
+
+/** MediaRecorder fallback pipeline: single-pass recording (original implementation) */
+async function assembleVideoMediaRecorder(
 	trip: Trip,
 	aspectRatio: AspectRatio,
 	onProgress?: ProgressCallback,
@@ -264,8 +284,8 @@ export async function assembleVideo(
 				let combinedDuration = 0;
 
 				// White flash before clips
-				await drawWhiteFlashToCanvas(ctx, width, height, 200, frameOverlay, pauseClock);
-				timelineCursor += 0.2;
+				await drawWhiteFlashToCanvas(ctx, width, height, 100, frameOverlay, pauseClock);
+				timelineCursor += 0.1;
 
 				for (let ci = 0; ci < clipsWithFiles.length; ci++) {
 					const clip = clipsWithFiles[ci];
@@ -286,8 +306,8 @@ export async function assembleVideo(
 				addToTimeline(`clip-${location.id}`, displayName, combinedDuration, 'clip');
 
 				// White flash after clips
-				await drawWhiteFlashToCanvas(ctx, width, height, 200, frameOverlay, pauseClock);
-				timelineCursor += 0.2;
+				await drawWhiteFlashToCanvas(ctx, width, height, 100, frameOverlay, pauseClock);
+				timelineCursor += 0.1;
 
 				console.log(`[TripStitch]   Clips took ${((performance.now() - clipStart) / 1000).toFixed(1)}s wall time, combined duration: ${combinedDuration.toFixed(1)}s`);
 			} else {

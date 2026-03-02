@@ -8,6 +8,13 @@ declare global {
 		// interface PageState {}
 		// interface Platform {}
 	}
+
+	interface HTMLVideoElement {
+		requestVideoFrameCallback?(
+			callback: (now: DOMHighResTimeStamp, metadata: { mediaTime: number }) => void
+		): number;
+		cancelVideoFrameCallback?(handle: number): void;
+	}
 }
 
 export {};

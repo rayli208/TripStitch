@@ -64,7 +64,9 @@ export function createAudioRecorder(
 		start() {
 			chunks.length = 0;
 			paused = false;
-			recorder.start(100);
+			// Don't use timeslice — Safari's MP4 MediaRecorder produces
+			// fragmented chunks that create an invalid file when concatenated.
+			recorder.start();
 		},
 		stop() {
 			return new Promise<Blob>((resolve) => {
@@ -378,8 +380,35 @@ export async function mergeVoiceOver(
 		console.log(`[AudioMerge] Music source: offset=${offset.toFixed(1)}s, remaining=${remaining.toFixed(1)}s, loop=${willLoop}, fadeStart=${fadeStart.toFixed(1)}s, gain=${gain}`);
 	}
 
-	// Get video track from captureStream (no audio since video is muted)
-	const videoStream = (video as HTMLVideoElement & { captureStream(): MediaStream }).captureStream();
+	// Get video stream — Safari doesn't support video.captureStream(),
+	// so fall back to drawing frames to a canvas and capturing that.
+	let videoStream: MediaStream;
+	let canvas: HTMLCanvasElement | null = null;
+	let drawRaf: number | null = null;
+
+	const hasVideoCaptureStream = typeof (video as any).captureStream === 'function';
+	if (hasVideoCaptureStream) {
+		videoStream = (video as any).captureStream();
+		console.log('[AudioMerge] Using video.captureStream()');
+	} else {
+		// Safari fallback: draw video to canvas, capture canvas stream
+		canvas = document.createElement('canvas');
+		canvas.width = video.videoWidth || 1920;
+		canvas.height = video.videoHeight || 1080;
+		const canvasCtx = canvas.getContext('2d')!;
+		videoStream = canvas.captureStream(30);
+		console.log(`[AudioMerge] Using canvas fallback (${canvas.width}x${canvas.height})`);
+
+		// Continuously draw video frames to canvas
+		function drawFrame() {
+			if (video.paused || video.ended) return;
+			canvasCtx.drawImage(video, 0, 0, canvas!.width, canvas!.height);
+			drawRaf = requestAnimationFrame(drawFrame);
+		}
+		// Start drawing once video plays (set up below)
+		video.addEventListener('play', () => { drawFrame(); }, { once: false });
+	}
+
 	const videoTrack = videoStream.getVideoTracks()[0];
 	const audioTrack = dest.stream.getAudioTracks()[0];
 
@@ -428,6 +457,7 @@ export async function mergeVoiceOver(
 	try { voSource?.stop(); } catch { /* already stopped */ }
 	try { origSource?.stop(); } catch { /* already stopped */ }
 	try { musicSource?.stop(); } catch { /* already stopped */ }
+	if (drawRaf !== null) cancelAnimationFrame(drawRaf);
 	videoStream.getTracks().forEach((t) => t.stop());
 	await audioCtx.close();
 	URL.revokeObjectURL(videoUrl);

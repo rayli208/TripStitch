@@ -46,7 +46,7 @@ export function createExportGuard(
 		audioCtx = new AudioContext();
 		oscillator = audioCtx.createOscillator();
 		const gain = audioCtx.createGain();
-		gain.gain.value = 0.001; // near-silent
+		gain.gain.value = 0.00001; // inaudible but keeps tab alive
 		oscillator.connect(gain);
 		gain.connect(audioCtx.destination);
 		oscillator.start();
@@ -109,4 +109,80 @@ export function createExportGuard(
 
 	console.log('[ExportGuard] Export guard created successfully');
 	return { pauseClock, destroy };
+}
+
+// ─── WebCodecs Export Guard ───
+// Simpler guard for WebCodecs path: no MediaRecorder to pause/resume.
+// rAF loops naturally pause when the tab is hidden, and frame-index-based
+// timestamps mean no gaps appear in the output.
+
+export interface WebCodecsExportGuard {
+	readonly isHidden: boolean;
+	destroy: () => void;
+}
+
+export function createWebCodecsExportGuard(
+	onHidden?: () => void,
+	onVisible?: () => void
+): WebCodecsExportGuard {
+	let hidden = false;
+	let visibilityEventCount = 0;
+
+	console.log('[WebCodecsExportGuard] Creating guard...');
+
+	// --- Wake Lock ---
+	let wakeLock: WakeLockSentinel | null = null;
+	if ('wakeLock' in navigator) {
+		navigator.wakeLock.request('screen').then(
+			(lock) => { wakeLock = lock; console.log('[WebCodecsExportGuard] Wake lock acquired'); },
+			(err) => { console.warn('[WebCodecsExportGuard] Wake lock unavailable:', err); }
+		);
+	}
+
+	// --- Silent Audio (keeps Android tab alive) ---
+	let audioCtx: AudioContext | null = null;
+	let oscillator: OscillatorNode | null = null;
+	try {
+		audioCtx = new AudioContext();
+		oscillator = audioCtx.createOscillator();
+		const gain = audioCtx.createGain();
+		gain.gain.value = 0.00001; // inaudible but keeps tab alive
+		oscillator.connect(gain);
+		gain.connect(audioCtx.destination);
+		oscillator.start();
+	} catch (err) {
+		console.warn('[WebCodecsExportGuard] Silent audio unavailable:', err);
+	}
+
+	// --- Visibility Handler ---
+	function handleVisibility() {
+		visibilityEventCount++;
+		if (document.hidden) {
+			hidden = true;
+			console.log(`[WebCodecsExportGuard] Tab hidden (#${visibilityEventCount})`);
+			onHidden?.();
+		} else {
+			hidden = false;
+			console.log(`[WebCodecsExportGuard] Tab visible (#${visibilityEventCount})`);
+			onVisible?.();
+		}
+	}
+
+	document.addEventListener('visibilitychange', handleVisibility);
+
+	function destroy() {
+		console.log(`[WebCodecsExportGuard] Destroying (visibility events: ${visibilityEventCount})`);
+		document.removeEventListener('visibilitychange', handleVisibility);
+		try { wakeLock?.release(); } catch { /* ignore */ }
+		try { oscillator?.stop(); } catch { /* ignore */ }
+		try { audioCtx?.close(); } catch { /* ignore */ }
+		wakeLock = null;
+		oscillator = null;
+		audioCtx = null;
+	}
+
+	return {
+		get isHidden() { return hidden; },
+		destroy
+	};
 }

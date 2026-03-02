@@ -8,11 +8,15 @@
 	let {
 		musicSelection = $bindable<MusicSelection | null>(null),
 		musicVolume = $bindable(70),
-		videoDuration = 0
+		videoDuration = 0,
+		disabled = false,
+		onvolumechange
 	}: {
 		musicSelection?: MusicSelection | null;
 		musicVolume?: number;
 		videoDuration?: number;
+		disabled?: boolean;
+		onvolumechange?: (volume: number) => void;
 	} = $props();
 
 	let expanded = $state(false);
@@ -61,6 +65,15 @@
 	let loopRemaining = $derived(loops ? videoDuration - firstPassDur : 0);
 	let loopCount = $derived(loops && songDur > 0 ? Math.ceil(loopRemaining / songDur) : 0);
 	let maxOffset = $derived(Math.max(0, songDur - 5));
+
+	// Close and stop everything when disabled
+	$effect(() => {
+		if (disabled && expanded) {
+			stopPreview();
+			stopOffsetPreview();
+			expanded = false;
+		}
+	});
 
 	function stopPreview() {
 		previewHandle?.stop();
@@ -263,11 +276,12 @@
 	}
 </style>
 
-<div class="bg-card rounded-xl border border-border overflow-hidden">
+<div class="w-full bg-card rounded-xl border border-border overflow-hidden {disabled ? 'opacity-50 pointer-events-none' : ''}">
 	<!-- Header / collapsed view -->
 	<button
 		class="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-card/80 transition-colors"
-		onclick={() => { expanded = !expanded; if (!expanded) { stopPreview(); stopOffsetPreview(); } }}
+		onclick={() => { if (disabled) return; expanded = !expanded; if (!expanded) { stopPreview(); stopOffsetPreview(); } }}
+		{disabled}
 	>
 		<div class="flex items-center gap-2">
 			<svg class="w-5 h-5 {musicSelection ? 'text-accent' : 'text-text-muted'}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -528,6 +542,7 @@
 					min="0"
 					max="100"
 					bind:value={musicVolume}
+					oninput={() => onvolumechange?.(musicVolume)}
 					class="flex-1 bg-accent/30 text-accent"
 				/>
 				<span class="text-xs text-text-muted font-mono w-9 text-right">{musicVolume}%</span>
