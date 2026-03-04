@@ -16,6 +16,8 @@ sw.addEventListener('install', (event) => {
 	event.waitUntil(
 		caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
 	);
+	// Activate new version immediately instead of waiting for all tabs to close
+	sw.skipWaiting();
 });
 
 sw.addEventListener('activate', (event) => {
@@ -27,6 +29,8 @@ sw.addEventListener('activate', (event) => {
 			)
 		)
 	);
+	// Take control of all open clients immediately
+	sw.clients.claim();
 });
 
 sw.addEventListener('fetch', (event) => {

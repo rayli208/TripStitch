@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import BottomNav from './BottomNav.svelte';
+	import InstallPWA from '$lib/components/ui/InstallPWA.svelte';
 
 	let {
 		title = 'TripStitch',
@@ -39,6 +40,7 @@
 			{/if}
 			<h1 class="text-lg font-semibold flex-1 truncate">{title}</h1>
 			<div class="flex items-center gap-2 flex-shrink-0">
+				<InstallPWA modal={false} />
 				{#if actions}
 					{@render actions()}
 				{/if}
@@ -52,3 +54,4 @@
 		<BottomNav />
 	{/if}
 </div>
+<InstallPWA button={false} />

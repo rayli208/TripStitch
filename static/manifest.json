@@ -1,7 +1,7 @@
 {
   "name": "TripStitch",
   "short_name": "TripStitch",
-  "start_url": "/",
+  "start_url": "/create",
   "display": "standalone",
   "background_color": "#FFFFFF",
   "theme_color": "#F4845F",
