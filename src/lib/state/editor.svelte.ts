@@ -1,4 +1,4 @@
-import type { Location, Clip, TransportMode, AspectRatio, AnimationStyle, MapStyle, MusicSelection } from '$lib/types';
+import type { Location, Clip, TransportMode, AspectRatio, AnimationStyle, MapStyle, MusicSelection, TripTag, TripVisibility, PriceTier } from '$lib/types';
 
 export function createEditorState(initial?: {
 	title?: string;
@@ -10,6 +10,8 @@ export function createEditorState(initial?: {
 	tripDate?: string;
 	aspectRatio?: AspectRatio;
 	locations?: Location[];
+	tags?: TripTag[];
+	visibility?: TripVisibility;
 }) {
 	let currentStep = $state(0);
 	let title = $state(initial?.title ?? '');
@@ -27,6 +29,8 @@ export function createEditorState(initial?: {
 	})) : []);
 	let aspectRatio = $state<AspectRatio>(initial?.aspectRatio ?? '9:16');
 	let mapStyle = $state<MapStyle>(initial?.mapStyle ?? 'streets');
+	let tags = $state<TripTag[]>(initial?.tags ?? []);
+	let visibility = $state<TripVisibility>(initial?.visibility ?? 'public');
 	let tripDate = $state(initial?.tripDate ?? new Date().toISOString().slice(0, 10));
 	let keepOriginalAudio = $state(true);
 	let musicSelection = $state<MusicSelection | null>(null);
@@ -107,6 +111,18 @@ export function createEditorState(initial?: {
 		set mapStyle(v: MapStyle) {
 			mapStyle = v;
 		},
+		get tags() {
+			return tags;
+		},
+		set tags(v: TripTag[]) {
+			tags = v;
+		},
+		get visibility() {
+			return visibility;
+		},
+		set visibility(v: TripVisibility) {
+			visibility = v;
+		},
 		get tripDate() {
 			return tripDate;
 		},
@@ -178,7 +194,8 @@ export function createEditorState(initial?: {
 				country: loc.country ?? null,
 				clips: [],
 				transportMode: null,
-				rating: null
+				rating: null,
+				priceTier: null
 			};
 			locations = [...locations, newLoc];
 		},
@@ -261,6 +278,12 @@ export function createEditorState(initial?: {
 		updateLocationRating(id: string, rating: number | null) {
 			locations = locations.map((l) =>
 				l.id === id ? { ...l, rating } : l
+			);
+		},
+
+		updateLocationPriceTier(id: string, priceTier: PriceTier | null) {
+			locations = locations.map((l) =>
+				l.id === id ? { ...l, priceTier } : l
 			);
 		},
 

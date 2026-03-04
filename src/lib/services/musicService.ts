@@ -64,6 +64,7 @@ export function createTrackPreview(url: string): {
 	function play() {
 		stop();
 		audio.currentTime = 0;
+		// Expected: browsers may block autoplay without user gesture
 		audio.play().catch(() => {});
 		playing = true;
 		timeout = setTimeout(stop, 8000);

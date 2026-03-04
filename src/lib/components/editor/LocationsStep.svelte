@@ -1,11 +1,12 @@
 <script lang="ts">
-	import type { Location, TransportMode, AnimationStyle } from '$lib/types';
+	import type { Location, TransportMode, AnimationStyle, PriceTier } from '$lib/types';
 	import { suggestTransportMode } from '$lib/utils/distance';
 	import LocationSearch from './LocationSearch.svelte';
 	import MediaUpload from './MediaUpload.svelte';
 	import TransportPicker from './TransportPicker.svelte';
 	import StarRating from '$lib/components/ui/StarRating.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
+	import { PRICE_TIERS } from '$lib/constants/tags';
 
 	let {
 		locations,
@@ -19,6 +20,7 @@
 		onlabel,
 		ondescription,
 		onrating,
+		onpricetier,
 		onclipanimation,
 		onnext,
 		onback
@@ -34,6 +36,7 @@
 		onlabel: (id: string, label: string) => void;
 		ondescription: (id: string, description: string) => void;
 		onrating: (id: string, rating: number | null) => void;
+		onpricetier: (id: string, tier: PriceTier | null) => void;
 		onclipanimation: (locationId: string, clipId: string, style: AnimationStyle) => void;
 		onnext: () => void;
 		onback: () => void;
@@ -130,7 +133,7 @@
 		clipDragOverIndex = null;
 	}
 
-	function handleAdd(loc: { name: string; lat: number; lng: number }) {
+	function handleAdd(loc: { name: string; lat: number; lng: number; city: string | null; state: string | null; country: string | null }) {
 		onadd(loc);
 		// Auto-suggest transport if there's a previous location
 		const newIndex = locations.length; // index after add
@@ -259,37 +262,10 @@
 						</svg>
 					</button>
 				</div>
-				<!-- Rating -->
-				<div class="flex items-center gap-2 mt-2">
-					<span class="text-xs text-text-muted">Rating</span>
-					<StarRating rating={activeLoc.rating} onchange={(r) => onrating(activeLoc!.id, r)} size="sm" />
-				</div>
-				<!-- Description -->
-				<div class="mt-2">
-					<textarea
-						class="w-full bg-transparent text-sm text-text-secondary border border-border rounded-lg px-3 py-2 outline-none focus:border-accent transition-colors resize-none"
-						placeholder="Add a note about this stop..."
-						rows="2"
-						value={activeLoc.description ?? ''}
-						oninput={(e) => ondescription(activeLoc!.id, (e.target as HTMLTextAreaElement).value)}
-					></textarea>
-					<p class="text-xs text-text-muted mt-0.5">Won't appear in the video — shows on your shared trip page.</p>
-				</div>
 			</div>
 
-			<!-- Transport mode (not shown for first location) -->
-			{#if activeIndex > 0}
-				<div class="px-4 py-3 border-b border-border">
-					<span class="text-xs text-text-muted block mb-1.5">How did you get here?</span>
-					<TransportPicker
-						mode={activeLoc.transportMode}
-						onchange={(mode) => ontransport(activeLoc!.id, mode)}
-					/>
-				</div>
-			{/if}
-
-			<!-- Clips list -->
-			<div class="p-4">
+			<!-- Clips list (primary position) -->
+			<div class="p-4 border-b border-border">
 				<span class="text-xs text-text-muted block mb-2">
 					Clips ({activeLoc.clips.length})
 				</span>
@@ -371,6 +347,56 @@
 				{#if clipError}
 					<div class="mt-2 p-3 bg-error/10 border border-error/30 rounded-lg">
 						<p class="text-sm text-error">{clipError}</p>
+					</div>
+				{/if}
+			</div>
+
+			<!-- Optional Details -->
+			<div class="p-4">
+				<span class="text-xs font-medium text-text-muted block mb-3">Optional Details</span>
+
+				<!-- Rating -->
+				<div class="flex items-center gap-2 mb-3">
+					<span class="text-xs text-text-muted">Rating <span class="text-text-muted">*</span></span>
+					<StarRating rating={activeLoc.rating} onchange={(r) => onrating(activeLoc!.id, r)} size="sm" />
+				</div>
+
+				<!-- Price Tier -->
+				<div class="flex items-center gap-2 mb-3">
+					<span class="text-xs text-text-muted">Price <span class="text-text-muted">*</span></span>
+					<div class="flex gap-1">
+						{#each PRICE_TIERS as tier}
+							<button
+								class="text-xs px-2.5 py-1 rounded-lg transition-colors cursor-pointer
+									{activeLoc.priceTier === tier.value ? 'bg-accent text-white' : 'bg-card border border-border text-text-muted hover:bg-border'}"
+								onclick={() => onpricetier(activeLoc!.id, activeLoc!.priceTier === tier.value ? null : tier.value)}
+							>
+								{tier.label}
+							</button>
+						{/each}
+					</div>
+				</div>
+
+				<!-- Description -->
+				<div class="mb-3">
+					<textarea
+						class="w-full bg-transparent text-sm text-text-secondary border border-border rounded-lg px-3 py-2 outline-none focus:border-accent transition-colors resize-none"
+						placeholder="Add a note about this stop... *"
+						rows="2"
+						value={activeLoc.description ?? ''}
+						oninput={(e) => ondescription(activeLoc!.id, (e.target as HTMLTextAreaElement).value)}
+					></textarea>
+					<p class="text-xs text-text-muted mt-0.5">Won't appear in the video — shows on your shared trip page.</p>
+				</div>
+
+				<!-- Transport mode (not shown for first location) -->
+				{#if activeIndex > 0}
+					<div>
+						<span class="text-xs text-text-muted block mb-1.5">How did you get here? <span class="text-text-muted">*</span></span>
+						<TransportPicker
+							mode={activeLoc.transportMode}
+							onchange={(mode) => ontransport(activeLoc!.id, mode)}
+						/>
 					</div>
 				{/if}
 			</div>

@@ -136,7 +136,6 @@
 
 <AppShell title="Export" showBack onback={() => goto(`/trip/${tripId}/edit`)}>
 	<ExportStep
-		bind:aspectRatio
 		canExport={support.canExport}
 		{isExporting}
 		{exportDone}

@@ -7,6 +7,22 @@ export interface User {
 
 export type TransportMode = 'walked' | 'drove' | 'biked';
 
+export type PriceTier = '$' | '$$' | '$$$' | '$$$$';
+
+export type TripVisibility = 'public' | 'unlisted' | 'private';
+
+export type TripTag =
+	| 'Road Trip'
+	| 'Hiking'
+	| 'City Break'
+	| 'Beach'
+	| 'Backpacking'
+	| 'Foodie'
+	| 'Adventure'
+	| 'Nature'
+	| 'Cultural'
+	| 'Photography';
+
 export type AspectRatio = '9:16' | '1:1' | '16:9';
 
 export type AnimationStyle = 'kenBurns' | 'zoomIn' | 'panHorizontal' | 'static';
@@ -62,6 +78,7 @@ export interface Location {
 	clips: Clip[];
 	transportMode: TransportMode | null;
 	rating: number | null;
+	priceTier: PriceTier | null;
 }
 
 export interface VideoLinks {
@@ -82,9 +99,14 @@ export interface Trip {
 	fontId: string;
 	mapStyle: MapStyle;
 	tripDate: string;
+	tags: TripTag[];
+	visibility: TripVisibility;
 	locations: Location[];
 	aspectRatio: AspectRatio;
 	videoLinks?: VideoLinks;
+	cities: string[];
+	states: string[];
+	countries: string[];
 	createdAt: string;
 	updatedAt: string;
 }
@@ -102,6 +124,8 @@ export interface SharedTrip {
 	fontId: string;
 	mapStyle: MapStyle;
 	coverImageUrl: string | null;
+	tags: TripTag[];
+	visibility: TripVisibility;
 	locations: SharedLocation[];
 	aspectRatio: AspectRatio;
 	videoLinks?: VideoLinks;
@@ -126,6 +150,12 @@ export interface MusicSelection {
 	startOffsetSec: number;
 }
 
+export interface ExportStepItem {
+	id: string;
+	label: string;
+	icon: string;
+}
+
 export interface SharedLocation {
 	id: string;
 	order: number;
@@ -139,4 +169,5 @@ export interface SharedLocation {
 	country: string | null;
 	transportMode: TransportMode | null;
 	rating: number | null;
+	priceTier: PriceTier | null;
 }

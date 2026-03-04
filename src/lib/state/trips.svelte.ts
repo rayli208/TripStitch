@@ -20,6 +20,28 @@ const tripsRef = collection(db, 'trips');
 
 /** Strip non-serializable fields (File objects, blob URLs) before saving to Firestore */
 function serializeTrip(trip: Trip, userId: string) {
+	const locations = trip.locations.map((loc) => ({
+		id: loc.id,
+		order: loc.order,
+		name: loc.name,
+		label: loc.label,
+		description: loc.description ?? null,
+		lat: loc.lat,
+		lng: loc.lng,
+		city: loc.city ?? null,
+		state: loc.state ?? null,
+		country: loc.country ?? null,
+		clips: loc.clips.map((c) => ({
+			id: c.id,
+			order: c.order,
+			type: c.type,
+			animationStyle: c.animationStyle
+		})),
+		transportMode: loc.transportMode,
+		rating: loc.rating ?? null,
+		priceTier: loc.priceTier ?? null
+	}));
+
 	return {
 		userId,
 		title: trip.title,
@@ -28,29 +50,15 @@ function serializeTrip(trip: Trip, userId: string) {
 		showLogoOnTitle: trip.showLogoOnTitle ?? false,
 		fontId: trip.fontId ?? 'inter',
 		tripDate: trip.tripDate ?? '',
+		tags: trip.tags ?? [],
+		visibility: trip.visibility ?? 'public',
 		aspectRatio: trip.aspectRatio,
 		createdAt: trip.createdAt,
 		updatedAt: trip.updatedAt,
-		locations: trip.locations.map((loc) => ({
-			id: loc.id,
-			order: loc.order,
-			name: loc.name,
-			label: loc.label,
-			description: loc.description ?? null,
-			lat: loc.lat,
-			lng: loc.lng,
-			city: loc.city ?? null,
-			state: loc.state ?? null,
-			country: loc.country ?? null,
-			clips: loc.clips.map((c) => ({
-				id: c.id,
-				order: c.order,
-				type: c.type,
-				animationStyle: c.animationStyle
-			})),
-			transportMode: loc.transportMode,
-			rating: loc.rating ?? null
-		}))
+		locations,
+		cities: [...new Set(locations.map((l) => l.city).filter((v): v is string => !!v))],
+		states: [...new Set(locations.map((l) => l.state).filter((v): v is string => !!v))],
+		countries: [...new Set(locations.map((l) => l.country).filter((v): v is string => !!v))]
 	};
 }
 
@@ -130,11 +138,17 @@ function createTripsState() {
 								country: loc.country ?? null,
 								clips,
 								transportMode: loc.transportMode,
-								rating: (loc.rating as number) ?? null
+								rating: (loc.rating as number) ?? null,
+								priceTier: (loc.priceTier as string) ?? null
 							};
 						}),
+						tags: data.tags ?? [],
+						visibility: data.visibility ?? 'public',
 						aspectRatio: data.aspectRatio,
 						videoLinks: data.videoLinks ?? undefined,
+						cities: data.cities ?? [],
+						states: data.states ?? [],
+						countries: data.countries ?? [],
 						createdAt: data.createdAt,
 						updatedAt: data.updatedAt
 					} as Trip;
@@ -193,8 +207,10 @@ function createTripsState() {
 			if (updates.tripDate !== undefined) data.tripDate = updates.tripDate;
 			if (updates.aspectRatio !== undefined) data.aspectRatio = updates.aspectRatio;
 			if (updates.updatedAt !== undefined) data.updatedAt = updates.updatedAt;
+			if (updates.tags !== undefined) data.tags = updates.tags;
+			if (updates.visibility !== undefined) data.visibility = updates.visibility;
 			if (updates.locations !== undefined) {
-				data.locations = updates.locations.map((loc) => ({
+				const locs = updates.locations.map((loc) => ({
 					id: loc.id,
 					order: loc.order,
 					name: loc.name,
@@ -212,8 +228,13 @@ function createTripsState() {
 						animationStyle: c.animationStyle
 					})),
 					transportMode: loc.transportMode,
-					rating: loc.rating ?? null
+					rating: loc.rating ?? null,
+					priceTier: loc.priceTier ?? null
 				}));
+				data.locations = locs;
+				data.cities = [...new Set(locs.map((l) => l.city).filter((v): v is string => !!v))];
+				data.states = [...new Set(locs.map((l) => l.state).filter((v): v is string => !!v))];
+				data.countries = [...new Set(locs.map((l) => l.country).filter((v): v is string => !!v))];
 			}
 			await updateDoc(docRef, data);
 		},

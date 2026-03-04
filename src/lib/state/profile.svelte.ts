@@ -160,13 +160,17 @@ function createProfileState() {
 			if (!uid) return;
 
 			try {
-				// Try to delete from storage (ignore if doesn't exist)
+				// Try to delete from storage — file extension is unknown, so one delete will fail
 				try {
 					await deleteObject(ref(storage, `users/${uid}/logo.webp`));
-				} catch { /* ignore */ }
+				} catch {
+					// Expected: file may not exist as .webp
+				}
 				try {
 					await deleteObject(ref(storage, `users/${uid}/logo.jpg`));
-				} catch { /* ignore */ }
+				} catch {
+					// Expected: file may not exist as .jpg
+				}
 
 				await setDoc(
 					doc(db, 'users', uid, 'profile', 'main'),

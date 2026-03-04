@@ -5,7 +5,9 @@
 	import { getFontById, fontFamily } from '$lib/constants/fonts';
 	import { STYLE_URLS } from '$lib/constants/map';
 	import { parseAllVideoLinks } from '$lib/utils/videoEmbed';
+	import { TRIP_TAGS } from '$lib/constants/tags';
 	import VideoEmbed from '$lib/components/ui/VideoEmbed.svelte';
+	import authState from '$lib/state/auth.svelte';
 
 	const tripId = page.params.id!;
 
@@ -21,6 +23,9 @@
 		loading = true;
 		try {
 			trip = await fetchTrip(tripId);
+			if (trip && trip.visibility === 'private' && trip.userId !== authState.user?.id) {
+				trip = null;
+			}
 			notFound = !trip;
 		} catch {
 			notFound = true;
@@ -121,6 +126,12 @@
 					const stars = loc.rating
 						? `<div style="margin-top:3px">${'★'.repeat(loc.rating)}${'☆'.repeat(5 - loc.rating)}</div>`
 						: '';
+					const price = loc.priceTier
+						? `<span style="font-size:11px;color:#4ade80;margin-left:${stars ? '6px' : '0'}">${loc.priceTier}</span>`
+						: '';
+					const ratingLine = (stars || price)
+						? `<div style="margin-top:3px;display:flex;align-items:center">${stars}${price}</div>`
+						: '';
 					const desc = loc.description
 						? `<div style="font-size:11px;color:#94a3b8;margin-top:2px;max-width:180px">${loc.description}</div>`
 						: '';
@@ -130,7 +141,7 @@
 						closeButton: false,
 						className: 'ts-popup'
 					}).setHTML(
-						`<div style="font-weight:600;font-size:13px;color:#f1f5f9">${label}</div>${stars}${desc}`
+						`<div style="font-weight:600;font-size:13px;color:#f1f5f9">${label}</div>${ratingLine}${desc}`
 					);
 
 					new maplibregl.Marker({ element: el })
@@ -272,6 +283,19 @@
 			</div>
 		</div>
 
+		<!-- Tags -->
+		{#if trip.tags && trip.tags.length > 0}
+			<div class="px-6 sm:px-8 py-3 flex flex-wrap gap-1.5 border-b border-border">
+				{#each trip.tags as tag}
+					{@const tagInfo = TRIP_TAGS.find(t => t.value === tag)}
+					<span class="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-accent/10 text-accent border border-accent/20">
+						{#if tagInfo}<span>{tagInfo.icon}</span>{/if}
+						{tag}
+					</span>
+				{/each}
+			</div>
+		{/if}
+
 		<!-- Video Embed -->
 		{#if parsedVideos.length > 0}
 			<div class="px-6 sm:px-8 py-6 border-b border-border">
@@ -319,12 +343,19 @@
 							{#if loc.label && loc.name !== loc.label}
 								<p class="text-xs text-text-muted">{loc.name}</p>
 							{/if}
-							{#if loc.rating}
-								<div class="flex items-center gap-0.5 mt-0.5">
-									{#each Array(5) as _, s}
-										<span class="text-xs {s < loc.rating ? 'text-amber-400' : 'text-border'}"
-										>&#9733;</span>
-									{/each}
+							{#if loc.rating || loc.priceTier}
+								<div class="flex items-center gap-2 mt-0.5">
+									{#if loc.rating}
+										<div class="flex items-center gap-0.5">
+											{#each Array(5) as _, s}
+												<span class="text-xs {s < loc.rating ? 'text-amber-400' : 'text-border'}"
+												>&#9733;</span>
+											{/each}
+										</div>
+									{/if}
+									{#if loc.priceTier}
+										<span class="text-xs text-green-400 font-medium">{loc.priceTier}</span>
+									{/if}
 								</div>
 							{/if}
 							{#if loc.description}

@@ -1,6 +1,7 @@
 <script lang="ts">
-	import type { Location, TransportMode, MapStyle } from '$lib/types';
+	import type { Location, TransportMode, MapStyle, TripTag, TripVisibility } from '$lib/types';
 	import { haversineDistance, estimateTravelTime, suggestTransportMode } from '$lib/utils/distance';
+	import { TRIP_TAGS } from '$lib/constants/tags';
 	import TransportPicker from './TransportPicker.svelte';
 	import RoutePreviewMap from './RoutePreviewMap.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -9,6 +10,8 @@
 		locations,
 		mapStyle = 'streets',
 		titleColor = '#FFFFFF',
+		tags = $bindable<TripTag[]>([]),
+		visibility = $bindable<TripVisibility>('public'),
 		onremove,
 		onmove,
 		ontransport,
@@ -19,6 +22,8 @@
 		locations: Location[];
 		mapStyle?: MapStyle;
 		titleColor?: string;
+		tags?: TripTag[];
+		visibility?: TripVisibility;
 		onremove: (id: string) => void;
 		onmove: (from: number, to: number) => void;
 		ontransport: (id: string, mode: TransportMode) => void;
@@ -26,6 +31,14 @@
 		onnext: () => void;
 		onback: () => void;
 	} = $props();
+
+	function toggleTag(tag: TripTag) {
+		if (tags.includes(tag)) {
+			tags = tags.filter((t) => t !== tag);
+		} else {
+			tags = [...tags, tag];
+		}
+	}
 
 	// Stats
 	let totalMiles = $derived(() => {
@@ -116,6 +129,45 @@
 		<div class="text-center">
 			<p class="text-lg font-bold text-text-primary">{mediaCount}</p>
 			<p class="text-xs text-text-muted">clips</p>
+		</div>
+	</div>
+
+	<!-- Tags -->
+	<div>
+		<span class="block text-sm font-medium text-text-secondary mb-2">Tags</span>
+		<div class="flex flex-wrap gap-1.5">
+			{#each TRIP_TAGS as tag}
+				<button
+					class="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer
+						{tags.includes(tag.value) ? 'bg-accent text-white' : 'bg-card border border-border text-text-muted hover:bg-border'}"
+					onclick={() => toggleTag(tag.value)}
+				>
+					<span>{tag.icon}</span>
+					<span>{tag.label}</span>
+				</button>
+			{/each}
+		</div>
+	</div>
+
+	<!-- Visibility — segmented control -->
+	<div>
+		<span class="block text-sm font-medium text-text-secondary mb-2">Visibility</span>
+		<div class="flex rounded-lg border border-border bg-card overflow-hidden">
+			<button
+				class="flex-1 py-2 text-xs font-medium transition-colors cursor-pointer
+					{visibility === 'public' ? 'bg-accent text-white' : 'text-text-muted hover:bg-card-hover'}"
+				onclick={() => (visibility = 'public')}
+			>Public</button>
+			<button
+				class="flex-1 py-2 text-xs font-medium border-x border-border transition-colors cursor-pointer
+					{visibility === 'unlisted' ? 'bg-accent text-white' : 'text-text-muted hover:bg-card-hover'}"
+				onclick={() => (visibility = 'unlisted')}
+			>Unlisted</button>
+			<button
+				class="flex-1 py-2 text-xs font-medium transition-colors cursor-pointer
+					{visibility === 'private' ? 'bg-accent text-white' : 'text-text-muted hover:bg-card-hover'}"
+				onclick={() => (visibility = 'private')}
+			>Private</button>
 		</div>
 	</div>
 

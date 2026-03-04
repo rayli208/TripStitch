@@ -44,10 +44,10 @@
 		onnext: () => void;
 	} = $props();
 
-	const ratios: { value: AspectRatio; label: string; width: string; height: string }[] = [
-		{ value: '9:16', label: 'Vertical', width: 'w-12', height: 'h-20' },
-		{ value: '1:1', label: 'Square', width: 'w-16', height: 'h-16' },
-		{ value: '16:9', label: 'Horizontal', width: 'w-20', height: 'h-12' }
+	const ratios: { value: AspectRatio; label: string }[] = [
+		{ value: '9:16', label: 'Vertical' },
+		{ value: '1:1', label: 'Square' },
+		{ value: '16:9', label: 'Wide' }
 	];
 
 	const mapStyles: { value: MapStyle; label: string; icon: string }[] = [
@@ -59,6 +59,8 @@
 		{ value: 'light', label: 'Light', icon: '☀️' }
 	];
 
+	let customizeOpen = $state(false);
+	let fontDropdownOpen = $state(false);
 	let fileInput: HTMLInputElement;
 
 	function handleFile(e: Event) {
@@ -87,140 +89,27 @@
 	const otherFonts = $derived(
 		preferredFontId ? FONTS.filter((f) => f.id !== preferredFontId) : FONTS
 	);
+
+	// Close font dropdown on outside click
+	function handleClickOutside(e: MouseEvent) {
+		const target = e.target as HTMLElement;
+		if (!target.closest('.font-dropdown')) {
+			fontDropdownOpen = false;
+		}
+	}
 </script>
 
 <svelte:head>
 	<link rel="stylesheet" href={googleFontsUrl()} />
 </svelte:head>
+<svelte:window onclick={handleClickOutside} />
 
 <div class="space-y-4">
-	<div>
-		<h2 class="text-xl font-semibold mb-0.5">Trip Details</h2>
-		<p class="text-sm text-text-muted">Give your trip a name and pick a title color.</p>
-	</div>
-
 	<Input label="Trip Title" placeholder="e.g. Weekend in Paris" bind:value={title} />
 
+	<!-- Cover Photo -->
 	<div>
-		<label class="block text-sm font-medium text-text-secondary mb-1">Description</label>
-		<textarea
-			bind:value={titleDescription}
-			placeholder="Optional subtitle or description"
-			rows="2"
-			class="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent resize-none"
-		></textarea>
-	</div>
-
-	<div>
-		<label class="block text-sm font-medium text-text-secondary mb-1">Trip Date</label>
-		<input
-			type="date"
-			bind:value={tripDate}
-			class="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-		/>
-	</div>
-
-	<!-- Colors side by side -->
-	<div class="grid grid-cols-2 gap-4">
-		<div>
-			<span class="block text-sm font-medium text-text-secondary mb-1.5">Title Color</span>
-			<ColorPicker bind:selected={titleColor} colors={pickerColors} primaryColor={primaryBrandColor} />
-		</div>
-		<div>
-			<span class="block text-sm font-medium text-text-secondary mb-1.5">Background</span>
-			<ColorPicker bind:selected={secondaryColor} colors={secondaryPickerColors} primaryColor={primarySecondaryColor} />
-		</div>
-	</div>
-
-	<!-- Aspect Ratio + Map Style side by side -->
-	<div class="grid grid-cols-2 gap-4">
-		<!-- Aspect Ratio -->
-		<div>
-			<span class="block text-sm font-medium text-text-secondary mb-2">Aspect Ratio</span>
-			<div class="flex flex-col gap-1.5">
-				{#each ratios as ratio}
-					<button
-						class="flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 transition-all cursor-pointer
-							{aspectRatio === ratio.value
-							? 'border-accent bg-accent-light'
-							: 'border-border bg-card hover:border-primary-light'}"
-						onclick={() => (aspectRatio = ratio.value)}
-					>
-						<div
-							class="rounded border {aspectRatio === ratio.value ? 'border-accent' : 'border-border'}
-								{ratio.value === '9:16' ? 'w-4 h-6' : ratio.value === '1:1' ? 'w-5 h-5' : 'w-6 h-4'}"
-						></div>
-						<span class="text-xs font-medium {aspectRatio === ratio.value ? 'text-text-primary' : 'text-text-muted'}">
-							{ratio.label}
-						</span>
-					</button>
-				{/each}
-			</div>
-		</div>
-
-		<!-- Map Style -->
-		<div>
-			<span class="block text-sm font-medium text-text-secondary mb-2">Map Style</span>
-			<div class="grid grid-cols-2 gap-1.5">
-				{#each mapStyles as style}
-					<button
-						class="flex items-center gap-1 px-2 py-1.5 rounded-lg border-2 transition-all cursor-pointer
-							{mapStyle === style.value
-							? 'border-accent bg-accent-light'
-							: 'border-border bg-card hover:border-primary-light'}"
-						onclick={() => (mapStyle = style.value)}
-					>
-						<span class="text-sm">{style.icon}</span>
-						<span class="text-xs font-medium {mapStyle === style.value ? 'text-text-primary' : 'text-text-muted'}">
-							{style.label}
-						</span>
-					</button>
-				{/each}
-			</div>
-		</div>
-	</div>
-
-	<!-- Font Picker -->
-	<div>
-		<span class="block text-sm font-medium text-text-secondary mb-2">Font</span>
-		{#if preferredFont}
-			<button
-				class="w-full flex items-center justify-between px-3 py-2 text-left transition-colors cursor-pointer rounded-lg border mb-2 {fontId === preferredFont.id ? 'border-accent bg-accent-light' : 'border-border bg-card hover:bg-card-hover'}"
-				style="font-family: {preferredFont.family}, system-ui, sans-serif"
-				onclick={() => (fontId = preferredFont.id)}
-			>
-				<div class="flex items-center gap-2">
-					<span class="text-sm text-text-primary">{preferredFont.name}</span>
-					<span class="text-[10px] text-text-muted px-1.5 py-0.5 rounded bg-border/60">Your font</span>
-				</div>
-				{#if fontId === preferredFont.id}
-					<svg class="w-4 h-4 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-					</svg>
-				{/if}
-			</button>
-		{/if}
-		<div class="max-h-48 overflow-y-auto rounded-lg border border-border bg-card">
-			{#each otherFonts as font (font.id)}
-				<button
-					class="w-full flex items-center justify-between px-3 py-2 text-left transition-colors cursor-pointer border-b border-border last:border-b-0 {fontId === font.id ? 'bg-accent-light' : 'hover:bg-card-hover'}"
-					style="font-family: {font.family}, system-ui, sans-serif"
-					onclick={() => (fontId = font.id)}
-					onmouseenter={() => preloadFont(font.id)}
-				>
-					<span class="text-sm text-text-primary">{font.name}</span>
-					{#if fontId === font.id}
-						<svg class="w-4 h-4 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-						</svg>
-					{/if}
-				</button>
-			{/each}
-		</div>
-	</div>
-
-	<div>
-		<span class="block text-sm font-medium text-text-secondary mb-2">Cover Photo (optional)</span>
+		<span class="block text-sm font-medium text-text-secondary mb-2">Cover Photo <span class="text-text-muted">*</span></span>
 		{#if titleMediaPreviewUrl}
 			<div class="relative rounded-lg overflow-hidden bg-card border border-border">
 				<img src={titleMediaPreviewUrl} alt="Cover preview" class="w-full h-32 object-cover" />
@@ -252,23 +141,9 @@
 		/>
 	</div>
 
-	<!-- Logo toggle (only if user has a logo) -->
-	{#if logoUrl}
-		<label class="flex items-center gap-3 cursor-pointer">
-			<input
-				type="checkbox"
-				bind:checked={showLogoOnTitle}
-				class="w-4 h-4 rounded border-border bg-card text-accent focus:ring-accent accent-accent"
-			/>
-			<div class="flex items-center gap-2">
-				<img src={logoUrl} alt="Your logo" class="w-6 h-6 rounded object-contain" />
-				<span class="text-sm text-text-secondary">Show logo watermark on video</span>
-			</div>
-		</label>
-	{/if}
-
+	<!-- Preview -->
 	{#if title}
-		<div class="mt-4 rounded-lg border border-border overflow-hidden">
+		<div class="rounded-lg border border-border overflow-hidden">
 			<p class="text-xs text-text-muted px-4 pt-3 pb-1">Preview</p>
 			{#if titleMediaPreviewUrl}
 				<div class="relative h-40 flex items-center justify-center">
@@ -303,6 +178,163 @@
 							class="absolute bottom-2 right-3 w-8 h-8 object-contain opacity-80"
 						/>
 					{/if}
+				</div>
+			{/if}
+		</div>
+	{/if}
+
+	<!-- Customize toggle -->
+	<button
+		class="w-full flex items-center justify-between py-2 px-3 rounded-lg bg-card border border-border text-sm text-text-secondary hover:bg-card-hover transition-colors cursor-pointer"
+		onclick={() => (customizeOpen = !customizeOpen)}
+	>
+		<span class="font-medium">Customize Style</span>
+		<svg class="w-4 h-4 transition-transform {customizeOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+		</svg>
+	</button>
+
+	{#if customizeOpen}
+		<div class="space-y-4 pl-1 border-l-2 border-border ml-1">
+			<!-- Date + Description -->
+			<div class="pl-3">
+				<label class="block text-sm font-medium text-text-secondary mb-1">Trip Date</label>
+				<input
+					type="date"
+					bind:value={tripDate}
+					class="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+				/>
+			</div>
+
+			<div class="pl-3">
+				<label class="block text-sm font-medium text-text-secondary mb-1">Description</label>
+				<textarea
+					bind:value={titleDescription}
+					placeholder="Optional subtitle or description"
+					rows="2"
+					class="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+				></textarea>
+			</div>
+
+			<!-- Colors -->
+			<div class="pl-3 grid grid-cols-2 gap-4">
+				<div>
+					<span class="block text-sm font-medium text-text-secondary mb-1.5">Title Color</span>
+					<ColorPicker bind:selected={titleColor} colors={pickerColors} primaryColor={primaryBrandColor} />
+				</div>
+				<div>
+					<span class="block text-sm font-medium text-text-secondary mb-1.5">Background</span>
+					<ColorPicker bind:selected={secondaryColor} colors={secondaryPickerColors} primaryColor={primarySecondaryColor} />
+				</div>
+			</div>
+
+			<!-- Font — compact dropdown -->
+			<div class="pl-3 relative font-dropdown">
+				<span class="block text-sm font-medium text-text-secondary mb-1.5">Font</span>
+				<button
+					class="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-border bg-card text-sm text-text-primary hover:bg-card-hover transition-colors cursor-pointer"
+					style="font-family: {selectedFont.family}, system-ui, sans-serif"
+					onclick={() => (fontDropdownOpen = !fontDropdownOpen)}
+				>
+					<span>{selectedFont.name}</span>
+					<svg class="w-4 h-4 text-text-muted transition-transform {fontDropdownOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+					</svg>
+				</button>
+				{#if fontDropdownOpen}
+					<div class="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-border bg-card shadow-xl">
+						{#if preferredFont}
+							<button
+								class="w-full flex items-center justify-between px-3 py-2 text-left transition-colors cursor-pointer border-b border-border {fontId === preferredFont.id ? 'bg-accent-light' : 'hover:bg-card-hover'}"
+								style="font-family: {preferredFont.family}, system-ui, sans-serif"
+								onclick={() => { fontId = preferredFont.id; fontDropdownOpen = false; }}
+							>
+								<div class="flex items-center gap-2">
+									<span class="text-sm text-text-primary">{preferredFont.name}</span>
+									<span class="text-[10px] text-text-muted px-1.5 py-0.5 rounded bg-border/60">Your font</span>
+								</div>
+								{#if fontId === preferredFont.id}
+									<svg class="w-4 h-4 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+									</svg>
+								{/if}
+							</button>
+						{/if}
+						{#each otherFonts as font (font.id)}
+							<button
+								class="w-full flex items-center justify-between px-3 py-2 text-left transition-colors cursor-pointer border-b border-border last:border-b-0 {fontId === font.id ? 'bg-accent-light' : 'hover:bg-card-hover'}"
+								style="font-family: {font.family}, system-ui, sans-serif"
+								onclick={() => { fontId = font.id; fontDropdownOpen = false; }}
+								onmouseenter={() => preloadFont(font.id)}
+							>
+								<span class="text-sm text-text-primary">{font.name}</span>
+								{#if fontId === font.id}
+									<svg class="w-4 h-4 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+									</svg>
+								{/if}
+							</button>
+						{/each}
+					</div>
+				{/if}
+			</div>
+
+			<!-- Aspect Ratio — inline row -->
+			<div class="pl-3">
+				<span class="block text-sm font-medium text-text-secondary mb-1.5">Aspect Ratio</span>
+				<div class="flex gap-1.5">
+					{#each ratios as ratio}
+						<button
+							class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all cursor-pointer
+								{aspectRatio === ratio.value
+								? 'border-accent bg-accent-light text-text-primary'
+								: 'border-border bg-card text-text-muted hover:border-primary-light'}"
+							onclick={() => (aspectRatio = ratio.value)}
+						>
+							<div
+								class="rounded border {aspectRatio === ratio.value ? 'border-accent' : 'border-current'}
+									{ratio.value === '9:16' ? 'w-3 h-5' : ratio.value === '1:1' ? 'w-4 h-4' : 'w-5 h-3'}"
+							></div>
+							<span class="text-xs font-medium">{ratio.label}</span>
+						</button>
+					{/each}
+				</div>
+			</div>
+
+			<!-- Map Style — icon row -->
+			<div class="pl-3">
+				<span class="block text-sm font-medium text-text-secondary mb-1.5">Map Style</span>
+				<div class="flex gap-1">
+					{#each mapStyles as style}
+						<button
+							class="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg border transition-all cursor-pointer
+								{mapStyle === style.value
+								? 'border-accent bg-accent-light'
+								: 'border-border bg-card hover:border-primary-light'}"
+							onclick={() => (mapStyle = style.value)}
+							title={style.label}
+						>
+							<span class="text-base">{style.icon}</span>
+							<span class="text-[10px] font-medium {mapStyle === style.value ? 'text-text-primary' : 'text-text-muted'}">{style.label}</span>
+						</button>
+					{/each}
+				</div>
+			</div>
+
+			<!-- Logo toggle -->
+			{#if logoUrl}
+				<div class="pl-3">
+					<label class="flex items-center gap-3 cursor-pointer">
+						<input
+							type="checkbox"
+							bind:checked={showLogoOnTitle}
+							class="w-4 h-4 rounded border-border bg-card text-accent focus:ring-accent accent-accent"
+						/>
+						<div class="flex items-center gap-2">
+							<img src={logoUrl} alt="Your logo" class="w-6 h-6 rounded object-contain" />
+							<span class="text-sm text-text-secondary">Show logo watermark</span>
+						</div>
+					</label>
 				</div>
 			{/if}
 		</div>

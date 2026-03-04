@@ -219,6 +219,7 @@
 		offsetAudio = new Audio(musicSelection.previewUrl);
 		offsetAudio.currentTime = musicSelection.startOffsetSec;
 		offsetAudio.volume = musicVolume / 100;
+		// Expected: browsers may block autoplay without user gesture
 		offsetAudio.play().catch(() => {});
 		offsetPlaying = true;
 

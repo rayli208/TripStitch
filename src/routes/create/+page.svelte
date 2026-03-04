@@ -5,7 +5,7 @@
 	import tripsState from '$lib/state/trips.svelte';
 	import profileState from '$lib/state/profile.svelte';
 	import type { AssemblyProgress, VideoSegmentInfo } from '$lib/services/videoAssembler';
-	import type { ExportStepItem } from '$lib/components/editor/ExportStep.svelte';
+	import type { ExportStepItem } from '$lib/types';
 	import { checkBrowserSupport, getSupportedMimeType, getFileExtension } from '$lib/utils/browserCompat';
 	import { getShareUrl } from '$lib/services/shareService';
 	import { estimateVideoDuration } from '$lib/utils/durationEstimate';
@@ -174,8 +174,13 @@
 			fontId: editor.fontId,
 			mapStyle: editor.mapStyle,
 			tripDate: editor.tripDate,
+			tags: editor.tags,
+			visibility: editor.visibility,
 			locations: editor.locations,
 			aspectRatio: editor.aspectRatio,
+			cities: [] as string[],
+			states: [] as string[],
+			countries: [] as string[],
 			createdAt: new Date().toISOString(),
 			updatedAt: new Date().toISOString()
 		};
@@ -293,23 +298,6 @@
 		toast.success('Link copied!');
 	}
 
-	async function handleShare() {
-		if (!navigator.share) return;
-		try {
-			if (videoBlob) {
-				const mimeType = videoBlob.type || getSupportedMimeType();
-				const ext = getFileExtension(mimeType);
-				const file = new File([videoBlob], `${editor.title || 'tripstitch'}.${ext}`, { type: mimeType });
-				await navigator.share({ files: [file] });
-			} else if (shareUrl) {
-				await navigator.share({ title: editor.title || 'TripStitch', url: shareUrl });
-			}
-		} catch (err) {
-			if ((err as Error).name !== 'AbortError') {
-				console.warn('[TripStitch] Share failed:', err);
-			}
-		}
-	}
 </script>
 
 <AppShell title="Create Trip" showBottomNav logoUrl={profileState.profile?.logoUrl}>
@@ -348,6 +336,7 @@
 			onlabel={(id, label) => editor.updateLocationLabel(id, label)}
 			ondescription={(id, desc) => editor.updateLocationDescription(id, desc)}
 			onrating={(id, rating) => editor.updateLocationRating(id, rating)}
+			onpricetier={(id, tier) => editor.updateLocationPriceTier(id, tier)}
 			onclipanimation={(locId, clipId, style) => editor.updateClipAnimation(locId, clipId, style)}
 			onnext={() => editor.nextStep()}
 			onback={() => editor.prevStep()}
@@ -357,6 +346,8 @@
 			locations={editor.locations}
 			mapStyle={editor.mapStyle}
 			titleColor={editor.titleColor}
+			bind:tags={editor.tags}
+			bind:visibility={editor.visibility}
 			onremove={(id) => editor.removeLocation(id)}
 			onmove={(from, to) => editor.moveLocation(from, to)}
 			ontransport={(id, mode) => editor.updateLocationTransport(id, mode)}
@@ -366,8 +357,6 @@
 		/>
 	{:else}
 		<ExportStep
-			bind:aspectRatio={editor.aspectRatio}
-			bind:mapStyle={editor.mapStyle}
 			bind:musicSelection={editor.musicSelection}
 			bind:musicVolume={editor.musicVolume}
 			bind:keepOriginalAudio={editor.keepOriginalAudio}
@@ -395,7 +384,6 @@
 			ondownload={handleDownload}
 			ondashboard={handleDashboard}
 			onmusicmerged={handleMusicMerged}
-			onshare={typeof navigator !== 'undefined' && navigator.share ? handleShare : undefined}
 			{shareUrl}
 			oncopylink={handleCopyLink}
 		/>

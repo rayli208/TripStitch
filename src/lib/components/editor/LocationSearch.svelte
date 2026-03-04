@@ -42,7 +42,8 @@
 					placeId: s.placePrediction.placeId,
 					text: s.placePrediction.text.text
 				}));
-		} catch {
+		} catch (err) {
+			console.warn('[LocationSearch] Autocomplete failed:', err);
 			suggestions = [];
 		}
 		loading = false;
@@ -86,8 +87,8 @@
 				country
 			});
 			query = '';
-		} catch {
-			// If detail fetch fails, reset
+		} catch (err) {
+			console.warn('[LocationSearch] Place detail fetch failed:', err);
 			query = '';
 		}
 	}

@@ -6,6 +6,7 @@
 	import TravelGlobe from '$lib/components/TravelGlobe.svelte';
 	import TravelMap from '$lib/components/TravelMap.svelte';
 	import { parseAllVideoLinks } from '$lib/utils/videoEmbed';
+	import { TRIP_TAGS } from '$lib/constants/tags';
 
 	const username = (page.params as Record<string, string>).username!;
 
@@ -227,6 +228,20 @@
 										{trip.stats.stops} stops &middot;
 										{trip.stats.miles < 10 ? trip.stats.miles.toFixed(1) : Math.round(trip.stats.miles)} mi
 									</p>
+									{#if trip.tags && trip.tags.length > 0}
+										<div class="flex flex-wrap gap-1 mt-1.5">
+											{#each trip.tags.slice(0, 3) as tag}
+												{@const tagInfo = TRIP_TAGS.find(t => t.value === tag)}
+												<span class="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-accent/10 text-accent">
+													{#if tagInfo}<span>{tagInfo.icon}</span>{/if}
+													{tag}
+												</span>
+											{/each}
+											{#if trip.tags.length > 3}
+												<span class="text-[10px] text-text-muted px-1 py-0.5">+{trip.tags.length - 3}</span>
+											{/if}
+										</div>
+									{/if}
 									{#if videos.length > 0}
 										<div class="flex items-center gap-1.5 mt-2">
 											{#each videos as v}
