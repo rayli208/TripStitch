@@ -161,9 +161,8 @@
 		}, 500);
 
 		// Save trip to Firestore first
-		const tripId = crypto.randomUUID();
 		const tripData = {
-			id: tripId,
+			id: crypto.randomUUID(),
 			title: editor.title || 'Untitled Trip',
 			titleColor: editor.titleColor,
 			titleDescription: editor.titleDescription,
@@ -185,7 +184,7 @@
 			updatedAt: new Date().toISOString()
 		};
 
-		await tripsState.addTrip(tripData);
+		const docId = await tripsState.addTrip(tripData);
 
 		progress = { step: 'init', message: 'Getting things ready...', current: 0, total: 1 };
 
@@ -210,7 +209,7 @@
 			isExporting = false;
 			exportDone = true;
 			progress = { step: 'done', message: 'Your video is ready!', current: 1, total: 1 };
-			shareUrl = getShareUrl(tripId);
+			shareUrl = docId ? getShareUrl(docId) : null;
 		} catch (err) {
 			isExporting = false;
 			if ((err as Error).message === 'Export cancelled') {

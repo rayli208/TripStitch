@@ -62,9 +62,9 @@
 		onkeydown={handleKeydown}
 	>
 		<div class="absolute inset-0" onclick={() => (open = false)} role="presentation"></div>
-		<div class="relative bg-card border border-border rounded-xl w-full max-w-md p-6" bind:this={dialogEl}>
+		<div class="relative bg-card border-3 border-border rounded-xl w-full max-w-md p-6 shadow-[6px_6px_0_var(--color-border)]" bind:this={dialogEl}>
 			{#if title}
-				<h2 class="text-lg font-semibold text-text-primary mb-4">{title}</h2>
+				<h2 class="text-lg font-bold text-text-primary mb-4">{title}</h2>
 			{/if}
 			{@render children()}
 		</div>

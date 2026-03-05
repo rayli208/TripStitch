@@ -15,7 +15,7 @@
 </script>
 
 <div class="flex flex-col items-center gap-3">
-	<div class="{sizeClasses[size]} animate-spin rounded-full border-2 border-border border-t-accent"></div>
+	<div class="{sizeClasses[size]} animate-spin rounded-full border-3 border-border border-t-accent"></div>
 	{#if label}
 		<p class="text-sm text-text-muted">{label}</p>
 	{/if}

@@ -23,7 +23,7 @@
 </script>
 
 <div class="min-h-screen bg-page text-text-primary">
-	<header class="sticky top-0 z-40 bg-page/80 backdrop-blur-sm border-b border-border">
+	<header class="sticky top-0 z-40 bg-page border-b-3 border-border">
 		<div class="max-w-lg mx-auto flex items-center h-14 px-4 gap-3">
 			{#if showBack}
 				<button
@@ -38,7 +38,7 @@
 			{:else if logoUrl}
 				<img src={logoUrl} alt="Logo" class="w-7 h-7 rounded-md object-cover flex-shrink-0" />
 			{/if}
-			<h1 class="text-lg font-semibold flex-1 truncate">{title}</h1>
+			<h1 class="text-lg font-bold flex-1 truncate">{title}</h1>
 			<div class="flex items-center gap-2 flex-shrink-0">
 				<InstallPWA modal={false} />
 				{#if actions}

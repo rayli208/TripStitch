@@ -13,7 +13,7 @@ import {
 	orderBy,
 	type Unsubscribe
 } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref as storageRef, uploadBytes, getDownloadURL, listAll, deleteObject } from 'firebase/storage';
 import { compressImage, imageExtension } from '$lib/utils/imageUtils';
 
 const tripsRef = collection(db, 'trips');
@@ -49,6 +49,7 @@ function serializeTrip(trip: Trip, userId: string) {
 		titleDescription: trip.titleDescription ?? '',
 		showLogoOnTitle: trip.showLogoOnTitle ?? false,
 		fontId: trip.fontId ?? 'inter',
+		mapStyle: trip.mapStyle ?? 'streets',
 		tripDate: trip.tripDate ?? '',
 		tags: trip.tags ?? [],
 		visibility: trip.visibility ?? 'public',
@@ -102,6 +103,7 @@ function createTripsState() {
 						titleMediaType: null,
 						showLogoOnTitle: data.showLogoOnTitle ?? false,
 						fontId: data.fontId ?? 'inter',
+						mapStyle: data.mapStyle ?? 'streets',
 						tripDate: data.tripDate ?? '',
 						locations: (data.locations ?? []).map((loc: Record<string, unknown>) => {
 							// Backward compat: migrate old single-media to clips array
@@ -170,24 +172,28 @@ function createTripsState() {
 
 			const data = serializeTrip(trip, uid);
 
-			// Upload cover image to Storage if present
+			// Create Firestore doc first so storage rules can verify it
+			const docRef = await addDoc(tripsRef, data);
+			const docId = docRef.id;
+
+			// Upload cover image using the Firestore doc ID
 			if (trip.titleMediaFile) {
 				try {
-					const compressed = await compressImage(trip.titleMediaFile, 1200, 0.8);
+					const compressed = await compressImage(trip.titleMediaFile, 1600, 0.82);
 					const ext = imageExtension(compressed);
-					const imgRef = storageRef(storage, `trips/${trip.id}/cover.${ext}`);
+					const imgRef = storageRef(storage, `trips/${docId}/cover.${ext}`);
 					await uploadBytes(imgRef, compressed, {
 						contentType: compressed.type,
 						cacheControl: 'public, max-age=31536000'
 					});
-					(data as any).coverImageUrl = await getDownloadURL(imgRef);
+					const coverImageUrl = await getDownloadURL(imgRef);
+					await updateDoc(docRef, { coverImageUrl });
 				} catch (err) {
 					console.warn('[Trips] Cover image upload failed:', err);
 				}
 			}
 
-			const docRef = await addDoc(tripsRef, data);
-			return docRef.id;
+			return docId;
 		},
 
 		getTrip(id: string): Trip | undefined {
@@ -204,11 +210,29 @@ function createTripsState() {
 			if (updates.titleDescription !== undefined) data.titleDescription = updates.titleDescription;
 			if (updates.showLogoOnTitle !== undefined) data.showLogoOnTitle = updates.showLogoOnTitle;
 			if (updates.fontId !== undefined) data.fontId = updates.fontId;
+			if (updates.mapStyle !== undefined) data.mapStyle = updates.mapStyle;
 			if (updates.tripDate !== undefined) data.tripDate = updates.tripDate;
 			if (updates.aspectRatio !== undefined) data.aspectRatio = updates.aspectRatio;
 			if (updates.updatedAt !== undefined) data.updatedAt = updates.updatedAt;
 			if (updates.tags !== undefined) data.tags = updates.tags;
 			if (updates.visibility !== undefined) data.visibility = updates.visibility;
+
+			// Upload cover image if a new file is present
+			if (updates.titleMediaFile) {
+				try {
+					const compressed = await compressImage(updates.titleMediaFile, 1600, 0.82);
+					const ext = imageExtension(compressed);
+					const imgRef = storageRef(storage, `trips/${id}/cover.${ext}`);
+					await uploadBytes(imgRef, compressed, {
+						contentType: compressed.type,
+						cacheControl: 'public, max-age=31536000'
+					});
+					data.coverImageUrl = await getDownloadURL(imgRef);
+				} catch (err) {
+					console.warn('[Trips] Cover image upload failed:', err);
+				}
+			}
+
 			if (updates.locations !== undefined) {
 				const locs = updates.locations.map((loc) => ({
 					id: loc.id,
@@ -249,6 +273,17 @@ function createTripsState() {
 		async deleteTrip(id: string) {
 			const uid = authState.user?.id;
 			if (!uid) return;
+
+			// Delete all files under trips/{id}/ in Storage
+			try {
+				const folderRef = storageRef(storage, `trips/${id}`);
+				const list = await listAll(folderRef);
+				await Promise.all(list.items.map((item) => deleteObject(item)));
+			} catch (err) {
+				// Folder may not exist if no images were uploaded — that's fine
+				console.warn('[Trips] Storage cleanup:', err);
+			}
+
 			await deleteDoc(doc(db, 'trips', id));
 		}
 	};

@@ -5,8 +5,8 @@
 <div class="fixed bottom-20 inset-x-0 z-50 flex flex-col items-center gap-2 px-4 pointer-events-none" aria-live="polite" aria-atomic="false" role="status">
 	{#each toast.toasts as t (t.id)}
 		<div
-			class="pointer-events-auto max-w-sm w-full px-4 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 animate-slide-up
-				{t.type === 'success' ? 'bg-success text-white' : t.type === 'error' ? 'bg-error text-white' : 'bg-card text-text-primary border border-border'}"
+			class="pointer-events-auto max-w-sm w-full px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2 animate-slide-up border-2 border-border shadow-[4px_4px_0_var(--color-border)]
+				{t.type === 'success' ? 'bg-success text-white' : t.type === 'error' ? 'bg-error text-white' : 'bg-card text-text-primary'}"
 			role={t.type === 'error' ? 'alert' : 'status'}
 		>
 			{#if t.type === 'success'}

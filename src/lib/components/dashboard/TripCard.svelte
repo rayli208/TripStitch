@@ -28,16 +28,16 @@
 	);
 </script>
 
-<div class="bg-card border border-border rounded-xl p-4 hover:border-primary-light transition-colors">
+<div class="bg-card border-2 border-border rounded-xl p-4 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[4px_4px_0_var(--color-accent)] hover:-translate-y-0.5 transition-all">
 	<div class="flex items-start justify-between mb-3">
 		<div>
-			<h3 class="font-semibold text-text-primary">{trip.title || 'Untitled Trip'}</h3>
+			<h3 class="font-bold text-text-primary">{trip.title || 'Untitled Trip'}</h3>
 			<p class="text-sm text-text-muted mt-0.5">
 				{locationCount} {locationCount === 1 ? 'stop' : 'stops'} &middot; {dateLabel}
 			</p>
 		</div>
 		<span
-			class="text-xs px-2 py-1 rounded-full bg-border text-text-muted"
+			class="text-xs font-bold px-2 py-1 rounded-full bg-warning text-black border-2 border-border"
 		>
 			{trip.aspectRatio}
 		</span>
@@ -72,14 +72,14 @@
 	{:else}
 		<div class="flex gap-2">
 			<button
-				class="flex-1 text-sm py-2 rounded-lg bg-accent hover:bg-accent-hover text-white transition-colors cursor-pointer"
+				class="flex-1 text-sm py-2 rounded-lg bg-accent text-white font-bold border-2 border-border shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
 				onclick={onlinks}
 			>
 				{hasLinks ? 'Edit Link' : 'Add Link'}
 			</button>
 			{#if onshare}
 				<button
-					class="text-sm py-2 px-3 rounded-lg bg-border hover:bg-primary-light text-text-secondary hover:text-white transition-colors cursor-pointer"
+					class="text-sm py-2 px-3 rounded-lg bg-card border-2 border-border text-text-primary shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
 					onclick={onshare}
 					title="Copy share link"
 				>
@@ -89,7 +89,7 @@
 				</button>
 			{/if}
 			<button
-				class="text-sm py-2 px-3 rounded-lg bg-border hover:bg-primary-light text-text-secondary hover:text-white transition-colors cursor-pointer"
+				class="text-sm py-2 px-3 rounded-lg bg-card border-2 border-border text-text-primary shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
 				onclick={() => { confirmingDelete = true; }}
 				title="Delete trip"
 			>

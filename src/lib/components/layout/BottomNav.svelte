@@ -10,12 +10,12 @@
 	const isActive = (href: string) => page.url.pathname === href;
 </script>
 
-<nav class="fixed bottom-0 inset-x-0 z-40 bg-page/80 backdrop-blur-sm border-t border-border pb-[env(safe-area-inset-bottom)]">
+<nav class="fixed bottom-0 inset-x-0 z-40 bg-page border-t-3 border-border pb-[env(safe-area-inset-bottom)]">
 	<div class="max-w-lg mx-auto flex items-center justify-around h-14">
 		{#each tabs as tab}
 			<a
 				href={tab.href}
-				class="flex flex-col items-center gap-0.5 px-4 py-1.5 transition-colors {isActive(tab.href) ? 'text-accent' : 'text-text-muted hover:text-text-secondary'}"
+				class="flex flex-col items-center gap-0.5 px-4 py-1.5 transition-colors {isActive(tab.href) ? 'text-accent font-bold' : 'text-text-muted hover:text-text-secondary'}"
 			>
 				{#if tab.icon === 'create'}
 					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -17,7 +17,7 @@
 <div class="flex flex-wrap items-center gap-2">
 	{#if primaryColor}
 		<button
-			class="w-8 h-8 rounded-full border-2 transition-all cursor-pointer {selected === primaryColor ? 'border-accent scale-110 ring-2 ring-accent/30' : 'border-border hover:border-primary-light'}"
+			class="w-8 h-8 rounded-full border-2 transition-all cursor-pointer {selected === primaryColor ? 'border-accent scale-110 ring-2 ring-accent/30' : 'border-border hover:border-primary-medium'}"
 			style="background-color: {primaryColor}"
 			onclick={() => (selected = primaryColor)}
 			aria-label="Select your brand color"
@@ -27,7 +27,7 @@
 	{/if}
 	{#each otherColors as color}
 		<button
-			class="w-8 h-8 rounded-full border-2 transition-all cursor-pointer {selected === color ? 'border-accent scale-110' : 'border-border hover:border-primary-light'}"
+			class="w-8 h-8 rounded-full border-2 transition-all cursor-pointer {selected === color ? 'border-accent scale-110' : 'border-border hover:border-primary-medium'}"
 			style="background-color: {color}"
 			onclick={() => (selected = color)}
 			aria-label="Select color {color}"

@@ -198,21 +198,21 @@
 		<div class="space-y-4 pl-1 border-l-2 border-border ml-1">
 			<!-- Date + Description -->
 			<div class="pl-3">
-				<label class="block text-sm font-medium text-text-secondary mb-1">Trip Date</label>
+				<span class="block text-sm font-bold text-text-primary mb-1">Trip Date</span>
 				<input
 					type="date"
 					bind:value={tripDate}
-					class="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text-primary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+					class="w-full rounded-lg border-2 border-border bg-card px-3 py-2 text-sm text-text-primary shadow-[2px_2px_0_var(--color-border)] focus:outline-none focus:shadow-[4px_4px_0_var(--color-accent)] focus:border-border transition-shadow"
 				/>
 			</div>
 
 			<div class="pl-3">
-				<label class="block text-sm font-medium text-text-secondary mb-1">Description</label>
+				<span class="block text-sm font-bold text-text-primary mb-1">Description</span>
 				<textarea
 					bind:value={titleDescription}
 					placeholder="Optional subtitle or description"
 					rows="2"
-					class="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+					class="w-full rounded-lg border-2 border-border bg-card px-3 py-2 text-sm text-text-primary placeholder-text-muted shadow-[2px_2px_0_var(--color-border)] focus:outline-none focus:shadow-[4px_4px_0_var(--color-accent)] focus:border-border transition-shadow resize-none"
 				></textarea>
 			</div>
 
@@ -303,19 +303,19 @@
 
 			<!-- Map Style — icon row -->
 			<div class="pl-3">
-				<span class="block text-sm font-medium text-text-secondary mb-1.5">Map Style</span>
-				<div class="flex gap-1">
+				<span class="block text-sm font-bold text-text-primary mb-1.5">Map Style</span>
+				<div class="grid grid-cols-3 gap-1.5">
 					{#each mapStyles as style}
 						<button
-							class="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg border transition-all cursor-pointer
+							class="flex flex-col items-center gap-0.5 py-2 rounded-lg border-2 transition-all cursor-pointer
 								{mapStyle === style.value
 								? 'border-accent bg-accent-light'
-								: 'border-border bg-card hover:border-primary-light'}"
+								: 'border-border bg-card hover:border-primary-medium'}"
 							onclick={() => (mapStyle = style.value)}
 							title={style.label}
 						>
 							<span class="text-base">{style.icon}</span>
-							<span class="text-[10px] font-medium {mapStyle === style.value ? 'text-text-primary' : 'text-text-muted'}">{style.label}</span>
+							<span class="text-[10px] font-bold {mapStyle === style.value ? 'text-text-primary' : 'text-text-muted'}">{style.label}</span>
 						</button>
 					{/each}
 				</div>
