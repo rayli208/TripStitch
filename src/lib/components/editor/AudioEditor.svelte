@@ -308,6 +308,9 @@
 		if (voiceOverUrl) URL.revokeObjectURL(voiceOverUrl);
 		voiceOverUrl = URL.createObjectURL(blob);
 
+		// Auto-lower music volume so voice-over is prominent
+		if (musicVolume > 20) musicVolume = 20;
+
 		if (videoEl) videoEl.pause();
 		waveformRenderer?.stop();
 		waveformRenderer = null;
@@ -593,110 +596,113 @@
 			{/if}
 		</div>
 
-		<!-- Voice-over recording controls -->
-		{#if supportsVoiceOver}
-			<div class="w-full p-4 bg-card rounded-xl border border-border">
-				<div class="flex items-center gap-3">
-					<div class="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
-						<svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m-4 0h8m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-						</svg>
-					</div>
-					<div class="flex-1 min-w-0">
+		<!-- Unified audio card -->
+		<div class="w-full bg-card rounded-xl border border-border overflow-hidden">
+			<!-- Voice-over recording controls -->
+			{#if supportsVoiceOver}
+				<div class="p-4">
+					<div class="flex items-center gap-3">
+						<div class="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
+							<svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m-4 0h8m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+							</svg>
+						</div>
+						<div class="flex-1 min-w-0">
+							{#if recordingPhase === 'recording'}
+								<p class="text-sm font-medium text-text-primary">Recording...</p>
+								<p class="text-xs text-red-400">Tap video to {isPaused ? 'resume' : 'pause'}</p>
+							{:else if recordingPhase === 'countdown'}
+								<p class="text-sm font-medium text-text-primary">Starting in {countdown}...</p>
+								<p class="text-xs text-text-muted">Get ready to narrate</p>
+							{:else if voiceOverBlob}
+								<p class="text-sm font-medium text-text-primary">Voice-over recorded</p>
+								<p class="text-xs text-text-muted">Adjust volume below</p>
+							{:else}
+								<p class="text-sm font-medium text-text-primary">Add narration</p>
+								<p class="text-xs text-text-muted">Record while watching your video</p>
+							{/if}
+						</div>
 						{#if recordingPhase === 'recording'}
-							<p class="text-sm font-medium text-text-primary">Recording...</p>
-							<p class="text-xs text-red-400">Tap video to {isPaused ? 'resume' : 'pause'}</p>
-						{:else if recordingPhase === 'countdown'}
-							<p class="text-sm font-medium text-text-primary">Starting in {countdown}...</p>
-							<p class="text-xs text-text-muted">Get ready to narrate</p>
-						{:else if voiceOverBlob}
-							<p class="text-sm font-medium text-text-primary">Voice-over recorded</p>
-							<p class="text-xs text-text-muted">Adjust in the mixer below</p>
-						{:else}
-							<p class="text-sm font-medium text-text-primary">Add narration</p>
-							<p class="text-xs text-text-muted">Record while watching your video</p>
-						{/if}
-					</div>
-					{#if recordingPhase === 'recording'}
-						<button
-							class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg font-medium transition-colors cursor-pointer"
-							onclick={stopVoiceRecording}
-						>
-							Stop
-						</button>
-					{:else if recordingPhase === 'countdown'}
-						<!-- Countdown in progress -->
-					{:else}
-						<Button variant={voiceOverBlob ? 'ghost' : 'primary'} onclick={startVoiceRecording}>
-							{voiceOverBlob ? 'Re-record' : 'Record'}
-						</Button>
-					{/if}
-				</div>
-				{#if voRecordError}
-					<p class="text-xs text-error mt-2">{voRecordError}</p>
-				{/if}
-			</div>
-		{/if}
-
-		<!-- Audio controls (disabled during recording) -->
-		{#if recordingPhase === 'idle'}
-			{#if hasVideoWithAudio || voiceOverBlob}
-				<div class="w-full bg-card rounded-xl border border-border overflow-hidden">
-					<div class="px-4 pb-4 pt-4 space-y-3">
-						<!-- Original Audio -->
-						{#if hasVideoWithAudio}
-							<div class="flex items-center gap-3">
-								<svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-								</svg>
-								<span class="text-xs text-text-primary flex-1">Original Audio</span>
-								<!-- Mute toggle -->
-								<button
-									class="relative w-9 h-5 rounded-full transition-colors cursor-pointer {keepOriginalAudio ? 'bg-accent' : 'bg-border'}"
-									onclick={() => { keepOriginalAudio = !keepOriginalAudio; }}
-									aria-label={keepOriginalAudio ? 'Mute original audio' : 'Unmute original audio'}
-								>
-									<div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform {keepOriginalAudio ? 'translate-x-4' : ''}"></div>
-								</button>
-							</div>
-						{/if}
-
-						<!-- Voice-over -->
-						{#if voiceOverBlob}
-							<div class="flex items-center gap-3">
-								<svg class="w-4 h-4 text-purple-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m-4 0h8m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-								</svg>
-								<span class="text-xs text-text-primary w-14 shrink-0">Voice-over</span>
-								<input
-									type="range"
-									min="0"
-									max="100"
-									bind:value={voiceOverVolume}
-									oninput={() => { if (voPreviewAudioEl) voPreviewAudioEl.volume = voiceOverVolume / 100; }}
-									class="flex-1 bg-accent/30 text-accent"
-								/>
-								<span class="text-xs text-text-muted font-mono w-9 text-right">{voiceOverVolume}%</span>
-							</div>
 							<button
-								class="text-xs text-text-muted hover:text-error transition-colors cursor-pointer ml-7"
-								onclick={removeVoiceOver}
+								class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg font-medium transition-colors cursor-pointer"
+								onclick={stopVoiceRecording}
 							>
-								Remove voice-over
+								Stop
 							</button>
+						{:else if recordingPhase === 'countdown'}
+							<!-- Countdown in progress -->
+						{:else}
+							<Button variant={voiceOverBlob ? 'ghost' : 'primary'} onclick={startVoiceRecording}>
+								{voiceOverBlob ? 'Re-record' : 'Record'}
+							</Button>
 						{/if}
 					</div>
+					{#if voRecordError}
+						<p class="text-xs text-error mt-2">{voRecordError}</p>
+					{/if}
 				</div>
 			{/if}
 
-			<!-- Music picker for selecting/changing tracks -->
-			<MusicPicker
-				bind:musicSelection
-				bind:musicVolume
-				{videoDuration}
-				onvolumechange={(vol) => { if (musicAudioEl) musicAudioEl.volume = vol / 100; }}
-			/>
-		{/if}
+			<!-- Mixer & music sections (hidden during active recording) -->
+			{#if recordingPhase === 'idle'}
+				<!-- Voice-over volume + remove -->
+				{#if voiceOverBlob}
+					<div class="border-t border-border px-4 py-3 space-y-2">
+						<div class="flex items-center gap-3">
+							<svg class="w-4 h-4 text-purple-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m-4 0h8m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+							</svg>
+							<span class="text-xs text-text-primary w-14 shrink-0">Voice-over</span>
+							<input
+								type="range"
+								min="0"
+								max="100"
+								bind:value={voiceOverVolume}
+								oninput={() => { if (voPreviewAudioEl) voPreviewAudioEl.volume = voiceOverVolume / 100; }}
+								class="flex-1 bg-accent/30 text-accent"
+							/>
+							<span class="text-xs text-text-muted font-mono w-9 text-right">{voiceOverVolume}%</span>
+						</div>
+						<button
+							class="text-xs text-text-muted hover:text-error transition-colors cursor-pointer ml-7"
+							onclick={removeVoiceOver}
+						>
+							Remove voice-over
+						</button>
+					</div>
+				{/if}
+
+				<!-- Original Audio toggle -->
+				{#if hasVideoWithAudio}
+					<div class="border-t border-border px-4 py-3">
+						<div class="flex items-center gap-3">
+							<svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+							</svg>
+							<span class="text-xs text-text-primary flex-1">Original Audio</span>
+							<button
+								class="relative w-9 h-5 rounded-full transition-colors cursor-pointer {keepOriginalAudio ? 'bg-accent' : 'bg-border'}"
+								onclick={() => { keepOriginalAudio = !keepOriginalAudio; }}
+								aria-label={keepOriginalAudio ? 'Mute original audio' : 'Unmute original audio'}
+							>
+								<div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform {keepOriginalAudio ? 'translate-x-4' : ''}"></div>
+							</button>
+						</div>
+					</div>
+				{/if}
+
+				<!-- Background Music (inline, compact) -->
+				<div class="border-t border-border">
+					<MusicPicker
+						bind:musicSelection
+						bind:musicVolume
+						{videoDuration}
+						compact
+						onvolumechange={(vol) => { if (musicAudioEl) musicAudioEl.volume = vol / 100; }}
+					/>
+				</div>
+			{/if}
+		</div>
 
 		<!-- Audio action buttons -->
 		{#if recordingPhase === 'idle'}

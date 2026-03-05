@@ -1,6 +1,8 @@
 <script lang="ts">
-	import type { Location, TransportMode, AnimationStyle, PriceTier } from '$lib/types';
+	import type { Location, Clip, TransportMode, AnimationStyle, PriceTier } from '$lib/types';
 	import { suggestTransportMode } from '$lib/utils/distance';
+	import { dragHandleZone, dragHandle } from 'svelte-dnd-action';
+	import { flip } from 'svelte/animate';
 	import LocationSearch from './LocationSearch.svelte';
 	import MediaUpload from './MediaUpload.svelte';
 	import TransportPicker from './TransportPicker.svelte';
@@ -22,6 +24,7 @@
 		onrating,
 		onpricetier,
 		onclipanimation,
+		oncliptrim,
 		onnext,
 		onback
 	}: {
@@ -29,7 +32,7 @@
 		canAdd: boolean;
 		onadd: (loc: { name: string; lat: number; lng: number; city: string | null; state: string | null; country: string | null }) => void;
 		onremove: (id: string) => void;
-		onaddclip: (locationId: string, file: File) => void;
+		onaddclip: (locationId: string, file: File, durationSec?: number) => void;
 		onremoveclip: (locationId: string, clipId: string) => void;
 		onmoveclip: (locationId: string, fromIndex: number, toIndex: number) => void;
 		ontransport: (id: string, mode: TransportMode) => void;
@@ -38,6 +41,7 @@
 		onrating: (id: string, rating: number | null) => void;
 		onpricetier: (id: string, tier: PriceTier | null) => void;
 		onclipanimation: (locationId: string, clipId: string, style: AnimationStyle) => void;
+		oncliptrim: (locationId: string, clipId: string, start: number, end: number) => void;
 		onnext: () => void;
 		onback: () => void;
 	} = $props();
@@ -49,6 +53,8 @@
 		{ value: 'static', label: 'Static' }
 	];
 
+	const FLIP_DURATION_MS = 200;
+
 	// Wizard state: 'search' | 'card'
 	let wizardPhase = $state<'search' | 'card'>(locations.length === 0 ? 'search' : 'card');
 	let activeIndex = $state(Math.max(0, locations.length - 1));
@@ -57,6 +63,15 @@
 	let canProceed = $derived(locations.length >= 2 && allLocsHaveClips);
 	let activeLoc = $derived(locations[activeIndex] as Location | undefined);
 	let activeLocHasClips = $derived(activeLoc ? activeLoc.clips.length > 0 : false);
+
+	// Local mutable copy of clips for svelte-dnd-action (it needs to mutate items)
+	let dndClips = $state<Clip[]>([]);
+
+	// Sync from parent whenever the active location's clips change
+	$effect(() => {
+		const clips = activeLoc ? [...activeLoc.clips].sort((a, b) => a.order - b.order) : [];
+		dndClips = clips;
+	});
 
 	// Video duration validation
 	let clipError = $state<string | null>(null);
@@ -69,11 +84,12 @@
 	}
 
 	async function handleAddClip(locationId: string, file: File) {
+		let durationSec: number | undefined;
 		if (file.type.startsWith('video/')) {
 			try {
-				const duration = await getVideoDuration(file);
-				if (duration > 30) {
-					showClipError(`Video is ${Math.round(duration)}s long. Maximum is 30 seconds.`);
+				durationSec = await getVideoDuration(file);
+				if (durationSec > 30) {
+					showClipError(`Video is ${Math.round(durationSec)}s long. Maximum is 30 seconds.`);
 					return;
 				}
 			} catch {
@@ -81,7 +97,7 @@
 			}
 		}
 		clipError = null;
-		onaddclip(locationId, file);
+		onaddclip(locationId, file, durationSec);
 	}
 
 	function getVideoDuration(file: File): Promise<number> {
@@ -102,46 +118,175 @@
 		});
 	}
 
-	// Clip drag-and-drop state
-	let clipDragFromIndex: number | null = $state(null);
-	let clipDragOverIndex: number | null = $state(null);
+	// ── Drag-and-drop via svelte-dnd-action ──
+	let isDragging = $state(false);
 
-	function handleClipDragStart(e: DragEvent, index: number) {
-		clipDragFromIndex = index;
-		if (e.dataTransfer) {
-			e.dataTransfer.effectAllowed = 'move';
+	function handleDndConsider(e: CustomEvent<{ items: Clip[] }>) {
+		if (!isDragging && playingClipId) {
+			// Pause any playing video when drag starts
+			const vid = videoElements.get(playingClipId);
+			if (vid) vid.pause();
+			if (playbackRAF) { cancelAnimationFrame(playbackRAF); playbackRAF = null; }
+			playingClipId = null;
+		}
+		isDragging = true;
+		dndClips = e.detail.items;
+	}
+
+	function handleDndFinalize(e: CustomEvent<{ items: Clip[] }>) {
+		isDragging = false;
+		if (!activeLoc) return;
+		dndClips = e.detail.items;
+		// Find what moved: compare parent's order to new order
+		const oldClips = [...activeLoc.clips].sort((a, b) => a.order - b.order);
+		const newIds = e.detail.items.map(c => c.id);
+		for (let i = 0; i < newIds.length; i++) {
+			const oldIndex = oldClips.findIndex(c => c.id === newIds[i]);
+			if (oldIndex !== i) {
+				onmoveclip(activeLoc.id, oldIndex, i);
+				return;
+			}
 		}
 	}
 
-	function handleClipDragOver(e: DragEvent, index: number) {
-		e.preventDefault();
-		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-		clipDragOverIndex = index;
+	function formatTime(sec: number): string {
+		return sec.toFixed(1) + 's';
 	}
 
-	function handleClipDrop(e: DragEvent, index: number) {
-		e.preventDefault();
-		if (clipDragFromIndex !== null && clipDragFromIndex !== index && activeLoc) {
-			onmoveclip(activeLoc.id, clipDragFromIndex, index);
+	// ── Clip preview state ──
+	let playingClipId = $state<string | null>(null);
+	let clipCurrentTime = $state<number>(0);
+	let videoElements = $state<Map<string, HTMLVideoElement>>(new Map());
+	let videoLoaded = $state<Set<string>>(new Set());
+	// Thumbnail data URLs for both videos (poster frame) and photos
+	let clipThumbnails = $state<Map<string, string>>(new Map());
+	let playbackRAF: number | null = null;
+
+	function capturePoster(video: HTMLVideoElement, clipId: string) {
+		try {
+			const w = video.videoWidth;
+			const h = video.videoHeight;
+			if (!w || !h) return;
+			const canvas = document.createElement('canvas');
+			canvas.width = w;
+			canvas.height = h;
+			const ctx = canvas.getContext('2d');
+			if (!ctx) return;
+			ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+			const url = canvas.toDataURL('image/jpeg', 0.7);
+			clipThumbnails = new Map(clipThumbnails).set(clipId, url);
+		} catch {
+			// cross-origin or other issue
 		}
-		clipDragFromIndex = null;
-		clipDragOverIndex = null;
 	}
 
-	function handleClipDragEnd() {
-		clipDragFromIndex = null;
-		clipDragOverIndex = null;
+	// Generate thumbnails for photo clips using createImageBitmap (handles HEIC, WebP, etc.)
+	function generatePhotoThumbnail(file: File, clipId: string) {
+		if (clipThumbnails.has(clipId)) return;
+		createImageBitmap(file)
+			.then((bitmap) => {
+				const canvas = document.createElement('canvas');
+				const maxDim = 200;
+				const scale = Math.min(maxDim / bitmap.width, maxDim / bitmap.height, 1);
+				canvas.width = Math.round(bitmap.width * scale);
+				canvas.height = Math.round(bitmap.height * scale);
+				const ctx = canvas.getContext('2d')!;
+				ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+				bitmap.close();
+				const url = canvas.toDataURL('image/jpeg', 0.8);
+				clipThumbnails = new Map(clipThumbnails).set(clipId, url);
+			})
+			.catch(() => {
+				// Browser can't decode this image format — leave thumbnail empty
+			});
+	}
+
+	// Generate photo thumbnails whenever clips change
+	$effect(() => {
+		if (!activeLoc) return;
+		for (const clip of activeLoc.clips) {
+			if (clip.type === 'photo' && clip.file) {
+				generatePhotoThumbnail(clip.file, clip.id);
+			}
+		}
+	});
+
+	function videoRef(el: HTMLVideoElement, clipId: string) {
+		videoElements = new Map(videoElements).set(clipId, el);
+
+		function markLoaded() {
+			videoLoaded = new Set(videoLoaded).add(clipId);
+			if (el.videoWidth > 0) {
+				capturePoster(el, clipId);
+			} else {
+				el.addEventListener('loadedmetadata', () => capturePoster(el, clipId), { once: true });
+			}
+		}
+
+		if (el.readyState >= 2) {
+			markLoaded();
+		} else {
+			el.addEventListener('loadeddata', () => markLoaded(), { once: true });
+			el.addEventListener('canplay', () => {
+				if (!videoLoaded.has(clipId)) markLoaded();
+			}, { once: true });
+		}
+		return {
+			destroy() {
+				const copy = new Map(videoElements);
+				copy.delete(clipId);
+				videoElements = copy;
+			}
+		};
+	}
+
+	function togglePlay(clipId: string, durationSec: number, trimStart: number, trimEnd: number) {
+		const vid = videoElements.get(clipId);
+		if (!vid) return;
+
+		if (playingClipId === clipId) {
+			vid.pause();
+			if (playbackRAF) { cancelAnimationFrame(playbackRAF); playbackRAF = null; }
+			playingClipId = null;
+			return;
+		}
+
+		// Stop any other playing clip
+		if (playingClipId) {
+			const prev = videoElements.get(playingClipId);
+			if (prev) prev.pause();
+			if (playbackRAF) { cancelAnimationFrame(playbackRAF); playbackRAF = null; }
+		}
+
+		playingClipId = clipId;
+		vid.currentTime = trimStart;
+		vid.play();
+
+		const tick = () => {
+			if (!vid.paused && !vid.ended) {
+				clipCurrentTime = vid.currentTime;
+				if (vid.currentTime >= trimEnd) {
+					vid.pause();
+					vid.currentTime = trimStart;
+					clipCurrentTime = trimStart;
+					playingClipId = null;
+					return;
+				}
+				playbackRAF = requestAnimationFrame(tick);
+			} else {
+				clipCurrentTime = vid.currentTime;
+				playingClipId = null;
+			}
+		};
+		playbackRAF = requestAnimationFrame(tick);
 	}
 
 	function handleAdd(loc: { name: string; lat: number; lng: number; city: string | null; state: string | null; country: string | null }) {
 		onadd(loc);
-		// Auto-suggest transport if there's a previous location
-		const newIndex = locations.length; // index after add
+		const newIndex = locations.length;
 		if (newIndex > 0) {
 			const prev = locations[newIndex - 1];
 			const suggested = suggestTransportMode(prev.lat, prev.lng, loc.lat, loc.lng);
-			// We need to wait for the location to be added, then set transport
-			// The new location will be at index `newIndex` after the state updates
 			setTimeout(() => {
 				const newLoc = locations[newIndex];
 				if (newLoc && !newLoc.transportMode) {
@@ -264,76 +409,187 @@
 				</div>
 			</div>
 
-			<!-- Clips list (primary position) -->
+			<!-- Clips list -->
 			<div class="p-4 border-b border-border">
 				<span class="text-xs text-text-muted block mb-2">
 					Clips ({activeLoc.clips.length})
 				</span>
 
-				{#if activeLoc.clips.length > 0}
-					<div class="space-y-2 mb-3">
-						{#each [...activeLoc.clips].sort((a, b) => a.order - b.order) as clip, ci (clip.id)}
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<div
-								class="flex items-center gap-2 p-2 rounded-lg border transition-colors
-									{clipDragOverIndex === ci && clipDragFromIndex !== ci
-									? 'border-accent bg-accent/5'
-									: 'border-border bg-card'}"
-								draggable="true"
-								ondragstart={(e) => handleClipDragStart(e, ci)}
-								ondragover={(e) => handleClipDragOver(e, ci)}
-								ondrop={(e) => handleClipDrop(e, ci)}
-								ondragend={handleClipDragEnd}
-							>
-								<!-- Drag handle -->
-								<div class="cursor-grab text-text-muted flex-shrink-0">
-									<svg class="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
-										<circle cx="5" cy="3" r="1.5" /><circle cx="11" cy="3" r="1.5" />
-										<circle cx="5" cy="8" r="1.5" /><circle cx="11" cy="8" r="1.5" />
-										<circle cx="5" cy="13" r="1.5" /><circle cx="11" cy="13" r="1.5" />
-									</svg>
-								</div>
+				{#if dndClips.length > 0}
+					<div
+						class="clip-list mb-3"
+						use:dragHandleZone={{ items: dndClips, flipDurationMs: FLIP_DURATION_MS, dropTargetStyle: {} }}
+						onconsider={handleDndConsider}
+						onfinalize={handleDndFinalize}
+					>
+						{#each dndClips as clip (clip.id)}
+							<div class="rounded-lg border border-border bg-card mb-2" animate:flip={{ duration: FLIP_DURATION_MS }}>
+								<div class="flex items-center gap-2 p-2">
+									<!-- Drag handle -->
+									<div
+										class="cursor-grab active:cursor-grabbing text-text-muted flex-shrink-0 touch-none"
+										use:dragHandle
+										aria-label="drag handle"
+									>
+										<svg class="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+											<circle cx="5" cy="3" r="1.5" /><circle cx="11" cy="3" r="1.5" />
+											<circle cx="5" cy="8" r="1.5" /><circle cx="11" cy="8" r="1.5" />
+											<circle cx="5" cy="13" r="1.5" /><circle cx="11" cy="13" r="1.5" />
+										</svg>
+									</div>
 
-								<!-- Thumbnail -->
-								<div class="w-10 h-10 rounded overflow-hidden bg-card flex-shrink-0">
-									{#if clip.previewUrl}
-										{#if clip.type === 'video'}
-											<!-- svelte-ignore a11y_media_has_caption -->
-											<video src={clip.previewUrl} class="w-full h-full object-cover" muted></video>
-										{:else}
-											<img src={clip.previewUrl} alt="Clip" class="w-full h-full object-cover" />
-										{/if}
-									{:else}
-										<div class="w-full h-full flex items-center justify-center text-text-muted text-xs">--</div>
-									{/if}
-								</div>
-
-								<!-- Type label + animation picker -->
-								<div class="flex-1 min-w-0">
-									<span class="text-xs font-medium text-text-secondary capitalize">{clip.type ?? 'unknown'}</span>
-									{#if clip.type === 'photo'}
-										<select
-											class="ml-2 text-xs bg-card border border-border rounded px-1 py-0.5 text-text-muted"
-											value={clip.animationStyle}
-											onchange={(e) => onclipanimation(activeLoc!.id, clip.id, (e.target as HTMLSelectElement).value as AnimationStyle)}
+									<!-- Thumbnail / Video preview -->
+									{#if clip.type === 'video' && clip.previewUrl}
+										<button
+											class="relative w-28 h-20 rounded overflow-hidden bg-black flex-shrink-0 cursor-pointer group"
+											onclick={() => { if (!isDragging) togglePlay(clip.id, clip.durationSec!, clip.trimStartSec ?? 0, clip.trimEndSec ?? clip.durationSec!); }}
 										>
-											{#each ANIMATION_OPTIONS as opt}
-												<option value={opt.value}>{opt.label}</option>
-											{/each}
-										</select>
+												<!-- svelte-ignore a11y_media_has_caption -->
+											<video
+												src={clip.previewUrl}
+												class="absolute inset-0 w-full h-full object-cover {playingClipId === clip.id ? 'z-10' : 'opacity-0'}"
+												muted
+												playsinline
+												preload="auto"
+												use:videoRef={clip.id}
+											></video>
+											<!-- Static poster always covers video when not playing — prevents flicker during DnD -->
+											{#if playingClipId !== clip.id}
+												{#if clipThumbnails.has(clip.id)}
+													<img src={clipThumbnails.get(clip.id)} alt="" class="absolute inset-0 w-full h-full object-cover" />
+												{:else}
+													<div class="absolute inset-0 flex items-center justify-center bg-black/60">
+														<div class="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+													</div>
+												{/if}
+											{/if}
+											{#if !isDragging}
+												<div class="absolute inset-0 flex items-center justify-center {playingClipId === clip.id ? 'opacity-0 group-hover:opacity-100' : ''} transition-opacity">
+													<div class="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center">
+														{#if playingClipId === clip.id}
+															<svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+																<path d="M5 4h3v12H5V4zm7 0h3v12h-3V4z" />
+															</svg>
+														{:else}
+															<svg class="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20">
+																<path d="M6.3 2.84A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.27l9.344-5.891a1.5 1.5 0 000-2.538L6.3 2.84z" />
+															</svg>
+														{/if}
+													</div>
+												</div>
+											{/if}
+										</button>
+									{:else}
+										<div class="w-20 h-14 rounded overflow-hidden bg-card flex-shrink-0">
+											{#if clipThumbnails.has(clip.id)}
+												<img src={clipThumbnails.get(clip.id)} alt="" class="w-full h-full object-cover" />
+											{:else}
+												<div class="w-full h-full flex items-center justify-center bg-black/10">
+													<svg class="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+													</svg>
+												</div>
+											{/if}
+										</div>
 									{/if}
-								</div>
 
-								<!-- Remove clip -->
-								<button
-									class="text-text-muted hover:text-error transition-colors cursor-pointer p-1 flex-shrink-0"
-									onclick={() => onremoveclip(activeLoc!.id, clip.id)}
-									title="Remove clip"
-								>
-									<svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-										<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-									</svg>
-								</button>
+									<!-- Middle: type label + trim slider (or animation picker for photos) -->
+									<div class="flex-1 min-w-0">
+										{#if clip.type === 'video' && clip.durationSec}
+											{@const trimStart = clip.trimStartSec ?? 0}
+											{@const trimEnd = clip.trimEndSec ?? clip.durationSec}
+											<div class="flex items-center gap-1 mb-1">
+												<span class="text-xs font-medium text-text-secondary capitalize">Video</span>
+												<span class="text-xs text-text-muted">{formatTime(trimEnd - trimStart)}</span>
+											</div>
+											<!-- Trim slider -->
+											<div class="relative h-5">
+												<!-- Track background -->
+												<div class="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1.5 rounded-full bg-border"></div>
+												<!-- Active range -->
+												<div
+													class="absolute top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-accent pointer-events-none"
+													style="left: {(trimStart / clip.durationSec) * 100}%; right: {(1 - trimEnd / clip.durationSec) * 100}%"
+												></div>
+												<!-- Playhead indicator -->
+												{#if playingClipId === clip.id}
+													<div
+														class="absolute top-0 bottom-0 w-0.5 bg-white rounded-full pointer-events-none"
+														style="left: {(clipCurrentTime / clip.durationSec) * 100}%; box-shadow: 0 0 3px rgba(0,0,0,0.5);"
+													></div>
+												{/if}
+												<!-- Start handle -->
+												<input
+													type="range"
+													min="0"
+													max={clip.durationSec}
+													step="0.1"
+													value={trimStart}
+													class="trim-range trim-range-start absolute inset-0 w-full"
+													style="z-index: {trimStart > trimEnd - 0.5 ? 4 : 2};"
+													oninput={(e) => {
+														const val = parseFloat((e.target as HTMLInputElement).value);
+														const end = clip.trimEndSec ?? clip.durationSec!;
+	
+														if (val < end) {
+															oncliptrim(activeLoc!.id, clip.id, val, end);
+															const vid = videoElements.get(clip.id);
+															if (vid && playingClipId !== clip.id) vid.currentTime = val;
+														}
+													}}
+												/>
+												<!-- End handle -->
+												<input
+													type="range"
+													min="0"
+													max={clip.durationSec}
+													step="0.1"
+													value={trimEnd}
+													class="trim-range trim-range-end absolute inset-0 w-full"
+													style="z-index: 3;"
+													oninput={(e) => {
+														const val = parseFloat((e.target as HTMLInputElement).value);
+														const start = clip.trimStartSec ?? 0;
+	
+														if (val > start) {
+															oncliptrim(activeLoc!.id, clip.id, start, val);
+															const vid = videoElements.get(clip.id);
+															if (vid && playingClipId !== clip.id) vid.currentTime = Math.min(val, vid.duration);
+														}
+													}}
+												/>
+											</div>
+											<div class="flex justify-between text-xs text-text-muted mt-0.5">
+												<span>{formatTime(trimStart)}</span>
+												<span>{formatTime(trimEnd)}</span>
+											</div>
+										{:else}
+											<span class="text-xs font-medium text-text-secondary capitalize">{clip.type ?? 'unknown'}</span>
+											{#if clip.type === 'photo'}
+												<select
+													class="ml-2 text-xs bg-card border border-border rounded px-1 py-0.5 text-text-muted"
+													value={clip.animationStyle}
+													onchange={(e) => onclipanimation(activeLoc!.id, clip.id, (e.target as HTMLSelectElement).value as AnimationStyle)}
+												>
+													{#each ANIMATION_OPTIONS as opt}
+														<option value={opt.value}>{opt.label}</option>
+													{/each}
+												</select>
+											{/if}
+										{/if}
+									</div>
+
+									<!-- Remove clip -->
+									<button
+										class="text-text-muted hover:text-error transition-colors cursor-pointer p-1 flex-shrink-0"
+										onclick={() => onremoveclip(activeLoc!.id, clip.id)}
+										title="Remove clip"
+									>
+										<svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+											<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+										</svg>
+									</button>
+								</div>
 							</div>
 						{/each}
 					</div>
@@ -469,3 +725,54 @@
 		</Button>
 	</div>
 </div>
+
+<style>
+	.trim-range {
+		-webkit-appearance: none;
+		appearance: none;
+		background: transparent;
+		pointer-events: none;
+		height: 100%;
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		margin: 0;
+		padding: 0;
+	}
+	.trim-range::-webkit-slider-runnable-track {
+		background: transparent;
+		height: 100%;
+	}
+	.trim-range::-moz-range-track {
+		background: transparent;
+		height: 100%;
+	}
+	.trim-range::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		appearance: none;
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		background: var(--color-accent, #3b82f6);
+		border: 2px solid white;
+		cursor: pointer;
+		pointer-events: auto;
+		box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+		position: relative;
+	}
+	.trim-range::-moz-range-thumb {
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		background: var(--color-accent, #3b82f6);
+		border: 2px solid white;
+		cursor: pointer;
+		pointer-events: auto;
+		box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+	}
+
+	/* Prevent dnd library from adding outlines to the zone */
+	.clip-list {
+		outline: none;
+	}
+</style>

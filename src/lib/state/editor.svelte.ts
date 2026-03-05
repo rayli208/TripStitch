@@ -211,7 +211,7 @@ export function createEditorState(initial?: {
 			locations = copy.map((l, i) => ({ ...l, order: i }));
 		},
 
-		addClipToLocation(locationId: string, file: File) {
+		addClipToLocation(locationId: string, file: File, durationSec?: number) {
 			const isVideo = file.type.startsWith('video/');
 			const previewUrl = URL.createObjectURL(file);
 			const clip: Clip = {
@@ -220,7 +220,8 @@ export function createEditorState(initial?: {
 				file,
 				previewUrl,
 				type: isVideo ? 'video' : 'photo',
-				animationStyle: 'kenBurns'
+				animationStyle: 'kenBurns',
+				durationSec
 			};
 			locations = locations.map((l) => {
 				if (l.id !== locationId) return l;
@@ -253,6 +254,16 @@ export function createEditorState(initial?: {
 				return {
 					...l,
 					clips: l.clips.map((c) => (c.id === clipId ? { ...c, animationStyle: style } : c))
+				};
+			});
+		},
+
+		updateClipTrim(locationId: string, clipId: string, trimStartSec: number, trimEndSec: number) {
+			locations = locations.map((l) => {
+				if (l.id !== locationId) return l;
+				return {
+					...l,
+					clips: l.clips.map((c) => (c.id === clipId ? { ...c, trimStartSec, trimEndSec } : c))
 				};
 			});
 		},

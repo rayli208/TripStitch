@@ -6,7 +6,8 @@ Browser-based travel video creator. Users add photos/videos from trips, and the 
 
 - **Svelte 5** (runes: `$state`, `$derived`, `$effect`) + **SvelteKit** (file-based routing)
 - **TypeScript**, **Tailwind CSS v4**, **Vite**
-- **Firebase**: Auth (Google Sign-In), Firestore (data), Storage (images)
+
+- **Firebase**: Auth (Google + Email/Password), Firestore (data), Storage (images)
 - **MapLibre GL** + **MapTiler** for maps, **Globe.GL** for 3D globe
 - **mp4-muxer** + **WebCodecs API** for video encoding
 
@@ -17,7 +18,7 @@ src/
   routes/                    # SvelteKit file-based routing
     +page.svelte             # Landing page
     create/                  # Trip editor (multi-step form)
-    signin/                  # Google auth
+    signin/                  # Auth (Google + email/password + forgot password)
     trips/                   # Dashboard (user's trips)
     profile/                 # Profile setup
     trip/[id]/               # View trip (public share page)
@@ -92,6 +93,14 @@ All prefixed `PUBLIC_` (client-side accessible via SvelteKit):
 - **Security rules**: `firestore.rules`, `storage.rules`
 - **Index**: Composite index on trips `(userId ASC, createdAt DESC)`
 
-## Known Issues
+## Firebase Projects
 
-- `storage.rules`: Any authenticated user can write to any trip's storage folder (missing ownership check)
+- **Dev**: `tripstitch-dev` (used by `.env.development`)
+- **Prod**: `tripstitch-6b21a` (used by `.env.production`)
+- Deploy rules to both: `firebase deploy --only storage,firestore --project <project-id>`
+
+## Deployment
+
+- **Hosting**: Firebase Hosting with `adapter-static` (SPA fallback to `200.html`)
+- **CI/CD**: GitHub Actions auto-deploy on push to `main`, preview deploys on PRs
+- **Domain**: `tripstitch.blog` (custom domain via Namecheap DNS)

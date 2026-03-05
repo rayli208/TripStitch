@@ -422,7 +422,9 @@ export async function playVideoToCanvas(
 	height: number,
 	maxDurationSec = 30,
 	frameCallback?: FrameCallback,
-	pauseClock?: PauseClock
+	pauseClock?: PauseClock,
+	trimStartSec = 0,
+	trimEndSec?: number
 ): Promise<number> {
 	console.log(`[VideoProcessor] playVideoToCanvas: ${file.name}, ${(file.size / 1024 / 1024).toFixed(1)}MB`);
 	const video = document.createElement('video');
@@ -435,10 +437,14 @@ export async function playVideoToCanvas(
 		video.onerror = () => reject(new Error('Failed to load video'));
 	});
 
-	const duration = Math.min(video.duration, maxDurationSec);
-	console.log(`[VideoProcessor] Video loaded: ${video.videoWidth}x${video.videoHeight}, duration: ${video.duration.toFixed(1)}s (using ${duration.toFixed(1)}s)`);
+	const endTime = Math.min(trimEndSec ?? video.duration, trimStartSec + maxDurationSec, video.duration);
+	const duration = endTime - trimStartSec;
+	console.log(`[VideoProcessor] Video loaded: ${video.videoWidth}x${video.videoHeight}, duration: ${video.duration.toFixed(1)}s (using ${trimStartSec.toFixed(1)}s-${endTime.toFixed(1)}s = ${duration.toFixed(1)}s)`);
 
-	video.currentTime = 0;
+	video.currentTime = trimStartSec;
+	if (trimStartSec > 0) {
+		await new Promise<void>((resolve) => { video.onseeked = () => resolve(); });
+	}
 	await video.play();
 	console.log(`[VideoProcessor] playVideoToCanvas: playback started (duration target: ${duration.toFixed(1)}s)`);
 
@@ -447,7 +453,7 @@ export async function playVideoToCanvas(
 	let hiddenFrames = 0;
 	await new Promise<void>((resolve) => {
 		const drawFrame = () => {
-			if (video.ended || video.currentTime >= duration) {
+			if (video.ended || video.currentTime >= endTime) {
 				resolve();
 				return;
 			}
@@ -664,7 +670,9 @@ export async function playVideoAccelerated(
 	fps: number,
 	playbackRate: number,
 	onFrame: (canvas: HTMLCanvasElement) => void,
-	frameOverlay?: FrameCallback
+	frameOverlay?: FrameCallback,
+	trimStartSec = 0,
+	trimEndSec?: number
 ): Promise<number> {
 	const ctx = canvas.getContext('2d')!;
 	const video = document.createElement('video');
@@ -677,35 +685,34 @@ export async function playVideoAccelerated(
 		video.onerror = () => reject(new Error('Failed to load video'));
 	});
 
-	const duration = Math.min(video.duration, maxDurationSec);
+	const endTime = Math.min(trimEndSec ?? video.duration, trimStartSec + maxDurationSec, video.duration);
+	const duration = endTime - trimStartSec;
 
-	console.log(`[VideoProcessor] playVideoAccelerated: ${file.name}, duration=${duration.toFixed(1)}s, rate=${playbackRate}x`);
+	console.log(`[VideoProcessor] playVideoAccelerated: ${file.name}, duration=${duration.toFixed(1)}s (${trimStartSec.toFixed(1)}s-${endTime.toFixed(1)}s), rate=${playbackRate}x`);
 
-	video.currentTime = 0;
+	video.currentTime = trimStartSec;
+	if (trimStartSec > 0) {
+		await new Promise<void>((resolve) => { video.onseeked = () => resolve(); });
+	}
 	video.playbackRate = playbackRate;
 	await video.play();
 
 	let frameCount = 0;
 	const frameInterval = 1 / fps; // seconds of video time per output frame
-	let nextFrameVideoTime = 0; // next video timestamp to encode at
+	let nextFrameVideoTime = trimStartSec; // next video timestamp to encode at
 
 	const hasRVFC = 'requestVideoFrameCallback' in video;
 
 	await new Promise<void>((resolve) => {
 		if (hasRVFC) {
-			// Use requestVideoFrameCallback for precise frame capture.
-			// At 4x playback, each callback may need to emit multiple output
-			// frames so the output duration matches the source video duration.
 			const onVideoFrame = (_now: DOMHighResTimeStamp, _metadata: { mediaTime: number }) => {
-				if (video.ended || video.currentTime >= duration) {
+				if (video.ended || video.currentTime >= endTime) {
 					resolve();
 					return;
 				}
-				// Draw current decoded frame to canvas
 				drawCover(ctx, video, w, h);
 				frameOverlay?.(ctx);
-				// Encode frames to catch up with video time
-				while (nextFrameVideoTime <= video.currentTime && nextFrameVideoTime < duration) {
+				while (nextFrameVideoTime <= video.currentTime && nextFrameVideoTime < endTime) {
 					onFrame(canvas);
 					frameCount++;
 					nextFrameVideoTime += frameInterval;
@@ -714,11 +721,10 @@ export async function playVideoAccelerated(
 			};
 			(video as any).requestVideoFrameCallback(onVideoFrame);
 		} else {
-			// Fallback: rAF loop at 1x speed (no acceleration)
 			console.warn('[VideoProcessor] requestVideoFrameCallback not available, falling back to rAF');
 			video.playbackRate = 1;
 			const drawFrame = () => {
-				if (video.ended || video.currentTime >= duration) {
+				if (video.ended || video.currentTime >= endTime) {
 					resolve();
 					return;
 				}

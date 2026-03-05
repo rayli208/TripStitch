@@ -329,7 +329,7 @@
 			canAdd={editor.canAddLocation}
 			onadd={(loc) => editor.addLocation({ name: loc.name, lat: loc.lat, lng: loc.lng, city: loc.city, state: loc.state, country: loc.country })}
 			onremove={(id) => editor.removeLocation(id)}
-			onaddclip={(locId, file) => editor.addClipToLocation(locId, file)}
+			onaddclip={(locId, file, dur) => editor.addClipToLocation(locId, file, dur)}
 			onremoveclip={(locId, clipId) => editor.removeClip(locId, clipId)}
 			onmoveclip={(locId, from, to) => editor.moveClip(locId, from, to)}
 			ontransport={(id, mode) => editor.updateLocationTransport(id, mode)}
@@ -338,6 +338,7 @@
 			onrating={(id, rating) => editor.updateLocationRating(id, rating)}
 			onpricetier={(id, tier) => editor.updateLocationPriceTier(id, tier)}
 			onclipanimation={(locId, clipId, style) => editor.updateClipAnimation(locId, clipId, style)}
+			oncliptrim={(locId, clipId, start, end) => editor.updateClipTrim(locId, clipId, start, end)}
 			onnext={() => editor.nextStep()}
 			onback={() => editor.prevStep()}
 		/>

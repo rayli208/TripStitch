@@ -539,9 +539,21 @@ function drawLocationTitleOnCanvas(
 	ctx.textAlign = 'center';
 	ctx.textBaseline = 'middle';
 
-	const metrics = ctx.measureText(text);
 	const padX = 44, padY = 20;
-	const bgW = metrics.width + padX * 2;
+	const maxBgW = width - 40; // 20px margin each side
+
+	// Truncate text with ellipsis if it overflows the canvas
+	let displayText = text;
+	let metrics = ctx.measureText(displayText);
+	if (metrics.width + padX * 2 > maxBgW) {
+		while (displayText.length > 1 && ctx.measureText(displayText + '...').width + padX * 2 > maxBgW) {
+			displayText = displayText.slice(0, -1);
+		}
+		displayText = displayText.trimEnd() + '...';
+		metrics = ctx.measureText(displayText);
+	}
+
+	const bgW = Math.min(metrics.width + padX * 2, maxBgW);
 	const bgH = fontSize + padY * 2;
 	const topOffset = width > 1200 ? 80 : 60;
 	const bgX = width / 2 - bgW / 2;
@@ -566,7 +578,7 @@ function drawLocationTitleOnCanvas(
 
 	// Title text with contrast color
 	ctx.fillStyle = textColor;
-	ctx.fillText(text, width / 2, topOffset + bgH / 2);
+	ctx.fillText(displayText, width / 2, topOffset + bgH / 2);
 
 	// Star rating below the title bar
 	if (rating && rating > 0) {

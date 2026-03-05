@@ -292,7 +292,7 @@ async function assembleVideoMediaRecorder(
 					checkAbort();
 					if (clip.type === 'video' && clip.file) {
 						console.log(`[TripStitch]   Playing video clip ${ci + 1}/${clipsWithFiles.length} (${clip.id}, ${clip.file.name}, ${(clip.file.size / 1024 / 1024).toFixed(1)}MB)`);
-						const dur = await playVideoToCanvas(clip.file, ctx, width, height, 30, frameOverlay, pauseClock);
+						const dur = await playVideoToCanvas(clip.file, ctx, width, height, 30, frameOverlay, pauseClock, clip.trimStartSec ?? 0, clip.trimEndSec);
 						combinedDuration += dur;
 						console.log(`[TripStitch]   Video clip done: ${dur.toFixed(1)}s`);
 					} else if (clip.type === 'photo' && clip.file) {

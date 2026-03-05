@@ -10,12 +10,14 @@
 		musicVolume = $bindable(70),
 		videoDuration = 0,
 		disabled = false,
+		compact = false,
 		onvolumechange
 	}: {
 		musicSelection?: MusicSelection | null;
 		musicVolume?: number;
 		videoDuration?: number;
 		disabled?: boolean;
+		compact?: boolean;
 		onvolumechange?: (volume: number) => void;
 	} = $props();
 
@@ -277,7 +279,7 @@
 	}
 </style>
 
-<div class="w-full bg-card rounded-xl border border-border overflow-hidden {disabled ? 'opacity-50 pointer-events-none' : ''}">
+<div class="{compact ? '' : 'w-full bg-card rounded-xl border border-border overflow-hidden'} {disabled ? 'opacity-50 pointer-events-none' : ''}">
 	<!-- Header / collapsed view -->
 	<button
 		class="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-card/80 transition-colors"

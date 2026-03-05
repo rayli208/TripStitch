@@ -273,6 +273,19 @@
 		{/each}
 	</div>
 
+	<!-- Audio reminder -->
+	<div class="flex items-start gap-3 p-3.5 rounded-xl bg-accent/5 border border-accent/20">
+		<div class="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+			<svg class="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m-4 0h8m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+			</svg>
+		</div>
+		<div>
+			<p class="text-sm font-medium text-text-primary">Add voice-over & music</p>
+			<p class="text-xs text-text-muted">Record narration and pick a soundtrack after stitching.</p>
+		</div>
+	</div>
+
 	<!-- Bottom nav -->
 	<div class="flex justify-between pt-2">
 		<Button variant="ghost" onclick={onback}>Locations</Button>

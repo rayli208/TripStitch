@@ -62,6 +62,9 @@ export interface Clip {
 	previewUrl: string | null;
 	type: 'photo' | 'video' | null;
 	animationStyle: AnimationStyle;
+	durationSec?: number;
+	trimStartSec?: number;
+	trimEndSec?: number;
 }
 
 export interface Location {

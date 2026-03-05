@@ -226,7 +226,8 @@ export async function assembleVideoWebCodecs(
 						const dur = await playVideoAccelerated(
 							clip.file, canvas, width, height,
 							30, TARGET_FPS, 4,
-							onFrame, frameOverlay
+							onFrame, frameOverlay,
+							clip.trimStartSec ?? 0, clip.trimEndSec
 						);
 						combinedDuration += dur;
 					} else if (clip.type === 'photo' && clip.file) {
