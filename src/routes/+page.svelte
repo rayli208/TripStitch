@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import authState from '$lib/state/auth.svelte';
-	import { ArrowRight, CaretDown, MapTrifold, Palette, Camera, Sparkle, FrameCorners, ShareNetwork, Backpack, Car, PersonSimpleHike, UsersThree } from 'phosphor-svelte';
+	import { ArrowRight, CaretDown, MapTrifold, Palette, Camera, Sparkle, FrameCorners, ShareNetwork, ShieldCheck, DeviceMobile, Timer, Download } from 'phosphor-svelte';
 
 	// Redirect authenticated users straight to dashboard
 	$effect(() => {
@@ -15,6 +15,26 @@
 	$effect(() => {
 		const t = setTimeout(() => { ready = true; }, 100);
 		return () => clearTimeout(t);
+	});
+
+	// Scroll-reveal: observe .reveal elements and add .revealed when in view
+	$effect(() => {
+		const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		const elements = document.querySelectorAll('.reveal');
+		if (prefersReduced) {
+			elements.forEach(el => el.classList.add('revealed'));
+			return;
+		}
+		const observer = new IntersectionObserver((entries) => {
+			entries.forEach(e => {
+				if (e.isIntersecting) {
+					e.target.classList.add('revealed');
+					observer.unobserve(e.target);
+				}
+			});
+		}, { threshold: 0.1 });
+		elements.forEach(el => observer.observe(el));
+		return () => observer.disconnect();
 	});
 </script>
 
@@ -61,10 +81,96 @@
 	.delay-200 { animation-delay: 0.2s; }
 	.delay-300 { animation-delay: 0.3s; }
 	.delay-400 { animation-delay: 0.4s; }
+	.delay-500 { animation-delay: 0.5s; }
 	.fill-both { animation-fill-mode: both; }
+
+	/* Scroll reveal — .revealed is added via JS, so use :global */
+	:global(.reveal) {
+		opacity: 0;
+		transform: translateY(24px);
+		transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+	}
+	:global(.reveal.revealed) {
+		opacity: 1;
+		transform: translateY(0);
+	}
+
+	/* Route line */
+	@keyframes route-draw {
+		to { stroke-dashoffset: -200; }
+	}
+	.animate-route {
+		stroke-dashoffset: 0;
+		animation: route-draw 8s linear infinite;
+	}
+
+	/* Marquee */
+	@keyframes marquee {
+		from { transform: translateX(0); }
+		to { transform: translateX(-50%); }
+	}
+	.animate-marquee {
+		animation: marquee 30s linear infinite;
+	}
+
+	/* Grain overlay */
+	.grain::after {
+		content: '';
+		position: fixed;
+		inset: 0;
+		z-index: 9999;
+		pointer-events: none;
+		opacity: 0.04;
+		filter: url(#grain-filter);
+		width: 100%;
+		height: 100%;
+	}
+
+	/* Rotated feature cards */
+	.feature-card { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+	.feature-card:nth-child(1) { transform: rotate(-1.5deg); }
+	.feature-card:nth-child(2) { transform: rotate(1deg); }
+	.feature-card:nth-child(3) { transform: rotate(-0.5deg); }
+	.feature-card:nth-child(4) { transform: rotate(1.5deg); }
+	.feature-card:nth-child(5) { transform: rotate(-1deg); }
+	.feature-card:nth-child(6) { transform: rotate(0.5deg); }
+	.feature-card:hover { transform: rotate(0) translateY(-4px); }
+
+	/* Showcase cards */
+	.showcase-card { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+	.showcase-card:nth-child(1) { transform: rotate(-1deg); }
+	.showcase-card:nth-child(2) { transform: rotate(0.5deg); }
+	.showcase-card:nth-child(3) { transform: rotate(-0.8deg); }
+	.showcase-card:hover { transform: rotate(0) translateY(-4px); }
+
+	/* Phone mockup */
+	.phone-mockup {
+		transform: rotate(-2deg);
+	}
+
+	/* Reduced motion */
+	@media (prefers-reduced-motion: reduce) {
+		.animate-marquee { animation: none; }
+		.animate-route { animation: none; }
+		:global(.reveal) { opacity: 1; transform: none; transition: none; }
+		.feature-card,
+		.feature-card:nth-child(n) { transform: none; }
+		.feature-card:hover { transform: translateY(-4px); }
+		.showcase-card,
+		.showcase-card:nth-child(n) { transform: none; }
+		.showcase-card:hover { transform: translateY(-4px); }
+		.phone-mockup { transform: none; }
+	}
 </style>
 
-<div class="min-h-screen bg-page">
+<div class="grain min-h-screen bg-page">
+	<!-- Noise filter for grain overlay -->
+	<svg class="hidden">
+		<filter id="grain-filter">
+			<feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" />
+		</filter>
+	</svg>
+
 	<!-- Hero -->
 	<section class="relative overflow-hidden">
 		<nav class="relative z-10 max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
@@ -80,7 +186,24 @@
 			</a>
 		</nav>
 
-		<div class="relative z-10 max-w-4xl mx-auto px-6 pt-16 pb-24 sm:pt-24 sm:pb-32 text-center">
+		<!-- Animated route line -->
+		<svg class="absolute inset-0 w-full h-full" viewBox="0 0 1200 600" preserveAspectRatio="none" aria-hidden="true">
+			<path
+				d="M-50,300 C200,100 400,500 600,250 S900,400 1250,200"
+				fill="none"
+				stroke="var(--color-accent)"
+				stroke-width="3"
+				stroke-dasharray="12 8"
+				stroke-linecap="round"
+				opacity="0.15"
+				class="animate-route"
+			/>
+			<circle cx="200" cy="220" r="6" fill="var(--color-accent)" opacity="0.2" />
+			<circle cx="600" cy="250" r="6" fill="var(--color-accent)" opacity="0.2" />
+			<circle cx="950" cy="280" r="6" fill="var(--color-accent)" opacity="0.2" />
+		</svg>
+
+		<div class="relative z-10 max-w-4xl mx-auto px-6 pt-16 pb-12 sm:pt-24 sm:pb-16 text-center">
 			<div class="{ready ? 'animate-fade-up fill-both delay-100' : 'opacity-0'}">
 				<span class="inline-block px-4 py-1.5 rounded-lg text-xs font-bold tracking-wide uppercase bg-warning text-black border-2 border-border shadow-[2px_2px_0_var(--color-border)] mb-6">
 					Free to use — sign up in seconds
@@ -115,19 +238,71 @@
 					<CaretDown size={16} weight="bold" />
 				</a>
 			</div>
+
+			<!-- Product preview mockup -->
+			<div class="relative max-w-sm mx-auto mt-14 {ready ? 'animate-fade-up fill-both delay-500' : 'opacity-0'}">
+				<div class="phone-mockup bg-card border-3 border-border rounded-2xl shadow-brutal-lg overflow-hidden">
+					<!-- Phone notch -->
+					<div class="bg-border h-6 flex items-center justify-center">
+						<div class="w-16 h-3 bg-card rounded-b-lg"></div>
+					</div>
+					<!-- Mini map area -->
+					<div class="relative bg-accent-light m-3 rounded-xl h-40 overflow-hidden">
+						<svg class="w-full h-full" viewBox="0 0 300 160" aria-hidden="true">
+							<!-- Route line -->
+							<path d="M40,120 C80,40 150,100 200,50 S260,80 280,30" fill="none" stroke="var(--color-accent)" stroke-width="2.5" stroke-dasharray="8 5" stroke-linecap="round" />
+							<!-- Pin dots -->
+							<circle cx="40" cy="120" r="5" fill="var(--color-accent)" />
+							<circle cx="150" cy="75" r="5" fill="var(--color-accent)" />
+							<circle cx="280" cy="30" r="5" fill="var(--color-accent)" />
+							<!-- Location labels -->
+							<text x="40" y="138" font-size="8" fill="var(--color-text-secondary)" font-weight="bold">Paris</text>
+							<text x="140" y="95" font-size="8" fill="var(--color-text-secondary)" font-weight="bold">Zurich</text>
+							<text x="260" y="22" font-size="8" fill="var(--color-text-secondary)" font-weight="bold">Rome</text>
+						</svg>
+					</div>
+					<!-- Photo placeholders -->
+					<div class="flex gap-2 mx-3 mb-3">
+						<div class="flex-1 h-16 rounded-lg bg-gradient-to-br from-sky-200 to-sky-300 border-2 border-border"></div>
+						<div class="flex-1 h-16 rounded-lg bg-gradient-to-br from-amber-200 to-amber-300 border-2 border-border"></div>
+						<div class="flex-1 h-16 rounded-lg bg-gradient-to-br from-rose-200 to-rose-300 border-2 border-border"></div>
+					</div>
+					<!-- Export bar -->
+					<div class="mx-3 mb-3 bg-accent text-white text-xs font-bold py-2 px-4 rounded-lg border-2 border-border text-center">
+						Export Video
+					</div>
+				</div>
+
+				<!-- Floating badge -->
+				<div class="absolute -top-3 -right-3 sm:-right-6 bg-warning text-black text-xs font-bold px-3 py-1.5 rounded-lg border-2 border-border shadow-[2px_2px_0_var(--color-border)] rotate-3">
+					100% in-browser
+				</div>
+			</div>
 		</div>
 	</section>
 
+	<!-- Marquee ticker -->
+	<div class="border-y-3 border-border bg-accent text-white overflow-hidden">
+		<div class="flex animate-marquee whitespace-nowrap py-3">
+			<span class="mx-4 text-sm font-bold tracking-widest uppercase">
+				ANIMATED MAPS &bull; VOICE-OVER &bull; AI CAPTIONS &bull; CUSTOM BRANDING &bull; 100% IN-BROWSER &bull; NO UPLOADS &bull; KEN BURNS EFFECTS &bull; MULTIPLE ASPECT RATIOS &bull; MUSIC TRACKS &bull; PUBLIC PROFILES &bull;&nbsp;
+			</span>
+			<span class="mx-4 text-sm font-bold tracking-widest uppercase" aria-hidden="true">
+				ANIMATED MAPS &bull; VOICE-OVER &bull; AI CAPTIONS &bull; CUSTOM BRANDING &bull; 100% IN-BROWSER &bull; NO UPLOADS &bull; KEN BURNS EFFECTS &bull; MULTIPLE ASPECT RATIOS &bull; MUSIC TRACKS &bull; PUBLIC PROFILES &bull;&nbsp;
+			</span>
+		</div>
+	</div>
+
 	<!-- Features -->
 	<section id="features" class="max-w-6xl mx-auto px-6 py-20 sm:py-28">
-		<div class="text-center mb-16">
+		<div class="text-center mb-16 reveal">
 			<h2 class="text-3xl sm:text-4xl font-bold text-text-primary">Everything happens in your browser</h2>
 			<p class="mt-4 text-text-secondary text-lg max-w-xl mx-auto">No uploads to external servers, no waiting, no subscriptions. Your media stays on your device.</p>
 		</div>
 
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-			<div class="group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] hover:-translate-y-1 transition-all duration-300">
-				<div class="w-12 h-12 rounded-xl bg-warning border-2 border-border flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 reveal">
+			<div class="feature-card group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] transition-all duration-300">
+				<div class="icon-bounce w-12 h-12 rounded-xl bg-warning border-2 border-border flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
 					<MapTrifold size={24} weight="bold" />
 				</div>
 				<h3 class="text-lg font-bold text-text-primary mb-2">Animated Map Transitions</h3>
@@ -136,8 +311,8 @@
 				</p>
 			</div>
 
-			<div class="group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] hover:-translate-y-1 transition-all duration-300">
-				<div class="w-12 h-12 rounded-xl bg-sky-300 border-2 border-border flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+			<div class="feature-card group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] transition-all duration-300">
+				<div class="icon-bounce w-12 h-12 rounded-xl bg-sky-300 border-2 border-border flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
 					<Palette size={24} weight="bold" />
 				</div>
 				<h3 class="text-lg font-bold text-text-primary mb-2">Your Brand, Your Colors</h3>
@@ -146,8 +321,8 @@
 				</p>
 			</div>
 
-			<div class="group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] hover:-translate-y-1 transition-all duration-300">
-				<div class="w-12 h-12 rounded-xl bg-accent-light border-2 border-border flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+			<div class="feature-card group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] transition-all duration-300">
+				<div class="icon-bounce w-12 h-12 rounded-xl bg-accent-light border-2 border-border flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
 					<Camera size={24} weight="bold" />
 				</div>
 				<h3 class="text-lg font-bold text-text-primary mb-2">Photos & Video Clips</h3>
@@ -156,8 +331,8 @@
 				</p>
 			</div>
 
-			<div class="group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] hover:-translate-y-1 transition-all duration-300">
-				<div class="w-12 h-12 rounded-xl bg-success-light border-2 border-border flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+			<div class="feature-card group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] transition-all duration-300">
+				<div class="icon-bounce w-12 h-12 rounded-xl bg-success-light border-2 border-border flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
 					<Sparkle size={24} weight="bold" />
 				</div>
 				<h3 class="text-lg font-bold text-text-primary mb-2">AI-Powered Captions</h3>
@@ -166,8 +341,8 @@
 				</p>
 			</div>
 
-			<div class="group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] hover:-translate-y-1 transition-all duration-300">
-				<div class="w-12 h-12 rounded-xl bg-warning border-2 border-border flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+			<div class="feature-card group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] transition-all duration-300">
+				<div class="icon-bounce w-12 h-12 rounded-xl bg-warning border-2 border-border flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
 					<FrameCorners size={24} weight="bold" />
 				</div>
 				<h3 class="text-lg font-bold text-text-primary mb-2">Any Aspect Ratio</h3>
@@ -176,8 +351,8 @@
 				</p>
 			</div>
 
-			<div class="group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] hover:-translate-y-1 transition-all duration-300">
-				<div class="w-12 h-12 rounded-xl bg-sky-300 border-2 border-border flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+			<div class="feature-card group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] transition-all duration-300">
+				<div class="icon-bounce w-12 h-12 rounded-xl bg-sky-300 border-2 border-border flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
 					<ShareNetwork size={24} weight="bold" />
 				</div>
 				<h3 class="text-lg font-bold text-text-primary mb-2">Share & Public Profile</h3>
@@ -191,79 +366,163 @@
 	<!-- How it works -->
 	<section class="bg-warning/20 border-y-3 border-border">
 		<div class="max-w-5xl mx-auto px-6 py-20 sm:py-28">
-			<div class="text-center mb-16">
+			<div class="text-center mb-16 reveal">
 				<h2 class="text-3xl sm:text-4xl font-bold text-text-primary">Three steps to your travel video</h2>
 			</div>
 
-			<div class="grid grid-cols-1 md:grid-cols-3 gap-10">
-				<div class="text-center">
-					<div class="w-16 h-16 rounded-2xl bg-accent text-white flex items-center justify-center text-2xl font-bold mx-auto mb-5 border-3 border-border shadow-[4px_4px_0_var(--color-border)]">
-						1
-					</div>
-					<h3 class="text-lg font-bold text-text-primary mb-2">Add your stops</h3>
-					<p class="text-sm text-text-secondary">Search for each place you visited. Add photos or short video clips at each stop.</p>
-				</div>
+			<div class="relative reveal">
+				<!-- Connecting route line (desktop: horizontal, mobile: vertical) -->
+				<svg class="hidden md:block absolute top-8 left-1/6 right-1/6 h-4 pointer-events-none" preserveAspectRatio="none" aria-hidden="true">
+					<line x1="0" y1="50%" x2="100%" y2="50%" stroke="var(--color-accent)" stroke-width="2" stroke-dasharray="8 5" opacity="0.2" />
+				</svg>
+				<svg class="md:hidden absolute left-1/2 -translate-x-1/2 top-16 bottom-16 w-4 pointer-events-none" preserveAspectRatio="none" aria-hidden="true">
+					<line x1="50%" y1="0" x2="50%" y2="100%" stroke="var(--color-accent)" stroke-width="2" stroke-dasharray="8 5" opacity="0.2" />
+				</svg>
 
-				<div class="text-center">
-					<div class="w-16 h-16 rounded-2xl bg-accent text-white flex items-center justify-center text-2xl font-bold mx-auto mb-5 border-3 border-border shadow-[4px_4px_0_var(--color-border)]">
-						2
+				<div class="grid grid-cols-1 md:grid-cols-3 gap-10 relative z-10">
+					<div class="text-center">
+						<div class="w-16 h-16 rounded-2xl bg-accent text-white flex items-center justify-center mx-auto mb-5 border-3 border-border shadow-[4px_4px_0_var(--color-border)]">
+							<Camera size={28} weight="bold" />
+						</div>
+						<h3 class="text-lg font-bold text-text-primary mb-2">Add your stops</h3>
+						<p class="text-sm text-text-secondary">Search for each place you visited. Add photos or short video clips at each stop.</p>
 					</div>
-					<h3 class="text-lg font-bold text-text-primary mb-2">Customize & preview</h3>
-					<p class="text-sm text-text-secondary">Pick your map style, colors, and font. Reorder stops and choose transport modes.</p>
-				</div>
 
-				<div class="text-center">
-					<div class="w-16 h-16 rounded-2xl bg-accent text-white flex items-center justify-center text-2xl font-bold mx-auto mb-5 border-3 border-border shadow-[4px_4px_0_var(--color-border)]">
-						3
+					<div class="text-center">
+						<div class="w-16 h-16 rounded-2xl bg-accent text-white flex items-center justify-center mx-auto mb-5 border-3 border-border shadow-[4px_4px_0_var(--color-border)]">
+							<MapTrifold size={28} weight="bold" />
+						</div>
+						<h3 class="text-lg font-bold text-text-primary mb-2">Customize & preview</h3>
+						<p class="text-sm text-text-secondary">Pick your map style, colors, and font. Reorder stops and choose transport modes.</p>
 					</div>
-					<h3 class="text-lg font-bold text-text-primary mb-2">Export & share</h3>
-					<p class="text-sm text-text-secondary">Download your polished video or share it with an interactive map link.</p>
+
+					<div class="text-center">
+						<div class="w-16 h-16 rounded-2xl bg-accent text-white flex items-center justify-center mx-auto mb-5 border-3 border-border shadow-[4px_4px_0_var(--color-border)]">
+							<Download size={28} weight="bold" />
+						</div>
+						<h3 class="text-lg font-bold text-text-primary mb-2">Export & share</h3>
+						<p class="text-sm text-text-secondary">Download your polished video or share it with an interactive map link.</p>
+					</div>
 				</div>
 			</div>
 		</div>
 	</section>
 
-	<!-- Use cases / who it's for -->
+	<!-- Trust / Value strip -->
+	<section class="border-y-3 border-border bg-card">
+		<div class="max-w-5xl mx-auto px-6 py-12">
+			<div class="grid grid-cols-2 md:grid-cols-4 gap-8 reveal">
+				<div class="text-center">
+					<div class="w-10 h-10 rounded-lg bg-success-light border-2 border-border flex items-center justify-center mx-auto mb-3">
+						<ShieldCheck size={20} weight="bold" />
+					</div>
+					<p class="font-bold text-text-primary text-sm">Free Forever</p>
+					<p class="text-xs text-text-muted mt-1">No subscriptions, no paywalls</p>
+				</div>
+				<div class="text-center">
+					<div class="w-10 h-10 rounded-lg bg-accent-light border-2 border-border flex items-center justify-center mx-auto mb-3">
+						<ShieldCheck size={20} weight="bold" />
+					</div>
+					<p class="font-bold text-text-primary text-sm">No Server Uploads</p>
+					<p class="text-xs text-text-muted mt-1">Media stays on your device</p>
+				</div>
+				<div class="text-center">
+					<div class="w-10 h-10 rounded-lg bg-warning-light border-2 border-border flex items-center justify-center mx-auto mb-3">
+						<DeviceMobile size={20} weight="bold" />
+					</div>
+					<p class="font-bold text-text-primary text-sm">Works on Any Device</p>
+					<p class="text-xs text-text-muted mt-1">Desktop, tablet, or phone</p>
+				</div>
+				<div class="text-center">
+					<div class="w-10 h-10 rounded-lg bg-sky-100 border-2 border-border flex items-center justify-center mx-auto mb-3">
+						<Timer size={20} weight="bold" />
+					</div>
+					<p class="font-bold text-text-primary text-sm">Ready in Minutes</p>
+					<p class="text-xs text-text-muted mt-1">From photos to video, fast</p>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<!-- What You Can Create showcase -->
 	<section class="max-w-5xl mx-auto px-6 py-20 sm:py-28">
-		<div class="text-center mb-16">
-			<h2 class="text-3xl sm:text-4xl font-bold text-text-primary">Built for every kind of traveler</h2>
-			<p class="mt-4 text-text-secondary text-lg max-w-xl mx-auto">Whether you're a travel creator, a weekend road tripper, or just back from a family vacation.</p>
+		<div class="text-center mb-16 reveal">
+			<h2 class="text-3xl sm:text-4xl font-bold text-text-primary">What you can create</h2>
+			<p class="mt-4 text-text-secondary text-lg max-w-xl mx-auto">From weekend getaways to cross-continental adventures — TripStitch handles it all.</p>
 		</div>
 
-		<div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-			<div class="flex gap-4 bg-card border-2 border-border rounded-2xl p-6 shadow-[4px_4px_0_var(--color-border)]">
-				<Backpack size={28} weight="bold" class="shrink-0" />
-				<div>
-					<h3 class="font-bold text-text-primary mb-1">Travel Creators</h3>
-					<p class="text-sm text-text-secondary">Custom branding, multiple aspect ratios, and voice-over make it easy to produce platform-ready content fast.</p>
+		<div class="flex md:grid md:grid-cols-3 gap-6 overflow-x-auto md:overflow-visible pb-4 md:pb-0 snap-x snap-mandatory reveal">
+			<!-- Card 1 -->
+			<div class="showcase-card flex-shrink-0 w-72 md:w-auto snap-start bg-card border-2 border-border rounded-2xl overflow-hidden shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] transition-all duration-300">
+				<div class="h-3 bg-accent"></div>
+				<div class="p-5">
+					<h3 class="font-bold text-text-primary mb-3">Weekend in Paris</h3>
+					<!-- Route visualization -->
+					<div class="flex items-center gap-1 mb-4">
+						<div class="w-3 h-3 rounded-full bg-accent border-2 border-border"></div>
+						<div class="flex-1 border-t-2 border-dashed border-accent/40"></div>
+						<div class="w-3 h-3 rounded-full bg-accent border-2 border-border"></div>
+						<div class="flex-1 border-t-2 border-dashed border-accent/40"></div>
+						<div class="w-3 h-3 rounded-full bg-accent border-2 border-border"></div>
+					</div>
+					<div class="flex flex-wrap gap-1.5">
+						<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-warning-light border border-border">3 stops</span>
+						<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent-light border border-border">Dark map</span>
+						<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-success-light border border-border">Music</span>
+					</div>
 				</div>
 			</div>
-			<div class="flex gap-4 bg-card border-2 border-border rounded-2xl p-6 shadow-[4px_4px_0_var(--color-border)]">
-				<Car size={28} weight="bold" class="shrink-0" />
-				<div>
-					<h3 class="font-bold text-text-primary mb-1">Road Trippers</h3>
-					<p class="text-sm text-text-secondary">Watch your route animate across the map between every stop. Perfect for capturing cross-country adventures.</p>
+
+			<!-- Card 2 -->
+			<div class="showcase-card flex-shrink-0 w-72 md:w-auto snap-start bg-card border-2 border-border rounded-2xl overflow-hidden shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] transition-all duration-300">
+				<div class="h-3 bg-warning"></div>
+				<div class="p-5">
+					<h3 class="font-bold text-text-primary mb-3">Pacific Coast Highway</h3>
+					<div class="flex items-center gap-1 mb-4">
+						<div class="w-3 h-3 rounded-full bg-warning border-2 border-border"></div>
+						<div class="flex-1 border-t-2 border-dashed border-warning/40"></div>
+						<div class="w-3 h-3 rounded-full bg-warning border-2 border-border"></div>
+						<div class="flex-1 border-t-2 border-dashed border-warning/40"></div>
+						<div class="w-3 h-3 rounded-full bg-warning border-2 border-border"></div>
+						<div class="flex-1 border-t-2 border-dashed border-warning/40"></div>
+						<div class="w-3 h-3 rounded-full bg-warning border-2 border-border"></div>
+					</div>
+					<div class="flex flex-wrap gap-1.5">
+						<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-warning-light border border-border">6 stops</span>
+						<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent-light border border-border">Satellite map</span>
+						<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-success-light border border-border">Voice-over</span>
+					</div>
 				</div>
 			</div>
-			<div class="flex gap-4 bg-card border-2 border-border rounded-2xl p-6 shadow-[4px_4px_0_var(--color-border)]">
-				<PersonSimpleHike size={28} weight="bold" class="shrink-0" />
-				<div>
-					<h3 class="font-bold text-text-primary mb-1">Hikers & Adventurers</h3>
-					<p class="text-sm text-text-secondary">Satellite and outdoor map styles bring your trailheads, peaks, and campsites to life on screen.</p>
-				</div>
-			</div>
-			<div class="flex gap-4 bg-card border-2 border-border rounded-2xl p-6 shadow-[4px_4px_0_var(--color-border)]">
-				<UsersThree size={28} weight="bold" class="shrink-0" />
-				<div>
-					<h3 class="font-bold text-text-primary mb-1">Families & Friends</h3>
-					<p class="text-sm text-text-secondary">Turn vacation photos into a keepsake video you can share with everyone — no editing skills needed.</p>
+
+			<!-- Card 3 -->
+			<div class="showcase-card flex-shrink-0 w-72 md:w-auto snap-start bg-card border-2 border-border rounded-2xl overflow-hidden shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] transition-all duration-300">
+				<div class="h-3 bg-success"></div>
+				<div class="p-5">
+					<h3 class="font-bold text-text-primary mb-3">Backpacking Southeast Asia</h3>
+					<div class="flex items-center gap-1 mb-4">
+						<div class="w-3 h-3 rounded-full bg-success border-2 border-border"></div>
+						<div class="flex-1 border-t-2 border-dashed border-success/40"></div>
+						<div class="w-3 h-3 rounded-full bg-success border-2 border-border"></div>
+						<div class="flex-1 border-t-2 border-dashed border-success/40"></div>
+						<div class="w-3 h-3 rounded-full bg-success border-2 border-border"></div>
+						<div class="flex-1 border-t-2 border-dashed border-success/40"></div>
+						<div class="w-3 h-3 rounded-full bg-success border-2 border-border"></div>
+						<div class="flex-1 border-t-2 border-dashed border-success/40"></div>
+						<div class="w-3 h-3 rounded-full bg-success border-2 border-border"></div>
+					</div>
+					<div class="flex flex-wrap gap-1.5">
+						<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-warning-light border border-border">8 stops</span>
+						<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent-light border border-border">Outdoor map</span>
+						<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-success-light border border-border">AI captions</span>
+					</div>
 				</div>
 			</div>
 		</div>
 	</section>
 
 	<!-- CTA -->
-	<section class="max-w-4xl mx-auto px-6 py-24 sm:py-32 text-center">
+	<section class="max-w-4xl mx-auto px-6 py-24 sm:py-32 text-center reveal">
 		<h2 class="text-3xl sm:text-5xl font-bold text-text-primary mb-6">
 			Ready to stitch your next trip?
 		</h2>
@@ -281,14 +540,46 @@
 
 	<!-- Footer -->
 	<footer class="border-t-3 border-border">
-		<div class="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-			<a href="/" aria-label="TripStitch home" class="flex items-center gap-1.5 opacity-70">
-				<img src="/favicon-192.png" alt="" class="h-5" />
-				<span class="text-base font-extrabold tracking-tight"><span class="text-text-primary">Trip</span><span class="text-accent">Stitch</span></span>
-			</a>
-			<p class="text-sm text-text-muted">
-				Built for travelers. No server-side processing — your media never leaves your device.
-			</p>
+		<div class="max-w-6xl mx-auto px-6 py-12">
+			<div class="grid grid-cols-1 sm:grid-cols-3 gap-10 sm:gap-8">
+				<!-- Logo + description -->
+				<div>
+					<a href="/" aria-label="TripStitch home" class="flex items-center gap-1.5 mb-3">
+						<img src="/favicon-192.png" alt="" class="h-5" />
+						<span class="text-base font-extrabold tracking-tight"><span class="text-text-primary">Trip</span><span class="text-accent">Stitch</span></span>
+					</a>
+					<p class="text-sm text-text-muted leading-relaxed">
+						Turn your travel photos into cinematic videos with animated map transitions — all in your browser.
+					</p>
+				</div>
+
+				<!-- Product links -->
+				<div>
+					<h4 class="font-bold text-text-primary text-sm mb-3">Product</h4>
+					<ul class="space-y-2 text-sm text-text-secondary">
+						<li><a href="/signin" class="hover:text-accent transition-colors">Get Started</a></li>
+						<li><a href="#features" class="hover:text-accent transition-colors">Features</a></li>
+						<li><a href="/explore" class="hover:text-accent transition-colors">Explore Trips</a></li>
+					</ul>
+				</div>
+
+				<!-- Info links -->
+				<div>
+					<h4 class="font-bold text-text-primary text-sm mb-3">Info</h4>
+					<ul class="space-y-2 text-sm text-text-secondary">
+						<li><a href="/signin" class="hover:text-accent transition-colors">Sign In</a></li>
+						<li><a href="/signin" class="hover:text-accent transition-colors">Create Account</a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+
+		<!-- Bottom bar -->
+		<div class="border-t-2 border-border">
+			<div class="max-w-6xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+				<p class="text-xs text-text-muted">&copy; {new Date().getFullYear()} TripStitch. All rights reserved.</p>
+				<p class="text-xs text-text-muted">No server-side processing — your media never leaves your device.</p>
+			</div>
 		</div>
 	</footer>
 </div>

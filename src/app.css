@@ -61,3 +61,22 @@
   --shadow-brutal: 4px 4px 0 #E8E8E8;
   --shadow-brutal-lg: 6px 6px 0 #E8E8E8;
 }
+
+/* Icon bounce on scroll-reveal */
+@keyframes icon-pop {
+	0% { transform: scale(1); }
+	50% { transform: scale(1.15); }
+	100% { transform: scale(1); }
+}
+:global(.reveal.revealed .icon-bounce) {
+	animation: icon-pop 0.4s ease-out;
+}
+:global(.reveal.revealed .icon-bounce:nth-child(2)) { animation-delay: 0.1s; }
+:global(.reveal.revealed .icon-bounce:nth-child(3)) { animation-delay: 0.15s; }
+:global(.reveal.revealed .icon-bounce:nth-child(4)) { animation-delay: 0.2s; }
+:global(.reveal.revealed .icon-bounce:nth-child(5)) { animation-delay: 0.25s; }
+:global(.reveal.revealed .icon-bounce:nth-child(6)) { animation-delay: 0.3s; }
+
+@media (prefers-reduced-motion: reduce) {
+	:global(.reveal.revealed .icon-bounce) { animation: none; }
+}
