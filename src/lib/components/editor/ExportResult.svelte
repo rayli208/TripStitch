@@ -1,11 +1,18 @@
 <script lang="ts">
 	import Button from '$lib/components/ui/Button.svelte';
+	import type { Location } from '$lib/types';
+	import { generateCaption, type CaptionResult } from '$lib/services/captionService';
+	import toast from '$lib/state/toast.svelte';
 
 	let {
 		videoUrl,
 		videoBlob,
 		tripTitle = '',
 		shareUrl = null,
+		locations = [],
+		tripDescription = '',
+		tripTags = [],
+		tripDate = '',
 		ondownload,
 		ondashboard,
 		oncopylink,
@@ -15,6 +22,10 @@
 		videoBlob: Blob;
 		tripTitle?: string;
 		shareUrl?: string | null;
+		locations?: Location[];
+		tripDescription?: string;
+		tripTags?: string[];
+		tripDate?: string;
 		ondownload?: () => void;
 		ondashboard?: () => void;
 		oncopylink?: () => void;
@@ -33,8 +44,36 @@
 
 	function shareToApp() {
 		const file = new File([videoBlob], `${tripTitle || 'tripstitch'}.mp4`, { type: videoBlob.type });
-		// Expected: user may dismiss the share sheet
 		navigator.share({ files: [file] }).catch(() => {});
+	}
+
+	// Caption generation
+	let captionLoading = $state(false);
+	let captionResult = $state<CaptionResult | null>(null);
+	let captionTab = $state<'full' | 'short'>('full');
+
+	async function handleGenerateCaption() {
+		captionLoading = true;
+		try {
+			captionResult = await generateCaption(tripTitle, locations, {
+				titleDescription: tripDescription,
+				tags: tripTags,
+				tripDate
+			});
+		} catch (err: any) {
+			console.error('[Caption] Generation failed:', err);
+			const msg = err?.code === 'functions/resource-exhausted'
+				? err.message
+				: 'Caption generation failed. Try again.';
+			toast.error(msg);
+		} finally {
+			captionLoading = false;
+		}
+	}
+
+	function copyText(text: string) {
+		navigator.clipboard.writeText(text);
+		toast.success('Copied!');
 	}
 </script>
 
@@ -67,6 +106,95 @@
 				Edit Audio
 			</span>
 		</Button>
+
+		<!-- Caption generation -->
+		<div class="bg-card border border-border rounded-lg p-4 w-full space-y-3">
+			<div class="flex items-center justify-between">
+				<p class="text-sm font-medium text-text-primary">AI Caption</p>
+				{#if captionResult}
+					<button
+						class="text-xs text-accent hover:underline cursor-pointer"
+						onclick={handleGenerateCaption}
+						disabled={captionLoading}
+					>
+						Regenerate
+					</button>
+				{/if}
+			</div>
+
+			{#if !captionResult && !captionLoading}
+				<button
+					class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-dashed border-border text-sm font-medium text-text-secondary hover:border-accent hover:text-accent transition-colors cursor-pointer"
+					onclick={handleGenerateCaption}
+				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
+					</svg>
+					Generate Caption
+				</button>
+			{:else if captionLoading}
+				<div class="flex items-center justify-center gap-2 py-4">
+					<div class="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin"></div>
+					<span class="text-sm text-text-muted">Writing your caption...</span>
+				</div>
+			{:else if captionResult}
+				<!-- Tab toggle -->
+				<div class="flex gap-1 bg-page rounded-lg p-0.5">
+					<button
+						class="flex-1 text-xs font-medium py-1.5 rounded-md transition-colors cursor-pointer {captionTab === 'full' ? 'bg-card text-text-primary shadow-sm' : 'text-text-muted'}"
+						onclick={() => captionTab = 'full'}
+					>
+						Full Caption
+					</button>
+					<button
+						class="flex-1 text-xs font-medium py-1.5 rounded-md transition-colors cursor-pointer {captionTab === 'short' ? 'bg-card text-text-primary shadow-sm' : 'text-text-muted'}"
+						onclick={() => captionTab = 'short'}
+					>
+						Short (Reels/TikTok)
+					</button>
+				</div>
+
+				<!-- Caption text -->
+				<div>
+					<p class="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">
+						{captionTab === 'full' ? captionResult.caption : captionResult.shortCaption}
+					</p>
+					<button
+						class="text-xs text-accent hover:underline cursor-pointer mt-1.5"
+						onclick={() => copyText(captionTab === 'full' ? captionResult!.caption : captionResult!.shortCaption)}
+					>
+						Copy
+					</button>
+				</div>
+
+				<!-- Hashtags -->
+				{#if captionResult.hashtags}
+					<div class="pt-2 border-t border-border">
+						<div class="flex items-center justify-between mb-1.5">
+							<p class="text-xs font-medium text-text-muted">Hashtags</p>
+							<button
+								class="text-xs text-accent hover:underline cursor-pointer"
+								onclick={() => copyText(captionResult!.hashtags)}
+							>
+								Copy
+							</button>
+						</div>
+						<p class="text-xs text-accent/80 leading-relaxed break-all">{captionResult.hashtags}</p>
+					</div>
+				{/if}
+
+				<!-- Copy all button -->
+				<button
+					class="w-full py-2 rounded-lg bg-accent/10 text-accent text-sm font-medium hover:bg-accent/20 transition-colors cursor-pointer"
+					onclick={() => {
+						const text = captionTab === 'full' ? captionResult!.caption : captionResult!.shortCaption;
+						copyText(text + '\n\n' + captionResult!.hashtags);
+					}}
+				>
+					Copy Caption + Hashtags
+				</button>
+			{/if}
+		</div>
 
 		<!-- Share to platforms -->
 		<div class="space-y-2 mt-2">

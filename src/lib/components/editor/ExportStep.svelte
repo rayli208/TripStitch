@@ -21,6 +21,9 @@
 		videoBlob = null,
 		error = null,
 		tripTitle = '',
+		tripDescription = '',
+		tripTags = [],
+		tripDate = '',
 		browserSupported = true,
 		browserWarnings = [],
 		exportSteps = [],
@@ -51,6 +54,9 @@
 		videoBlob?: Blob | null;
 		error?: string | null;
 		tripTitle?: string;
+		tripDescription?: string;
+		tripTags?: string[];
+		tripDate?: string;
 		browserSupported?: boolean;
 		browserWarnings?: string[];
 		exportSteps?: ExportStepItem[];
@@ -141,6 +147,10 @@
 			{videoUrl}
 			videoBlob={videoBlob}
 			{tripTitle}
+			{tripDescription}
+			{tripTags}
+			{tripDate}
+			{locations}
 			{shareUrl}
 			{ondownload}
 			{ondashboard}

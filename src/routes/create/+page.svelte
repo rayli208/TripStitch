@@ -371,6 +371,9 @@
 			{videoBlob}
 			{error}
 			tripTitle={editor.title}
+			tripDescription={editor.titleDescription}
+			tripTags={editor.tags}
+			tripDate={editor.tripDate}
 			browserSupported={support.canExport}
 			browserWarnings={support.warnings}
 			exportSteps={exportSteps}

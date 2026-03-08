@@ -12,5 +12,9 @@
         "destination": "/200.html"
       }
     ]
+  },
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs22"
   }
 }

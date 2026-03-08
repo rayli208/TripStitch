@@ -39,7 +39,8 @@
 			"Voice-over recording",
 			"Custom branding and fonts",
 			"9:16, 1:1, and 16:9 export",
-			"Client-side video processing"
+			"Client-side video processing",
+			"AI-powered captions and hashtags"
 		]
 	})}</script>`}
 </svelte:head>
@@ -160,11 +161,11 @@
 
 			<div class="group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] hover:-translate-y-1 transition-all duration-300">
 				<div class="w-12 h-12 rounded-xl bg-success-light border-2 border-border flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
-					🎙️
+					✨
 				</div>
-				<h3 class="text-lg font-bold text-text-primary mb-2">Voice Over Recording</h3>
+				<h3 class="text-lg font-bold text-text-primary mb-2">AI-Powered Captions</h3>
 				<p class="text-sm text-text-secondary leading-relaxed">
-					Record narration directly over your video with a segmented timeline showing exactly what's on screen. Merge it in one click.
+					One tap and AI writes you a scroll-stopping caption with hashtags — optimized for Instagram, TikTok, YouTube, and Facebook. Post faster, get more eyes.
 				</p>
 			</div>
 
