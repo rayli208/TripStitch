@@ -5,6 +5,14 @@
 	import TransportPicker from './TransportPicker.svelte';
 	import RoutePreviewMap from './RoutePreviewMap.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
+	import { DotsSixVertical, X, Star, Microphone, Car, PersonSimpleHike, Buildings, SunHorizon, Backpack, ForkKnife, Mountains, Leaf, Bank, Camera } from 'phosphor-svelte';
+	import type { Component } from 'svelte';
+
+	const TAG_ICONS: Record<string, Component> = {
+		'Road Trip': Car, 'Hiking': PersonSimpleHike, 'City Break': Buildings,
+		'Beach': SunHorizon, 'Backpacking': Backpack, 'Foodie': ForkKnife,
+		'Adventure': Mountains, 'Nature': Leaf, 'Cultural': Bank, 'Photography': Camera
+	};
 
 	let {
 		locations,
@@ -137,12 +145,13 @@
 		<span class="block text-sm font-medium text-text-secondary mb-2">Tags</span>
 		<div class="flex flex-wrap gap-1.5">
 			{#each TRIP_TAGS as tag}
+				{@const TagIcon = TAG_ICONS[tag.value]}
 				<button
 					class="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer
 						{tags.includes(tag.value) ? 'bg-accent text-white' : 'bg-card border border-border text-text-muted hover:bg-border'}"
 					onclick={() => toggleTag(tag.value)}
 				>
-					<span>{tag.icon}</span>
+					{#if TagIcon}<TagIcon size={14} weight="bold" />{/if}
 					<span>{tag.label}</span>
 				</button>
 			{/each}
@@ -210,11 +219,7 @@
 			>
 				<!-- Drag handle -->
 				<div class="cursor-grab text-text-muted flex-shrink-0">
-					<svg class="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
-						<circle cx="5" cy="3" r="1.5" /><circle cx="11" cy="3" r="1.5" />
-						<circle cx="5" cy="8" r="1.5" /><circle cx="11" cy="8" r="1.5" />
-						<circle cx="5" cy="13" r="1.5" /><circle cx="11" cy="13" r="1.5" />
-					</svg>
+					<DotsSixVertical size={16} weight="bold" />
 				</div>
 
 				<!-- Order number -->
@@ -250,9 +255,7 @@
 						{#if loc.rating}
 							<div class="flex items-center gap-0.5">
 								{#each Array(5) as _, s}
-									<svg class="w-3 h-3 {s < loc.rating ? 'text-amber-400' : 'text-border'}" viewBox="0 0 20 20" fill="currentColor">
-										<path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-									</svg>
+									<span class="{s < loc.rating ? 'text-amber-400' : 'text-border'}"><Star size={12} weight="fill" /></span>
 								{/each}
 							</div>
 						{/if}
@@ -265,9 +268,7 @@
 					onclick={() => onremove(loc.id)}
 					title="Remove location"
 				>
-					<svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-						<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-					</svg>
+					<X size={16} weight="bold" />
 				</button>
 			</div>
 		{/each}
@@ -276,9 +277,7 @@
 	<!-- Audio reminder -->
 	<div class="flex items-start gap-3 p-3.5 rounded-xl bg-accent/5 border border-accent/20">
 		<div class="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-			<svg class="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m-4 0h8m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-			</svg>
+			<Microphone size={16} weight="bold" class="text-accent" />
 		</div>
 		<div>
 			<p class="text-sm font-medium text-text-primary">Add voice-over & music</p>

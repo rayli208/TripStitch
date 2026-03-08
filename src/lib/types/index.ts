@@ -156,7 +156,7 @@ export interface MusicSelection {
 export interface ExportStepItem {
 	id: string;
 	label: string;
-	icon: string;
+	icon: 'title' | 'map' | 'clips' | 'route' | 'finalize';
 }
 
 export interface SharedLocation {

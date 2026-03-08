@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import authState from '$lib/state/auth.svelte';
+	import { ArrowRight, CaretDown, MapTrifold, Palette, Camera, Sparkle, FrameCorners, ShareNetwork, Backpack, Car, PersonSimpleHike, UsersThree } from 'phosphor-svelte';
 
 	// Redirect authenticated users straight to dashboard
 	$effect(() => {
@@ -104,18 +105,14 @@
 					class="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-accent text-white font-bold text-base border-2 border-border shadow-[4px_4px_0_var(--color-border)] hover:shadow-[2px_2px_0_var(--color-border)] hover:translate-x-[2px] hover:translate-y-[2px] active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all"
 				>
 					Get Started
-					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-					</svg>
+					<ArrowRight size={20} weight="bold" />
 				</a>
 				<a
 					href="#features"
 					class="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-bold border-2 border-border shadow-[4px_4px_0_var(--color-border)] hover:shadow-[2px_2px_0_var(--color-border)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
 				>
 					See how it works
-					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-					</svg>
+					<CaretDown size={16} weight="bold" />
 				</a>
 			</div>
 		</div>
@@ -130,8 +127,8 @@
 
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 			<div class="group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] hover:-translate-y-1 transition-all duration-300">
-				<div class="w-12 h-12 rounded-xl bg-warning border-2 border-border flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
-					🗺️
+				<div class="w-12 h-12 rounded-xl bg-warning border-2 border-border flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+					<MapTrifold size={24} weight="bold" />
 				</div>
 				<h3 class="text-lg font-bold text-text-primary mb-2">Animated Map Transitions</h3>
 				<p class="text-sm text-text-secondary leading-relaxed">
@@ -140,8 +137,8 @@
 			</div>
 
 			<div class="group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] hover:-translate-y-1 transition-all duration-300">
-				<div class="w-12 h-12 rounded-xl bg-sky-300 border-2 border-border flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
-					🎨
+				<div class="w-12 h-12 rounded-xl bg-sky-300 border-2 border-border flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+					<Palette size={24} weight="bold" />
 				</div>
 				<h3 class="text-lg font-bold text-text-primary mb-2">Your Brand, Your Colors</h3>
 				<p class="text-sm text-text-secondary leading-relaxed">
@@ -150,8 +147,8 @@
 			</div>
 
 			<div class="group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] hover:-translate-y-1 transition-all duration-300">
-				<div class="w-12 h-12 rounded-xl bg-accent-light border-2 border-border flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
-					📸
+				<div class="w-12 h-12 rounded-xl bg-accent-light border-2 border-border flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+					<Camera size={24} weight="bold" />
 				</div>
 				<h3 class="text-lg font-bold text-text-primary mb-2">Photos & Video Clips</h3>
 				<p class="text-sm text-text-secondary leading-relaxed">
@@ -160,8 +157,8 @@
 			</div>
 
 			<div class="group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] hover:-translate-y-1 transition-all duration-300">
-				<div class="w-12 h-12 rounded-xl bg-success-light border-2 border-border flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
-					✨
+				<div class="w-12 h-12 rounded-xl bg-success-light border-2 border-border flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+					<Sparkle size={24} weight="bold" />
 				</div>
 				<h3 class="text-lg font-bold text-text-primary mb-2">AI-Powered Captions</h3>
 				<p class="text-sm text-text-secondary leading-relaxed">
@@ -170,8 +167,8 @@
 			</div>
 
 			<div class="group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] hover:-translate-y-1 transition-all duration-300">
-				<div class="w-12 h-12 rounded-xl bg-warning border-2 border-border flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
-					📐
+				<div class="w-12 h-12 rounded-xl bg-warning border-2 border-border flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+					<FrameCorners size={24} weight="bold" />
 				</div>
 				<h3 class="text-lg font-bold text-text-primary mb-2">Any Aspect Ratio</h3>
 				<p class="text-sm text-text-secondary leading-relaxed">
@@ -180,8 +177,8 @@
 			</div>
 
 			<div class="group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] hover:-translate-y-1 transition-all duration-300">
-				<div class="w-12 h-12 rounded-xl bg-sky-300 border-2 border-border flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
-					🔗
+				<div class="w-12 h-12 rounded-xl bg-sky-300 border-2 border-border flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+					<ShareNetwork size={24} weight="bold" />
 				</div>
 				<h3 class="text-lg font-bold text-text-primary mb-2">Share & Public Profile</h3>
 				<p class="text-sm text-text-secondary leading-relaxed">
@@ -235,28 +232,28 @@
 
 		<div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
 			<div class="flex gap-4 bg-card border-2 border-border rounded-2xl p-6 shadow-[4px_4px_0_var(--color-border)]">
-				<span class="text-3xl shrink-0">🎒</span>
+				<Backpack size={28} weight="bold" class="shrink-0" />
 				<div>
 					<h3 class="font-bold text-text-primary mb-1">Travel Creators</h3>
 					<p class="text-sm text-text-secondary">Custom branding, multiple aspect ratios, and voice-over make it easy to produce platform-ready content fast.</p>
 				</div>
 			</div>
 			<div class="flex gap-4 bg-card border-2 border-border rounded-2xl p-6 shadow-[4px_4px_0_var(--color-border)]">
-				<span class="text-3xl shrink-0">🚗</span>
+				<Car size={28} weight="bold" class="shrink-0" />
 				<div>
 					<h3 class="font-bold text-text-primary mb-1">Road Trippers</h3>
 					<p class="text-sm text-text-secondary">Watch your route animate across the map between every stop. Perfect for capturing cross-country adventures.</p>
 				</div>
 			</div>
 			<div class="flex gap-4 bg-card border-2 border-border rounded-2xl p-6 shadow-[4px_4px_0_var(--color-border)]">
-				<span class="text-3xl shrink-0">🥾</span>
+				<PersonSimpleHike size={28} weight="bold" class="shrink-0" />
 				<div>
 					<h3 class="font-bold text-text-primary mb-1">Hikers & Adventurers</h3>
 					<p class="text-sm text-text-secondary">Satellite and outdoor map styles bring your trailheads, peaks, and campsites to life on screen.</p>
 				</div>
 			</div>
 			<div class="flex gap-4 bg-card border-2 border-border rounded-2xl p-6 shadow-[4px_4px_0_var(--color-border)]">
-				<span class="text-3xl shrink-0">👨‍👩‍👧‍👦</span>
+				<UsersThree size={28} weight="bold" class="shrink-0" />
 				<div>
 					<h3 class="font-bold text-text-primary mb-1">Families & Friends</h3>
 					<p class="text-sm text-text-secondary">Turn vacation photos into a keepsake video you can share with everyone — no editing skills needed.</p>
@@ -278,9 +275,7 @@
 			class="inline-flex items-center gap-2 px-10 py-4 rounded-xl bg-accent text-white font-bold text-lg border-2 border-border shadow-[4px_4px_0_var(--color-border)] hover:shadow-[2px_2px_0_var(--color-border)] hover:translate-x-[2px] hover:translate-y-[2px] active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all"
 		>
 			Start Creating
-			<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-			</svg>
+			<ArrowRight size={20} weight="bold" />
 		</a>
 	</section>
 

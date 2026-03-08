@@ -3,7 +3,6 @@ import type { MusicMood } from '$lib/types';
 export interface MusicMoodDef {
 	id: MusicMood;
 	label: string;
-	icon: string;
 }
 
 export interface MusicTrackDef {
@@ -15,12 +14,12 @@ export interface MusicTrackDef {
 }
 
 export const MUSIC_MOODS: MusicMoodDef[] = [
-	{ id: 'adventure', label: 'Adventure', icon: '🏔️' },
-	{ id: 'chill', label: 'Chill', icon: '🌊' },
-	{ id: 'cinematic', label: 'Cinematic', icon: '🎬' },
-	{ id: 'upbeat', label: 'Upbeat', icon: '🎉' },
-	{ id: 'romantic', label: 'Romantic', icon: '💕' },
-	{ id: 'epic', label: 'Epic', icon: '⚡' }
+	{ id: 'adventure', label: 'Adventure' },
+	{ id: 'chill', label: 'Chill' },
+	{ id: 'cinematic', label: 'Cinematic' },
+	{ id: 'upbeat', label: 'Upbeat' },
+	{ id: 'romantic', label: 'Romantic' },
+	{ id: 'epic', label: 'Epic' }
 ];
 
 export const MUSIC_TRACKS: MusicTrackDef[] = [

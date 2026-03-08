@@ -12,6 +12,7 @@
 	} from '$lib/services/voiceOverService';
 	import MusicPicker from './MusicPicker.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
+	import { CaretLeft, Microphone, SpeakerHigh, Play } from 'phosphor-svelte';
 
 	let {
 		videoUrl,
@@ -485,9 +486,7 @@
 				onclick={onback}
 				aria-label="Back"
 			>
-				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-				</svg>
+				<CaretLeft size={20} weight="bold" />
 			</button>
 			<h3 class="text-xl font-semibold text-text-primary">Edit Audio</h3>
 		</div>
@@ -577,9 +576,7 @@
 				>
 					{#if isPaused}
 						<div class="w-14 h-14 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
-							<svg class="w-7 h-7 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-								<path d="M8 5v14l11-7z" />
-							</svg>
+							<Play size={28} weight="fill" />
 						</div>
 					{/if}
 				</button>
@@ -603,9 +600,7 @@
 				<div class="p-4">
 					<div class="flex items-center gap-3">
 						<div class="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
-							<svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m-4 0h8m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-							</svg>
+							<Microphone size={20} weight="bold" class="text-accent" />
 						</div>
 						<div class="flex-1 min-w-0">
 							{#if recordingPhase === 'recording'}
@@ -649,9 +644,7 @@
 				{#if voiceOverBlob}
 					<div class="border-t border-border px-4 py-3 space-y-2">
 						<div class="flex items-center gap-3">
-							<svg class="w-4 h-4 text-purple-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m-4 0h8m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-							</svg>
+							<Microphone size={16} weight="bold" class="text-purple-400 shrink-0" />
 							<span class="text-xs text-text-primary w-14 shrink-0">Voice-over</span>
 							<input
 								type="range"
@@ -676,9 +669,7 @@
 				{#if hasVideoWithAudio}
 					<div class="border-t border-border px-4 py-3">
 						<div class="flex items-center gap-3">
-							<svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-							</svg>
+							<SpeakerHigh size={16} weight="bold" class="text-amber-400 shrink-0" />
 							<span class="text-xs text-text-primary flex-1">Original Audio</span>
 							<button
 								class="relative w-9 h-5 rounded-full transition-colors cursor-pointer {keepOriginalAudio ? 'bg-accent' : 'bg-border'}"

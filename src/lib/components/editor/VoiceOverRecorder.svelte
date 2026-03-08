@@ -9,6 +9,7 @@
 	} from '$lib/services/voiceOverService';
 	import type { VideoSegmentInfo } from '$lib/services/videoAssembler';
 	import Button from '$lib/components/ui/Button.svelte';
+	import { Microphone, MusicNote, SpeakerHigh, Play } from 'phosphor-svelte';
 
 	let {
 		videoUrl,
@@ -511,9 +512,7 @@
 				>
 					{#if isPaused}
 						<div class="w-14 h-14 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
-							<svg class="w-7 h-7 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-								<path d="M8 5v14l11-7z" />
-							</svg>
+							<Play size={28} weight="fill" />
 						</div>
 					{/if}
 				</button>
@@ -556,9 +555,7 @@
 
 				<!-- Voice over volume slider -->
 				<div class="flex items-center gap-3 px-1">
-					<svg class="w-4 h-4 text-accent shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m-4 0h8m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-					</svg>
+					<Microphone size={16} weight="bold" class="text-accent shrink-0" />
 					<span class="text-xs text-text-primary w-16 shrink-0">Voice Over</span>
 					<input
 						type="range"
@@ -573,9 +570,7 @@
 				<!-- Music volume slider (if music selected) -->
 				{#if musicBlob}
 					<div class="flex items-center gap-3 px-1">
-						<svg class="w-4 h-4 text-accent shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-						</svg>
+						<MusicNote size={16} weight="bold" class="text-accent shrink-0" />
 						<span class="text-xs text-text-primary w-16 shrink-0">Music</span>
 						<input
 							type="range"

@@ -3,6 +3,7 @@
 	import type { Location } from '$lib/types';
 	import { generateCaption, type CaptionResult } from '$lib/services/captionService';
 	import toast from '$lib/state/toast.svelte';
+	import { MusicNote, Sparkle, InstagramLogo, TiktokLogo, YoutubeLogo } from 'phosphor-svelte';
 
 	let {
 		videoUrl,
@@ -100,9 +101,7 @@
 
 		<Button variant="ghost" onclick={oneditaudio}>
 			<span class="flex items-center gap-2">
-				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-				</svg>
+				<MusicNote size={16} weight="bold" />
 				Edit Audio
 			</span>
 		</Button>
@@ -127,9 +126,7 @@
 					class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-dashed border-border text-sm font-medium text-text-secondary hover:border-accent hover:text-accent transition-colors cursor-pointer"
 					onclick={handleGenerateCaption}
 				>
-					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
-					</svg>
+					<Sparkle size={16} weight="bold" />
 					Generate Caption
 				</button>
 			{:else if captionLoading}
@@ -205,11 +202,7 @@
 						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-border bg-card hover:bg-card-hover transition-colors cursor-pointer"
 						onclick={shareToApp}
 					>
-						<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none">
-							<rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" stroke-width="1.5" class="text-pink-500" />
-							<circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.5" class="text-pink-500" />
-							<circle cx="18" cy="6" r="1.2" fill="currentColor" class="text-pink-500" />
-						</svg>
+						<InstagramLogo size={24} weight="bold" class="text-pink-500" />
 						<span class="text-xs font-medium text-text-secondary">Instagram</span>
 					</button>
 				{:else}
@@ -219,11 +212,7 @@
 						rel="noopener noreferrer"
 						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-border bg-card hover:bg-card-hover transition-colors"
 					>
-						<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none">
-							<rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" stroke-width="1.5" class="text-pink-500" />
-							<circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.5" class="text-pink-500" />
-							<circle cx="18" cy="6" r="1.2" fill="currentColor" class="text-pink-500" />
-						</svg>
+						<InstagramLogo size={24} weight="bold" class="text-pink-500" />
 						<span class="text-xs font-medium text-text-secondary">Instagram</span>
 					</a>
 				{/if}
@@ -233,9 +222,7 @@
 						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-border bg-card hover:bg-card-hover transition-colors cursor-pointer"
 						onclick={shareToApp}
 					>
-						<svg class="w-6 h-6 text-text-primary" viewBox="0 0 24 24" fill="currentColor">
-							<path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 0010.86 4.46V13a8.16 8.16 0 005.58 2.2v-3.46a4.85 4.85 0 01-3.58-1.47V6.69h3.58z" />
-						</svg>
+						<TiktokLogo size={24} weight="bold" />
 						<span class="text-xs font-medium text-text-secondary">TikTok</span>
 					</button>
 				{:else}
@@ -245,9 +232,7 @@
 						rel="noopener noreferrer"
 						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-border bg-card hover:bg-card-hover transition-colors"
 					>
-						<svg class="w-6 h-6 text-text-primary" viewBox="0 0 24 24" fill="currentColor">
-							<path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 0010.86 4.46V13a8.16 8.16 0 005.58 2.2v-3.46a4.85 4.85 0 01-3.58-1.47V6.69h3.58z" />
-						</svg>
+						<TiktokLogo size={24} weight="bold" />
 						<span class="text-xs font-medium text-text-secondary">TikTok</span>
 					</a>
 				{/if}
@@ -257,9 +242,7 @@
 						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-border bg-card hover:bg-card-hover transition-colors cursor-pointer"
 						onclick={shareToApp}
 					>
-						<svg class="w-6 h-6 text-red-500" viewBox="0 0 24 24" fill="currentColor">
-							<path d="M23.5 6.2a3.02 3.02 0 00-2.12-2.14C19.54 3.5 12 3.5 12 3.5s-7.54 0-9.38.56A3.02 3.02 0 00.5 6.2 31.7 31.7 0 000 12a31.7 31.7 0 00.5 5.8 3.02 3.02 0 002.12 2.14c1.84.56 9.38.56 9.38.56s7.54 0 9.38-.56a3.02 3.02 0 002.12-2.14A31.7 31.7 0 0024 12a31.7 31.7 0 00-.5-5.8zM9.75 15.56V8.44L15.75 12l-6 3.56z" />
-						</svg>
+						<YoutubeLogo size={24} weight="bold" class="text-red-500" />
 						<span class="text-xs font-medium text-text-secondary">YouTube</span>
 					</button>
 				{:else}
@@ -269,9 +252,7 @@
 						rel="noopener noreferrer"
 						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-border bg-card hover:bg-card-hover transition-colors"
 					>
-						<svg class="w-6 h-6 text-red-500" viewBox="0 0 24 24" fill="currentColor">
-							<path d="M23.5 6.2a3.02 3.02 0 00-2.12-2.14C19.54 3.5 12 3.5 12 3.5s-7.54 0-9.38.56A3.02 3.02 0 00.5 6.2 31.7 31.7 0 000 12a31.7 31.7 0 00.5 5.8 3.02 3.02 0 002.12 2.14c1.84.56 9.38.56 9.38.56s7.54 0 9.38-.56a3.02 3.02 0 002.12-2.14A31.7 31.7 0 0024 12a31.7 31.7 0 00-.5-5.8zM9.75 15.56V8.44L15.75 12l-6 3.56z" />
-						</svg>
+						<YoutubeLogo size={24} weight="bold" class="text-red-500" />
 						<span class="text-xs font-medium text-text-secondary">YouTube</span>
 					</a>
 				{/if}

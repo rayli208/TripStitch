@@ -2,6 +2,7 @@
 	import type { Location, TransportMode } from '$lib/types';
 	import TransportPicker from './TransportPicker.svelte';
 	import MediaUpload from './MediaUpload.svelte';
+	import { CaretUp, CaretDown, X } from 'phosphor-svelte';
 
 	let {
 		location,
@@ -35,9 +36,7 @@
 				disabled={isFirst}
 				onclick={onmoveup}
 			>
-				<svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-					<path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" />
-				</svg>
+				<CaretUp size={16} weight="bold" />
 			</button>
 			<span class="text-xs text-text-muted font-mono">{index + 1}</span>
 			<button
@@ -45,9 +44,7 @@
 				disabled={isLast}
 				onclick={onmovedown}
 			>
-				<svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-					<path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-				</svg>
+				<CaretDown size={16} weight="bold" />
 			</button>
 		</div>
 
@@ -71,9 +68,7 @@
 					class="text-text-muted hover:text-error transition-colors cursor-pointer p-1"
 					onclick={onremove}
 				>
-					<svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-						<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-					</svg>
+					<X size={16} weight="bold" />
 				</button>
 			</div>
 

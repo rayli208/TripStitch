@@ -9,6 +9,7 @@
 	import StarRating from '$lib/components/ui/StarRating.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import { PRICE_TIERS } from '$lib/constants/tags';
+	import { CaretLeft, CaretRight, Plus, Trash, X, Play, Pause, Image as ImageIcon, DotsSixVertical } from 'phosphor-svelte';
 
 	let {
 		locations,
@@ -343,9 +344,7 @@
 		<div class="flex items-center gap-1.5 flex-wrap">
 			{#each locations as loc, i (loc.id)}
 				{#if i > 0}
-					<svg class="w-3 h-3 text-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-					</svg>
+					<span class="text-text-muted flex-shrink-0"><CaretRight size={12} weight="bold" /></span>
 				{/if}
 				<button
 					class="px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer
@@ -402,9 +401,7 @@
 						onclick={handleRemove}
 						title="Remove location"
 					>
-						<svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-							<path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-						</svg>
+						<Trash size={20} weight="bold" />
 					</button>
 				</div>
 			</div>
@@ -431,11 +428,7 @@
 										use:dragHandle
 										aria-label="drag handle"
 									>
-										<svg class="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
-											<circle cx="5" cy="3" r="1.5" /><circle cx="11" cy="3" r="1.5" />
-											<circle cx="5" cy="8" r="1.5" /><circle cx="11" cy="8" r="1.5" />
-											<circle cx="5" cy="13" r="1.5" /><circle cx="11" cy="13" r="1.5" />
-										</svg>
+										<DotsSixVertical size={16} weight="bold" />
 									</div>
 
 									<!-- Thumbnail / Video preview -->
@@ -467,13 +460,9 @@
 												<div class="absolute inset-0 flex items-center justify-center {playingClipId === clip.id ? 'opacity-0 group-hover:opacity-100' : ''} transition-opacity">
 													<div class="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center">
 														{#if playingClipId === clip.id}
-															<svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-																<path d="M5 4h3v12H5V4zm7 0h3v12h-3V4z" />
-															</svg>
+															<Pause size={16} weight="fill" class="text-white" />
 														{:else}
-															<svg class="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20">
-																<path d="M6.3 2.84A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.27l9.344-5.891a1.5 1.5 0 000-2.538L6.3 2.84z" />
-															</svg>
+															<Play size={16} weight="fill" class="text-white ml-0.5" />
 														{/if}
 													</div>
 												</div>
@@ -485,9 +474,7 @@
 												<img src={clipThumbnails.get(clip.id)} alt="" class="w-full h-full object-cover" />
 											{:else}
 												<div class="w-full h-full flex items-center justify-center bg-black/10">
-													<svg class="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
-													</svg>
+													<ImageIcon size={20} weight="bold" class="text-text-muted" />
 												</div>
 											{/if}
 										</div>
@@ -585,9 +572,7 @@
 										onclick={() => onremoveclip(activeLoc!.id, clip.id)}
 										title="Remove clip"
 									>
-										<svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-											<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-										</svg>
+										<X size={14} weight="bold" />
 									</button>
 								</div>
 							</div>
@@ -665,9 +650,7 @@
 						disabled={activeIndex === 0}
 						onclick={() => activeIndex--}
 					>
-						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-						</svg>
+						<CaretLeft size={16} weight="bold" />
 						Prev stop
 					</button>
 					<button
@@ -676,9 +659,7 @@
 						onclick={() => activeIndex++}
 					>
 						Next stop
-						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-						</svg>
+						<CaretRight size={16} weight="bold" />
 					</button>
 				</div>
 			{/if}
@@ -691,9 +672,7 @@
 					class="w-full py-4 border-2 border-dashed border-accent/50 rounded-xl text-sm font-semibold text-accent hover:bg-accent/10 hover:border-accent transition-all cursor-pointer flex items-center justify-center gap-2"
 					onclick={addAnother}
 				>
-					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-					</svg>
+					<Plus size={20} weight="bold" />
 					Add another stop
 				</button>
 			{:else}

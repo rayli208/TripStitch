@@ -1,5 +1,6 @@
 <script lang="ts">
 	import toast from '$lib/state/toast.svelte';
+	import { Check, X } from 'phosphor-svelte';
 </script>
 
 <div class="fixed bottom-20 inset-x-0 z-50 flex flex-col items-center gap-2 px-4 pointer-events-none" aria-live="polite" aria-atomic="false" role="status">
@@ -10,13 +11,9 @@
 			role={t.type === 'error' ? 'alert' : 'status'}
 		>
 			{#if t.type === 'success'}
-				<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-				</svg>
+				<span class="flex-shrink-0" aria-hidden="true"><Check size={16} weight="bold" /></span>
 			{:else if t.type === 'error'}
-				<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-				</svg>
+				<span class="flex-shrink-0" aria-hidden="true"><X size={16} weight="bold" /></span>
 			{/if}
 			<span class="flex-1">{t.message}</span>
 			<button
@@ -24,9 +21,7 @@
 				onclick={() => toast.dismiss(t.id)}
 				aria-label="Dismiss"
 			>
-				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-				</svg>
+				<X size={16} weight="bold" />
 			</button>
 		</div>
 	{/each}

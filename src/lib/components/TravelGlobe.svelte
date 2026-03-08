@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { GlobeStyle } from '$lib/types';
 	import { onDestroy } from 'svelte';
+	import { X } from 'phosphor-svelte';
 
 	interface GlobeTrip {
 		id: string;
@@ -290,7 +291,7 @@
 							scheduleIdleReset();
 						}}
 					>
-						&times;
+						<X size={16} weight="bold" />
 					</button>
 					<div class="text-sm font-bold pr-4" style="color: #f1f5f9">{selectedTrip.title}</div>
 					<div class="text-xs mb-2.5" style="color: #94a3b8">

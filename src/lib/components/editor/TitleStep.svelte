@@ -5,6 +5,7 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import { FONTS, DEFAULT_BRAND_COLORS, getFontById, googleFontsUrl, fontFamily } from '$lib/constants/fonts';
 	import { preloadFont } from '$lib/utils/fontLoader';
+	import { Upload, X, CaretDown, Check, MapTrifold, Broadcast, Mountains, Compass, Moon, Sun } from 'phosphor-svelte';
 
 	let {
 		title = $bindable(''),
@@ -50,13 +51,13 @@
 		{ value: '16:9', label: 'Wide' }
 	];
 
-	const mapStyles: { value: MapStyle; label: string; icon: string }[] = [
-		{ value: 'streets', label: 'Streets', icon: '🗺️' },
-		{ value: 'satellite', label: 'Satellite', icon: '🛰️' },
-		{ value: 'outdoor', label: 'Outdoor', icon: '🏔️' },
-		{ value: 'topo', label: 'Topo', icon: '🧭' },
-		{ value: 'dark', label: 'Dark', icon: '🌙' },
-		{ value: 'light', label: 'Light', icon: '☀️' }
+	const mapStyles: { value: MapStyle; label: string }[] = [
+		{ value: 'streets', label: 'Streets' },
+		{ value: 'satellite', label: 'Satellite' },
+		{ value: 'outdoor', label: 'Outdoor' },
+		{ value: 'topo', label: 'Topo' },
+		{ value: 'dark', label: 'Dark' },
+		{ value: 'light', label: 'Light' }
 	];
 
 	let customizeOpen = $state(false);
@@ -118,7 +119,7 @@
 					onclick={() => onremovemedia?.()}
 					title="Remove cover photo"
 				>
-					&#10005;
+					<X size={12} weight="bold" />
 				</button>
 			</div>
 		{:else}
@@ -126,9 +127,7 @@
 				class="w-full h-20 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center text-text-muted hover:border-primary-light hover:text-text-secondary transition-colors cursor-pointer"
 				onclick={() => fileInput.click()}
 			>
-				<svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-				</svg>
+				<Upload size={20} weight="bold" class="mb-1" />
 				<span class="text-xs">Upload cover image</span>
 			</button>
 		{/if}
@@ -189,9 +188,7 @@
 		onclick={() => (customizeOpen = !customizeOpen)}
 	>
 		<span class="font-medium">Customize Style</span>
-		<svg class="w-4 h-4 transition-transform {customizeOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-		</svg>
+		<CaretDown size={16} weight="bold" class="transition-transform {customizeOpen ? 'rotate-180' : ''}" />
 	</button>
 
 	{#if customizeOpen}
@@ -237,9 +234,7 @@
 					onclick={() => (fontDropdownOpen = !fontDropdownOpen)}
 				>
 					<span>{selectedFont.name}</span>
-					<svg class="w-4 h-4 text-text-muted transition-transform {fontDropdownOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-					</svg>
+					<CaretDown size={16} weight="bold" class="text-text-muted transition-transform {fontDropdownOpen ? 'rotate-180' : ''}" />
 				</button>
 				{#if fontDropdownOpen}
 					<div class="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-border bg-card shadow-xl">
@@ -254,9 +249,7 @@
 									<span class="text-[10px] text-text-muted px-1.5 py-0.5 rounded bg-border/60">Your font</span>
 								</div>
 								{#if fontId === preferredFont.id}
-									<svg class="w-4 h-4 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-									</svg>
+									<Check size={16} weight="bold" class="text-accent flex-shrink-0" />
 								{/if}
 							</button>
 						{/if}
@@ -269,9 +262,7 @@
 							>
 								<span class="text-sm text-text-primary">{font.name}</span>
 								{#if fontId === font.id}
-									<svg class="w-4 h-4 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-									</svg>
+									<Check size={16} weight="bold" class="text-accent flex-shrink-0" />
 								{/if}
 							</button>
 						{/each}
@@ -314,7 +305,21 @@
 							onclick={() => (mapStyle = style.value)}
 							title={style.label}
 						>
-							<span class="text-base">{style.icon}</span>
+							<span class="text-base">
+							{#if style.value === 'streets'}
+								<MapTrifold size={20} weight="bold" />
+							{:else if style.value === 'satellite'}
+								<Broadcast size={20} weight="bold" />
+							{:else if style.value === 'outdoor'}
+								<Mountains size={20} weight="bold" />
+							{:else if style.value === 'topo'}
+								<Compass size={20} weight="bold" />
+							{:else if style.value === 'dark'}
+								<Moon size={20} weight="bold" />
+							{:else if style.value === 'light'}
+								<Sun size={20} weight="bold" />
+							{/if}
+						</span>
 							<span class="text-[10px] font-bold {mapStyle === style.value ? 'text-text-primary' : 'text-text-muted'}">{style.label}</span>
 						</button>
 					{/each}

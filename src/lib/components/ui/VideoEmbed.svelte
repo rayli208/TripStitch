@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { ParsedVideo } from '$lib/utils/videoEmbed';
+	import { ArrowSquareOut } from 'phosphor-svelte';
 
 	interface Props {
 		video: ParsedVideo;
@@ -34,7 +35,7 @@
 		rel="noopener noreferrer"
 		class="fallback-link {platformColors[video.platform] ?? 'text-accent'}"
 	>
-		Watch on {platformLabels[video.platform] ?? video.platform} &rarr;
+		Watch on {platformLabels[video.platform] ?? video.platform} <ArrowSquareOut size={14} weight="bold" class="inline -mt-0.5" />
 	</a>
 </div>
 

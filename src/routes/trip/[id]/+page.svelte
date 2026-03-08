@@ -5,9 +5,16 @@
 	import { getFontById, fontFamily } from '$lib/constants/fonts';
 	import { STYLE_URLS } from '$lib/constants/map';
 	import { parseAllVideoLinks } from '$lib/utils/videoEmbed';
-	import { TRIP_TAGS } from '$lib/constants/tags';
 	import VideoEmbed from '$lib/components/ui/VideoEmbed.svelte';
 	import authState from '$lib/state/auth.svelte';
+	import { Star, Car, PersonSimpleHike, Buildings, SunHorizon, Backpack, ForkKnife, Mountains, Leaf, Bank, Camera } from 'phosphor-svelte';
+	import type { Component } from 'svelte';
+
+	const TAG_ICONS: Record<string, Component> = {
+		'Road Trip': Car, 'Hiking': PersonSimpleHike, 'City Break': Buildings,
+		'Beach': SunHorizon, 'Backpacking': Backpack, 'Foodie': ForkKnife,
+		'Adventure': Mountains, 'Nature': Leaf, 'Cultural': Bank, 'Photography': Camera
+	};
 
 	const tripId = page.params.id!;
 
@@ -287,9 +294,9 @@
 		{#if trip.tags && trip.tags.length > 0}
 			<div class="px-6 sm:px-8 py-3 flex flex-wrap gap-1.5 border-b border-border">
 				{#each trip.tags as tag}
-					{@const tagInfo = TRIP_TAGS.find(t => t.value === tag)}
+					{@const TagIcon = TAG_ICONS[tag]}
 					<span class="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-accent/10 text-accent border border-accent/20">
-						{#if tagInfo}<span>{tagInfo.icon}</span>{/if}
+						{#if TagIcon}<TagIcon size={12} weight="bold" />{/if}
 						{tag}
 					</span>
 				{/each}
@@ -348,8 +355,7 @@
 									{#if loc.rating}
 										<div class="flex items-center gap-0.5">
 											{#each Array(5) as _, s}
-												<span class="text-xs {s < loc.rating ? 'text-amber-400' : 'text-border'}"
-												>&#9733;</span>
+												<span class="text-xs {s < loc.rating ? 'text-amber-400' : 'text-border'}"><Star size={12} weight="fill" /></span>
 											{/each}
 										</div>
 									{/if}

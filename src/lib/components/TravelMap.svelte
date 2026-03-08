@@ -2,6 +2,7 @@
 	import type { MapStyle } from '$lib/types';
 	import { STYLE_URLS } from '$lib/constants/map';
 	import { onDestroy } from 'svelte';
+	import { Plus, Minus, CornersOut, X } from 'phosphor-svelte';
 
 	interface MapTrip {
 		id: string;
@@ -274,27 +275,21 @@
 				onclick={handleZoomIn}
 				title="Zoom in"
 			>
-				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m6-6H6" />
-				</svg>
+				<Plus size={20} weight="bold" />
 			</button>
 			<button
 				class="w-9 h-9 rounded-lg bg-card/90 backdrop-blur-sm border border-border text-text-primary hover:bg-card-hover transition-colors cursor-pointer flex items-center justify-center shadow-sm"
 				onclick={handleZoomOut}
 				title="Zoom out"
 			>
-				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6" />
-				</svg>
+				<Minus size={20} weight="bold" />
 			</button>
 			<button
 				class="w-9 h-9 rounded-lg bg-card/90 backdrop-blur-sm border border-border text-text-primary hover:bg-card-hover transition-colors cursor-pointer flex items-center justify-center shadow-sm"
 				onclick={handleFitAll}
 				title="Fit all trips"
 			>
-				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-				</svg>
+				<CornersOut size={20} weight="bold" />
 			</button>
 		</div>
 
@@ -305,7 +300,7 @@
 						class="absolute top-1 right-2 text-lg leading-none text-text-muted hover:text-text-primary transition-colors cursor-pointer bg-transparent border-none p-0"
 						onclick={() => dismissSelection()}
 					>
-						&times;
+						<X size={16} weight="bold" />
 					</button>
 					<div class="text-sm font-bold text-text-primary pr-4">{selectedTrip.title}</div>
 					<div class="text-xs text-text-muted mb-2.5">

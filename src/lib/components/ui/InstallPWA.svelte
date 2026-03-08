@@ -8,6 +8,7 @@
 	import Button from './Button.svelte';
 	import pwaState from '$lib/state/pwa.svelte';
 	import authState from '$lib/state/auth.svelte';
+	import { Lightning, DownloadSimple, Desktop, DotsThreeVertical, Export } from 'phosphor-svelte';
 
 	let {
 		button = true,
@@ -63,11 +64,7 @@
 		onclick={() => (showModal = true)}
 		aria-label="Install app"
 	>
-		<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-			<rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-			<path d="M12 8v6" />
-			<path d="M9 13l3 3 3-3" />
-		</svg>
+		<DownloadSimple size={20} weight="bold" />
 	</button>
 {/if}
 
@@ -96,9 +93,7 @@
 					<div class="space-y-3 mb-6">
 						<div class="flex items-start gap-3">
 							<div class="w-8 h-8 rounded-lg bg-accent-light flex items-center justify-center flex-shrink-0 mt-0.5">
-								<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-									<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-								</svg>
+								<Lightning size={16} weight="bold" class="text-accent" />
 							</div>
 							<div>
 								<p class="text-sm font-medium text-text-primary">Instant access</p>
@@ -107,11 +102,7 @@
 						</div>
 						<div class="flex items-start gap-3">
 							<div class="w-8 h-8 rounded-lg bg-accent-light flex items-center justify-center flex-shrink-0 mt-0.5">
-								<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-									<rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-									<line x1="8" y1="21" x2="16" y2="21" />
-									<line x1="12" y1="17" x2="12" y2="21" />
-								</svg>
+								<Desktop size={16} weight="bold" class="text-accent" />
 							</div>
 							<div>
 								<p class="text-sm font-medium text-text-primary">Fullscreen experience</p>
@@ -120,11 +111,7 @@
 						</div>
 						<div class="flex items-start gap-3">
 							<div class="w-8 h-8 rounded-lg bg-accent-light flex items-center justify-center flex-shrink-0 mt-0.5">
-								<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-									<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-									<polyline points="7 10 12 15 17 10" />
-									<line x1="12" y1="15" x2="12" y2="3" />
-								</svg>
+								<DownloadSimple size={16} weight="bold" class="text-accent" />
 							</div>
 							<div>
 								<p class="text-sm font-medium text-text-primary">Works offline</p>
@@ -147,11 +134,7 @@
 							<div class="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">1</div>
 							<p class="text-sm text-text-primary">
 								Tap
-								<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 inline -mt-0.5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-									<path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" />
-									<polyline points="16 6 12 2 8 6" />
-									<line x1="12" y1="2" x2="12" y2="15" />
-								</svg>
+								<Export size={16} weight="bold" class="inline -mt-0.5 text-accent" />
 								<strong>Share</strong> in the toolbar
 							</p>
 						</div>
@@ -173,7 +156,7 @@
 					<div class="space-y-3 mb-6">
 						<div class="flex items-center gap-3">
 							<div class="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">1</div>
-							<p class="text-sm text-text-primary">Open your browser menu <strong class="text-lg leading-none">&#8942;</strong></p>
+							<p class="text-sm text-text-primary">Open your browser menu <DotsThreeVertical size={18} weight="bold" class="inline -mt-0.5" /></p>
 						</div>
 						<div class="flex items-center gap-3">
 							<div class="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">2</div>

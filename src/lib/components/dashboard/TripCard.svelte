@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Trip } from '$lib/types';
+	import { Link, Trash, CaretRight } from 'phosphor-svelte';
 
 	let {
 		trip,
@@ -46,8 +47,8 @@
 	{#if trip.locations.length > 0}
 		<div class="flex flex-wrap gap-1 mb-3">
 			{#each trip.locations as loc, i}
-				<span class="text-xs text-text-muted">
-					{loc.name}{i < trip.locations.length - 1 ? ' →' : ''}
+				<span class="text-xs text-text-muted inline-flex items-center gap-0.5">
+					{loc.name}{#if i < trip.locations.length - 1}<CaretRight size={10} weight="bold" />{/if}
 				</span>
 			{/each}
 		</div>
@@ -83,9 +84,7 @@
 					onclick={onshare}
 					title="Copy share link"
 				>
-					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-					</svg>
+					<Link size={16} weight="bold" />
 				</button>
 			{/if}
 			<button
@@ -93,9 +92,7 @@
 				onclick={() => { confirmingDelete = true; }}
 				title="Delete trip"
 			>
-				<svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-					<path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-				</svg>
+				<Trash size={16} weight="bold" />
 			</button>
 		</div>
 	{/if}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { TransportMode } from '$lib/types';
+	import { PersonSimpleWalk, Car, Bicycle } from 'phosphor-svelte';
 
 	let {
 		mode = null,
@@ -9,10 +10,10 @@
 		onchange: (mode: TransportMode) => void;
 	} = $props();
 
-	const options: { value: TransportMode; label: string; icon: string }[] = [
-		{ value: 'walked', label: 'Walked', icon: '🚶' },
-		{ value: 'drove', label: 'Drove', icon: '🚗' },
-		{ value: 'biked', label: 'Biked', icon: '🚲' }
+	const options: { value: TransportMode; label: string }[] = [
+		{ value: 'walked', label: 'Walked' },
+		{ value: 'drove', label: 'Drove' },
+		{ value: 'biked', label: 'Biked' }
 	];
 </script>
 
@@ -23,7 +24,12 @@
 				{mode === opt.value ? 'bg-accent text-white' : 'bg-card text-text-muted hover:bg-border'}"
 			onclick={() => onchange(opt.value)}
 		>
-			<span>{opt.icon}</span>
+			<span>
+				{#if opt.value === 'walked'}<PersonSimpleWalk size={16} weight="bold" />
+				{:else if opt.value === 'drove'}<Car size={16} weight="bold" />
+				{:else}<Bicycle size={16} weight="bold" />
+				{/if}
+			</span>
 			<span>{opt.label}</span>
 		</button>
 	{/each}

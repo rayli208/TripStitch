@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { Upload } from 'phosphor-svelte';
+
 	let {
 		previewUrl = null,
 		mediaType = null,
@@ -71,7 +73,7 @@
 				class="absolute top-1 right-1 w-6 h-6 bg-overlay/60 rounded-full flex items-center justify-center text-white text-xs hover:bg-overlay/80 cursor-pointer"
 				onclick={() => fileInput.click()}
 			>
-				↻
+				<Upload size={12} weight="bold" />
 			</button>
 		</div>
 	{:else}
@@ -84,10 +86,8 @@
 			ondragleave={handleDragLeave}
 			ondrop={handleDrop}
 		>
-			<svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-			</svg>
-			<span class="text-xs">{dragOver ? 'Drop files here' : 'Photos or videos (max 30s each)'}</span>
+			<Upload size={20} weight="bold" />
+			<span class="text-xs mt-1">{dragOver ? 'Drop files here' : 'Photos or videos (max 30s each)'}</span>
 		</button>
 	{/if}
 	{#if sizeWarning}

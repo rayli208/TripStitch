@@ -10,6 +10,7 @@
 	import { preloadFont } from '$lib/utils/fontLoader';
 	import SkeletonProfile from '$lib/components/ui/SkeletonProfile.svelte';
 	import themeState from '$lib/state/theme.svelte';
+	import { CaretDown, Check, Upload, Sun, Moon, Desktop, Globe, MapTrifold } from 'phosphor-svelte';
 	import type { ThemeMode } from '$lib/state/theme.svelte';
 	import type { GlobeStyle, MapDisplay } from '$lib/types';
 
@@ -256,17 +257,11 @@
 							onclick={() => themeState.setMode(option.id as ThemeMode)}
 						>
 							{#if option.icon === 'monitor'}
-								<svg class="w-6 h-6 {themeState.mode === option.id ? 'text-accent' : 'text-text-muted'}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z" />
-								</svg>
+								<Desktop size={24} weight="bold" class={themeState.mode === option.id ? 'text-accent' : 'text-text-muted'} />
 							{:else if option.icon === 'sun'}
-								<svg class="w-6 h-6 {themeState.mode === option.id ? 'text-accent' : 'text-text-muted'}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
-								</svg>
+								<Sun size={24} weight="bold" class={themeState.mode === option.id ? 'text-accent' : 'text-text-muted'} />
 							{:else}
-								<svg class="w-6 h-6 {themeState.mode === option.id ? 'text-accent' : 'text-text-muted'}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
-								</svg>
+								<Moon size={24} weight="bold" class={themeState.mode === option.id ? 'text-accent' : 'text-text-muted'} />
 							{/if}
 							<span class="text-xs font-medium {themeState.mode === option.id ? 'text-text-primary' : 'text-text-muted'}">{option.label}</span>
 						</button>
@@ -281,12 +276,7 @@
 					onclick={() => brandingOpen = !brandingOpen}
 				>
 					<h2 class="text-base font-semibold text-text-primary">Branding</h2>
-					<svg
-						class="w-5 h-5 text-text-muted transition-transform {brandingOpen ? 'rotate-180' : ''}"
-						fill="none" stroke="currentColor" viewBox="0 0 24 24"
-					>
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-					</svg>
+					<CaretDown size={20} weight="bold" class="transition-transform {brandingOpen ? 'rotate-180' : ''}" />
 				</button>
 
 				{#if brandingOpen}
@@ -332,9 +322,7 @@
 									{#if logoUploading}
 										<div class="w-4 h-4 border-2 border-border border-t-accent rounded-full animate-spin"></div>
 									{:else}
-										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-										</svg>
+										<Upload size={16} weight="bold" />
 										<span class="text-xs">Upload PNG, SVG, or JPG</span>
 									{/if}
 								</button>
@@ -400,9 +388,7 @@
 									<span class="text-sm font-medium text-text-primary">{selectedFontDef.name}</span>
 									<span class="text-[10px] text-text-muted px-1.5 py-0.5 rounded bg-border/60">Selected</span>
 								</div>
-								<svg class="w-4 h-4 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-								</svg>
+								<Check size={16} weight="bold" class="text-accent flex-shrink-0" />
 							</div>
 							<input
 								type="text"
@@ -434,12 +420,7 @@
 					onclick={() => mapSectionOpen = !mapSectionOpen}
 				>
 					<h2 class="text-base font-semibold text-text-primary">Map Display</h2>
-					<svg
-						class="w-5 h-5 text-text-muted transition-transform {mapSectionOpen ? 'rotate-180' : ''}"
-						fill="none" stroke="currentColor" viewBox="0 0 24 24"
-					>
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-					</svg>
+					<CaretDown size={20} weight="bold" class="transition-transform {mapSectionOpen ? 'rotate-180' : ''}" />
 				</button>
 
 				{#if mapSectionOpen}
@@ -452,11 +433,7 @@
 								class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all cursor-pointer {mapDisplay === 'globe' ? 'border-accent bg-accent-light' : 'border-border hover:border-primary-light'}"
 								onclick={() => mapDisplay = 'globe'}
 							>
-								<svg class="w-8 h-8 {mapDisplay === 'globe' ? 'text-accent' : 'text-text-muted'}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-									<circle cx="12" cy="12" r="10" />
-									<ellipse cx="12" cy="12" rx="4" ry="10" />
-									<path d="M2 12h20" />
-								</svg>
+								<Globe size={32} weight="bold" class={mapDisplay === 'globe' ? 'text-accent' : 'text-text-muted'} />
 								<div class="text-center">
 									<p class="text-sm font-medium {mapDisplay === 'globe' ? 'text-text-primary' : 'text-text-muted'}">3D Globe</p>
 									<p class="text-xs text-text-muted">Interactive rotating globe</p>
@@ -467,9 +444,7 @@
 								class="flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all cursor-pointer {mapDisplay === 'map' ? 'border-accent bg-accent-light' : 'border-border hover:border-primary-light'}"
 								onclick={() => mapDisplay = 'map'}
 							>
-								<svg class="w-8 h-8 {mapDisplay === 'map' ? 'text-accent' : 'text-text-muted'}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-								</svg>
+								<MapTrifold size={32} weight="bold" class={mapDisplay === 'map' ? 'text-accent' : 'text-text-muted'} />
 								<div class="text-center">
 									<p class="text-sm font-medium {mapDisplay === 'map' ? 'text-text-primary' : 'text-text-muted'}">Flat Map</p>
 									<p class="text-xs text-text-muted">Zoomable map with routes</p>
@@ -508,12 +483,7 @@
 					onclick={() => socialsOpen = !socialsOpen}
 				>
 					<h2 class="text-base font-semibold text-text-primary">Social Links</h2>
-					<svg
-						class="w-5 h-5 text-text-muted transition-transform {socialsOpen ? 'rotate-180' : ''}"
-						fill="none" stroke="currentColor" viewBox="0 0 24 24"
-					>
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-					</svg>
+					<CaretDown size={20} weight="bold" class="transition-transform {socialsOpen ? 'rotate-180' : ''}" />
 				</button>
 
 				{#if socialsOpen}

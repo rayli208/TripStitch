@@ -1,6 +1,13 @@
 <script lang="ts">
 	import type { ExportStepItem } from '$lib/types';
 	import type { AssemblyProgress } from '$lib/services/videoAssembler';
+	import { Warning, Check, FilmSlate, MapTrifold, FilmStrip, MapPin, Scissors } from 'phosphor-svelte';
+	import type { Component } from 'svelte';
+
+	const STEP_ICONS: Record<string, Component> = {
+		title: FilmSlate, map: MapTrifold, clips: FilmStrip,
+		route: MapPin, finalize: Scissors
+	};
 
 	let {
 		progress = null,
@@ -49,9 +56,7 @@
 <div class="flex flex-col items-center py-6 gap-5">
 	{#if exportPaused}
 		<div class="flex items-center gap-2 px-4 py-2 rounded-lg bg-warning/10 border border-warning/30">
-			<svg class="w-4 h-4 text-warning flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-			</svg>
+			<Warning size={16} weight="bold" class="text-warning flex-shrink-0" />
 			<p class="text-sm font-medium text-warning">Stitching paused — switch back to continue</p>
 		</div>
 	{:else}
@@ -63,17 +68,16 @@
 	{#if exportSteps.length > 0}
 		<div class="w-full max-w-xs space-y-2">
 			{#each exportSteps as step}
+				{@const StepIcon = STEP_ICONS[step.icon]}
 				{@const status = getStepStatus(step.id)}
 				<div class="flex items-center gap-3 py-1.5">
 					<div class="w-7 h-7 flex items-center justify-center flex-shrink-0">
 						{#if status === 'done'}
-							<svg class="w-5 h-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-							</svg>
+							<Check size={20} weight="bold" class="text-success" />
 						{:else if status === 'active'}
-							<span class="text-lg animate-pulse-glow">{step.icon}</span>
+							<span class="animate-pulse-glow"><StepIcon size={20} weight="bold" /></span>
 						{:else}
-							<span class="text-lg opacity-30">{step.icon}</span>
+							<span class="opacity-30"><StepIcon size={20} weight="bold" /></span>
 						{/if}
 					</div>
 					<span class="text-sm {status === 'done' ? 'text-text-muted line-through' : status === 'active' ? 'text-text-primary font-medium' : 'text-text-muted'}">

@@ -112,20 +112,20 @@
 	// Build export steps checklist based on current locations
 	let exportSteps = $derived.by<ExportStepItem[]>(() => {
 		const steps: ExportStepItem[] = [];
-		steps.push({ id: 'title', label: 'Creating title card', icon: '🎬' });
+		steps.push({ id: 'title', label: 'Creating title card', icon: 'title' });
 		for (const loc of editor.locations) {
 			const displayName = loc.label || loc.name.split(',')[0];
-			steps.push({ id: `map-${loc.id}`, label: `Map: ${displayName}`, icon: '🗺️' });
+			steps.push({ id: `map-${loc.id}`, label: `Map: ${displayName}`, icon: 'map' });
 			if (loc.clips.length > 0) {
 				steps.push({
 					id: `clip-${loc.id}`,
 					label: `${loc.clips.length} clip${loc.clips.length !== 1 ? 's' : ''}: ${displayName}`,
-					icon: '🎬'
+					icon: 'clips'
 				});
 			}
 		}
-		steps.push({ id: 'route', label: 'Drawing final route', icon: '📍' });
-		steps.push({ id: 'finalize', label: 'Stitching together', icon: '✂️' });
+		steps.push({ id: 'route', label: 'Drawing final route', icon: 'route' });
+		steps.push({ id: 'finalize', label: 'Stitching together', icon: 'finalize' });
 		return steps;
 	});
 

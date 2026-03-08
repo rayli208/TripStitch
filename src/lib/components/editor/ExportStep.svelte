@@ -5,6 +5,7 @@
 	import ExportResult from './ExportResult.svelte';
 	import AudioEditor from './AudioEditor.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
+	import { Warning, XCircle } from 'phosphor-svelte';
 
 	let {
 		musicSelection = $bindable<MusicSelection | null>(null),
@@ -96,7 +97,7 @@
 	{#if !browserSupported}
 		<!-- Browser not supported -->
 		<div class="text-center py-12">
-			<div class="text-5xl mb-4">&#x26A0;&#xFE0F;</div>
+			<div class="mb-4 text-warning"><Warning size={48} weight="fill" /></div>
 			<h3 class="text-lg font-semibold text-text-primary mb-2">Browser Not Supported</h3>
 			<p class="text-sm text-text-muted mb-4">
 				Your browser doesn't support video export. Please use Safari 14.5+, Chrome, or Firefox.
@@ -111,7 +112,7 @@
 	{:else if error}
 		<!-- Error state -->
 		<div class="text-center py-12">
-			<div class="text-5xl mb-4">&#x274C;</div>
+			<div class="mb-4 text-error"><XCircle size={48} weight="fill" /></div>
 			<h3 class="text-lg font-semibold text-text-primary mb-2">Export Failed</h3>
 			<p class="text-sm text-error mb-6">{error}</p>
 			<div class="flex justify-center gap-3">

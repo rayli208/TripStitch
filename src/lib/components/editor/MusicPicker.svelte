@@ -4,6 +4,13 @@
 	import { MUSIC_MOODS, MUSIC_TRACKS, getTracksByMood } from '$lib/constants/music';
 	import { getTrackUrl, fetchTrackBlob, createTrackPreview } from '$lib/services/musicService';
 	import Button from '$lib/components/ui/Button.svelte';
+	import { MusicNote, CaretDown, Play, Pause, SpeakerHigh, Upload, ArrowsClockwise, Mountains, Coffee, FilmSlate, Confetti, Heart, Lightning } from 'phosphor-svelte';
+	import type { Component } from 'svelte';
+
+	const MOOD_ICONS: Record<string, Component> = {
+		adventure: Mountains, chill: Coffee, cinematic: FilmSlate,
+		upbeat: Confetti, romantic: Heart, epic: Lightning
+	};
 
 	let {
 		musicSelection = $bindable<MusicSelection | null>(null),
@@ -287,9 +294,7 @@
 		{disabled}
 	>
 		<div class="flex items-center gap-2">
-			<svg class="w-5 h-5 {musicSelection ? 'text-accent' : 'text-text-muted'}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-			</svg>
+			<MusicNote size={20} weight="bold" class={musicSelection ? 'text-accent' : 'text-text-muted'} />
 			<div class="text-left">
 				<p class="text-sm font-medium text-text-primary">Background Music</p>
 				<p class="text-xs {musicSelection ? 'text-accent' : 'text-text-muted'}">{selectedLabel}</p>
@@ -299,12 +304,7 @@
 			{#if musicSelection && !expanded}
 				<span class="text-[10px] font-semibold uppercase tracking-wider text-accent bg-accent/10 rounded-full px-2 py-0.5">Active</span>
 			{/if}
-			<svg
-				class="w-4 h-4 text-text-muted transition-transform {expanded ? 'rotate-180' : ''}"
-				fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
-			>
-				<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-			</svg>
+			<CaretDown size={16} weight="bold" class="text-text-muted transition-transform {expanded ? 'rotate-180' : ''}" />
 		</div>
 	</button>
 
@@ -320,12 +320,14 @@
 					All
 				</button>
 				{#each MUSIC_MOODS as mood}
+					{@const MoodIcon = MOOD_ICONS[mood.id]}
 					<button
 						class="px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer
 							{activeMood === mood.id ? 'bg-accent text-white' : 'bg-border text-text-muted hover:text-text-primary'}"
 						onclick={() => { activeMood = activeMood === mood.id ? null : mood.id; }}
 					>
-						{mood.icon} {mood.label}
+						{#if MoodIcon}<MoodIcon size={14} weight="bold" />{/if}
+						{mood.label}
 					</button>
 				{/each}
 			</div>
@@ -348,13 +350,9 @@
 							title={isPreviewing ? 'Stop preview' : 'Preview track'}
 						>
 							{#if isPreviewing}
-								<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-									<rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" />
-								</svg>
+								<Pause size={14} weight="fill" />
 							{:else}
-								<svg class="w-3.5 h-3.5 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-									<path d="M8 5v14l11-7z" />
-								</svg>
+								<Play size={14} weight="fill" class="ml-0.5" />
 							{/if}
 						</button>
 
@@ -387,9 +385,7 @@
 					text-sm text-text-muted hover:text-text-primary hover:border-text-muted transition-colors cursor-pointer"
 				onclick={() => fileInput?.click()}
 			>
-				<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-				</svg>
+				<Upload size={16} weight="bold" />
 				Upload your own
 			</button>
 			<input
@@ -437,13 +433,9 @@
 							title={offsetPlaying ? 'Stop' : 'Preview from this position'}
 						>
 							{#if offsetPlaying}
-								<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-									<rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" />
-								</svg>
+								<Pause size={12} weight="fill" />
 							{:else}
-								<svg class="w-3 h-3 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-									<path d="M8 5v14l11-7z" />
-								</svg>
+								<Play size={12} weight="fill" class="ml-0.5" />
 							{/if}
 						</button>
 					</div>
@@ -503,9 +495,7 @@
 					{#if loops}
 						<div class="bg-accent/5 border border-accent/20 rounded-lg p-2.5 space-y-1">
 							<p class="text-[11px] text-text-primary font-medium flex items-center gap-1.5">
-								<svg class="w-3.5 h-3.5 text-accent shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-								</svg>
+								<ArrowsClockwise size={14} weight="bold" class="text-accent shrink-0" />
 								Song will loop {loopCount === 1 ? 'once' : `${loopCount} times`} to fill the video
 							</p>
 							<p class="text-[11px] text-text-muted leading-relaxed">
@@ -536,9 +526,7 @@
 
 			<!-- Volume slider -->
 			<div class="flex items-center gap-3">
-				<svg class="w-4 h-4 text-accent shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-				</svg>
+				<SpeakerHigh size={16} weight="bold" class="text-accent shrink-0" />
 				<span class="text-xs text-text-primary w-12 shrink-0">Music</span>
 				<input
 					type="range"

@@ -8,6 +8,7 @@
 	import Input from '$lib/components/ui/Input.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import { parseVideoUrl, getVideoUrl, videoUrlToLinks } from '$lib/utils/videoEmbed';
+	import { PlayCircle } from 'phosphor-svelte';
 
 	const tripId = page.params.id!;
 
@@ -78,10 +79,7 @@
 			<div class="space-y-4">
 				<div>
 					<label class="flex items-center gap-2 text-sm font-medium text-text-secondary mb-1.5">
-						<svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-						</svg>
+						<PlayCircle size={16} weight="bold" class="text-accent" />
 						Video Link
 					</label>
 					<Input placeholder="Paste a YouTube, Instagram, or TikTok link" bind:value={videoUrl} />
