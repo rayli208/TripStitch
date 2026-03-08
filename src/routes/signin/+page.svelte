@@ -101,8 +101,11 @@
 
 <div class="min-h-screen flex flex-col items-center justify-center bg-page text-text-primary px-4">
 	<div class="w-full max-w-sm [&_button]:w-full">
-		<img src="/logo.png" alt="TripStitch" class="h-16 mx-auto mb-6" />
-		<p class="text-text-muted mb-8 text-lg text-center">Create travel videos with animated map transitions</p>
+		<div class="flex items-center justify-center gap-2 mb-6">
+			<img src="/favicon-192.png" alt="" class="h-11" />
+			<span class="text-4xl font-extrabold tracking-tight"><span class="text-text-primary">Trip</span><span class="text-accent">Stitch</span></span>
+		</div>
+		<p class="text-text-muted mb-8 text-lg text-center">Your trips deserve more than a camera roll</p>
 
 		{#if mode === 'forgot'}
 			<form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-4">

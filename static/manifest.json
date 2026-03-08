@@ -1,12 +1,13 @@
 {
   "name": "TripStitch",
   "short_name": "TripStitch",
+  "description": "Turn your travel photos into cinematic videos with animated map transitions.",
   "start_url": "/create",
   "display": "standalone",
-  "background_color": "#FFFFFF",
-  "theme_color": "#F4845F",
+  "background_color": "#FFF8F0",
+  "theme_color": "#FF6B6B",
   "icons": [
-    { "src": "/logo.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/logo2.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "/favicon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/favicon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }

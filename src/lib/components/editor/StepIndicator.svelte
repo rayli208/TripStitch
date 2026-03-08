@@ -8,9 +8,9 @@
 	} = $props();
 </script>
 
-<div class="flex items-center justify-center gap-2 mb-8">
+<div class="flex items-center justify-center gap-1.5 sm:gap-2 mb-8 overflow-x-auto px-2">
 	{#each steps as step, i}
-		<div class="flex items-center gap-2">
+		<div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
 			<div
 				class="flex items-center justify-center w-7 h-7 rounded-full text-xs font-medium transition-colors
 					{i === current ? 'bg-accent text-white' : i < current ? 'bg-primary text-white' : 'bg-card text-text-muted'}"
@@ -23,9 +23,12 @@
 					{i + 1}
 				{/if}
 			</div>
-			<span class="text-xs {i === current ? 'text-text-primary' : 'text-text-muted'}">{step}</span>
+			<span class="text-xs {i === current ? 'text-text-primary' : 'text-text-muted'} hidden sm:inline">{step}</span>
+			{#if i === current}
+				<span class="text-xs text-text-primary sm:hidden">{step}</span>
+			{/if}
 			{#if i < steps.length - 1}
-				<div class="w-8 h-px {i < current ? 'bg-accent' : 'bg-border'}"></div>
+				<div class="w-5 sm:w-8 h-px {i < current ? 'bg-accent' : 'bg-border'}"></div>
 			{/if}
 		</div>
 	{/each}

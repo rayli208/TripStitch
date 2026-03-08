@@ -12,7 +12,6 @@
 
 	let ready = $state(false);
 	$effect(() => {
-		// Small delay so the entrance animations feel intentional
 		const t = setTimeout(() => { ready = true; }, 100);
 		return () => clearTimeout(t);
 	});
@@ -20,6 +19,29 @@
 
 <svelte:head>
 	<title>TripStitch - Turn Your Trips into Cinematic Videos</title>
+	<meta property="og:title" content="TripStitch - Turn Your Trips into Cinematic Videos" />
+	<meta property="og:description" content="Drop your photos, pick your stops on a map, and TripStitch stitches together a polished travel video with animated map transitions — all in your browser." />
+	<meta property="og:url" content="https://tripstitch.blog" />
+	<meta name="twitter:title" content="TripStitch - Turn Your Trips into Cinematic Videos" />
+	<meta name="twitter:description" content="Drop your photos, pick your stops on a map, and TripStitch stitches together a polished travel video with animated map transitions — all in your browser." />
+	{@html `<script type="application/ld+json">${JSON.stringify({
+		"@context": "https://schema.org",
+		"@type": "WebApplication",
+		"name": "TripStitch",
+		"url": "https://tripstitch.blog",
+		"description": "Turn your travel photos into cinematic videos with animated map transitions, custom branding, and voice-over — all in your browser.",
+		"applicationCategory": "MultimediaApplication",
+		"operatingSystem": "Any",
+		"offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+		"featureList": [
+			"Animated map transitions",
+			"Ken Burns photo animations",
+			"Voice-over recording",
+			"Custom branding and fonts",
+			"9:16, 1:1, and 16:9 export",
+			"Client-side video processing"
+		]
+	})}</script>`}
 </svelte:head>
 
 <style>
@@ -44,7 +66,10 @@
 	<!-- Hero -->
 	<section class="relative overflow-hidden">
 		<nav class="relative z-10 max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
-			<img src="/logo.png" alt="TripStitch" class="h-8 {ready ? 'animate-fade-in fill-both' : 'opacity-0'}" />
+			<a href="/" aria-label="TripStitch home" class="flex items-center gap-2 {ready ? 'animate-fade-in fill-both' : 'opacity-0'}">
+				<img src="/favicon-192.png" alt="" class="h-7" />
+				<span class="text-xl font-extrabold tracking-tight"><span class="text-text-primary">Trip</span><span class="text-accent">Stitch</span></span>
+			</a>
 			<a
 				href="/signin"
 				class="text-sm font-bold border-2 border-border px-4 py-2 rounded-lg shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all {ready ? 'animate-fade-in fill-both delay-200' : 'opacity-0'}"
@@ -56,7 +81,7 @@
 		<div class="relative z-10 max-w-4xl mx-auto px-6 pt-16 pb-24 sm:pt-24 sm:pb-32 text-center">
 			<div class="{ready ? 'animate-fade-up fill-both delay-100' : 'opacity-0'}">
 				<span class="inline-block px-4 py-1.5 rounded-lg text-xs font-bold tracking-wide uppercase bg-warning text-black border-2 border-border shadow-[2px_2px_0_var(--color-border)] mb-6">
-					Free & open — no watermarks
+					Free to use — sign up in seconds
 				</span>
 			</div>
 
@@ -99,11 +124,10 @@
 	<section id="features" class="max-w-6xl mx-auto px-6 py-20 sm:py-28">
 		<div class="text-center mb-16">
 			<h2 class="text-3xl sm:text-4xl font-bold text-text-primary">Everything happens in your browser</h2>
-			<p class="mt-4 text-text-secondary text-lg max-w-xl mx-auto">No uploads, no waiting for servers, no accounts required to try. Your media stays on your device.</p>
+			<p class="mt-4 text-text-secondary text-lg max-w-xl mx-auto">No uploads to external servers, no waiting, no subscriptions. Your media stays on your device.</p>
 		</div>
 
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-			<!-- Feature 1 -->
 			<div class="group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] hover:-translate-y-1 transition-all duration-300">
 				<div class="w-12 h-12 rounded-xl bg-warning border-2 border-border flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
 					🗺️
@@ -114,7 +138,6 @@
 				</p>
 			</div>
 
-			<!-- Feature 2 -->
 			<div class="group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] hover:-translate-y-1 transition-all duration-300">
 				<div class="w-12 h-12 rounded-xl bg-sky-300 border-2 border-border flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
 					🎨
@@ -125,7 +148,6 @@
 				</p>
 			</div>
 
-			<!-- Feature 3 -->
 			<div class="group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] hover:-translate-y-1 transition-all duration-300">
 				<div class="w-12 h-12 rounded-xl bg-accent-light border-2 border-border flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
 					📸
@@ -136,7 +158,6 @@
 				</p>
 			</div>
 
-			<!-- Feature 4 -->
 			<div class="group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] hover:-translate-y-1 transition-all duration-300">
 				<div class="w-12 h-12 rounded-xl bg-success-light border-2 border-border flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
 					🎙️
@@ -147,7 +168,6 @@
 				</p>
 			</div>
 
-			<!-- Feature 5 -->
 			<div class="group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] hover:-translate-y-1 transition-all duration-300">
 				<div class="w-12 h-12 rounded-xl bg-warning border-2 border-border flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
 					📐
@@ -158,7 +178,6 @@
 				</p>
 			</div>
 
-			<!-- Feature 6 -->
 			<div class="group relative bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] hover:-translate-y-1 transition-all duration-300">
 				<div class="w-12 h-12 rounded-xl bg-sky-300 border-2 border-border flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
 					🔗
@@ -206,6 +225,45 @@
 		</div>
 	</section>
 
+	<!-- Use cases / who it's for -->
+	<section class="max-w-5xl mx-auto px-6 py-20 sm:py-28">
+		<div class="text-center mb-16">
+			<h2 class="text-3xl sm:text-4xl font-bold text-text-primary">Built for every kind of traveler</h2>
+			<p class="mt-4 text-text-secondary text-lg max-w-xl mx-auto">Whether you're a travel creator, a weekend road tripper, or just back from a family vacation.</p>
+		</div>
+
+		<div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+			<div class="flex gap-4 bg-card border-2 border-border rounded-2xl p-6 shadow-[4px_4px_0_var(--color-border)]">
+				<span class="text-3xl shrink-0">🎒</span>
+				<div>
+					<h3 class="font-bold text-text-primary mb-1">Travel Creators</h3>
+					<p class="text-sm text-text-secondary">Custom branding, multiple aspect ratios, and voice-over make it easy to produce platform-ready content fast.</p>
+				</div>
+			</div>
+			<div class="flex gap-4 bg-card border-2 border-border rounded-2xl p-6 shadow-[4px_4px_0_var(--color-border)]">
+				<span class="text-3xl shrink-0">🚗</span>
+				<div>
+					<h3 class="font-bold text-text-primary mb-1">Road Trippers</h3>
+					<p class="text-sm text-text-secondary">Watch your route animate across the map between every stop. Perfect for capturing cross-country adventures.</p>
+				</div>
+			</div>
+			<div class="flex gap-4 bg-card border-2 border-border rounded-2xl p-6 shadow-[4px_4px_0_var(--color-border)]">
+				<span class="text-3xl shrink-0">🥾</span>
+				<div>
+					<h3 class="font-bold text-text-primary mb-1">Hikers & Adventurers</h3>
+					<p class="text-sm text-text-secondary">Satellite and outdoor map styles bring your trailheads, peaks, and campsites to life on screen.</p>
+				</div>
+			</div>
+			<div class="flex gap-4 bg-card border-2 border-border rounded-2xl p-6 shadow-[4px_4px_0_var(--color-border)]">
+				<span class="text-3xl shrink-0">👨‍👩‍👧‍👦</span>
+				<div>
+					<h3 class="font-bold text-text-primary mb-1">Families & Friends</h3>
+					<p class="text-sm text-text-secondary">Turn vacation photos into a keepsake video you can share with everyone — no editing skills needed.</p>
+				</div>
+			</div>
+		</div>
+	</section>
+
 	<!-- CTA -->
 	<section class="max-w-4xl mx-auto px-6 py-24 sm:py-32 text-center">
 		<h2 class="text-3xl sm:text-5xl font-bold text-text-primary mb-6">
@@ -228,9 +286,10 @@
 	<!-- Footer -->
 	<footer class="border-t-3 border-border">
 		<div class="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-			<div class="flex items-center gap-3">
-				<img src="/logo.png" alt="TripStitch" class="h-6 opacity-60" />
-			</div>
+			<a href="/" aria-label="TripStitch home" class="flex items-center gap-1.5 opacity-70">
+				<img src="/favicon-192.png" alt="" class="h-5" />
+				<span class="text-base font-extrabold tracking-tight"><span class="text-text-primary">Trip</span><span class="text-accent">Stitch</span></span>
+			</a>
 			<p class="text-sm text-text-muted">
 				Built for travelers. No server-side processing — your media never leaves your device.
 			</p>
