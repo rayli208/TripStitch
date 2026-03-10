@@ -618,7 +618,7 @@
 		</div>
 
 		<!-- ═══════════ Sticky bottom save bar ═══════════ -->
-		<div class="fixed bottom-14 left-0 right-0 z-30 border-t-2 border-border bg-page/95 backdrop-blur-sm {ready ? 'animate-fade-up fill-both delay-350' : 'opacity-0'}">
+		<div class="fixed left-0 right-0 z-30 border-t-2 border-border bg-page/95 backdrop-blur-sm {ready ? 'animate-fade-up fill-both delay-350' : 'opacity-0'}" style="bottom: calc(4rem + env(safe-area-inset-bottom, 0px) + 8px);">
 			<div class="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
 				<Button variant="primary" onclick={handleSave} disabled={!canSave}>
 					{#if saving}
