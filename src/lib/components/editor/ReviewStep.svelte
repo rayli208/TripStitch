@@ -5,7 +5,7 @@
 	import TransportPicker from './TransportPicker.svelte';
 	import RoutePreviewMap from './RoutePreviewMap.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
-	import { DotsSixVertical, X, Star, Microphone, Car, PersonSimpleHike, Buildings, SunHorizon, Backpack, ForkKnife, Mountains, Leaf, Bank, Camera } from 'phosphor-svelte';
+	import { DotsSixVertical, X, Star, StarHalf, Microphone, Car, PersonSimpleHike, Buildings, SunHorizon, Backpack, ForkKnife, Mountains, Leaf, Bank, Camera } from 'phosphor-svelte';
 	import type { Component } from 'svelte';
 
 	const TAG_ICONS: Record<string, Component> = {
@@ -255,7 +255,16 @@
 						{#if loc.rating}
 							<div class="flex items-center gap-0.5">
 								{#each Array(5) as _, s}
-									<span class="{s < loc.rating ? 'text-amber-400' : 'text-border'}"><Star size={12} weight="fill" /></span>
+									{#if loc.rating >= s + 1}
+										<span class="text-amber-400"><Star size={12} weight="fill" /></span>
+									{:else if loc.rating >= s + 0.5}
+										<span class="relative inline-block" style="width:12px;height:12px">
+											<span class="absolute inset-0 text-border"><Star size={12} weight="fill" /></span>
+											<span class="absolute inset-0 text-amber-400"><StarHalf size={12} weight="fill" /></span>
+										</span>
+									{:else}
+										<span class="text-border"><Star size={12} weight="fill" /></span>
+									{/if}
 								{/each}
 							</div>
 						{/if}

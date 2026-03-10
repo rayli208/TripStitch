@@ -135,6 +135,6 @@
 {#if locations.length >= 2}
 	<div
 		bind:this={container}
-		class="w-full h-[200px] rounded-xl overflow-hidden border border-border"
+		class="w-full h-[200px] rounded-xl overflow-hidden border-2 border-border"
 	></div>
 {/if}

@@ -599,9 +599,30 @@ function drawLocationTitleOnCanvas(
 		const starsX = width / 2 - totalStarsW / 2;
 		for (let i = 0; i < 5; i++) {
 			const cx = starsX + starSize + i * (starSize * 2 + starGap);
-			drawStar(ctx, cx, starsY, starSize);
-			ctx.fillStyle = i < rating ? '#FBBF24' : 'rgba(255,255,255,0.2)';
-			ctx.fill();
+			if (rating >= i + 1) {
+				// Full star
+				drawStar(ctx, cx, starsY, starSize);
+				ctx.fillStyle = '#FBBF24';
+				ctx.fill();
+			} else if (rating >= i + 0.5) {
+				// Half star: draw empty background, then clip left half for filled
+				drawStar(ctx, cx, starsY, starSize);
+				ctx.fillStyle = 'rgba(255,255,255,0.2)';
+				ctx.fill();
+				ctx.save();
+				ctx.beginPath();
+				ctx.rect(cx - starSize, starsY - starSize, starSize, starSize * 2);
+				ctx.clip();
+				drawStar(ctx, cx, starsY, starSize);
+				ctx.fillStyle = '#FBBF24';
+				ctx.fill();
+				ctx.restore();
+			} else {
+				// Empty star
+				drawStar(ctx, cx, starsY, starSize);
+				ctx.fillStyle = 'rgba(255,255,255,0.2)';
+				ctx.fill();
+			}
 		}
 	}
 

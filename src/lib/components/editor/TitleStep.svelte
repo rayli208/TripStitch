@@ -112,7 +112,7 @@
 	<div>
 		<span class="block text-sm font-medium text-text-secondary mb-2">Cover Photo <span class="text-text-muted">*</span></span>
 		{#if titleMediaPreviewUrl}
-			<div class="relative rounded-lg overflow-hidden bg-card border border-border">
+			<div class="relative rounded-lg overflow-hidden bg-card border-2 border-border">
 				<img src={titleMediaPreviewUrl} alt="Cover preview" class="w-full h-32 object-cover" />
 				<button
 					class="absolute top-1.5 right-1.5 w-7 h-7 bg-overlay/60 rounded-full flex items-center justify-center text-white text-xs hover:bg-red-600/80 transition-colors cursor-pointer"
@@ -142,7 +142,7 @@
 
 	<!-- Preview -->
 	{#if title}
-		<div class="rounded-lg border border-border overflow-hidden">
+		<div class="rounded-lg border-2 border-border overflow-hidden">
 			<p class="text-xs text-text-muted px-4 pt-3 pb-1">Preview</p>
 			{#if titleMediaPreviewUrl}
 				<div class="relative h-40 flex items-center justify-center">
@@ -184,7 +184,7 @@
 
 	<!-- Customize toggle -->
 	<button
-		class="w-full flex items-center justify-between py-2 px-3 rounded-lg bg-card border border-border text-sm text-text-secondary hover:bg-card-hover transition-colors cursor-pointer"
+		class="w-full flex items-center justify-between py-2 px-3 rounded-lg bg-card border-2 border-border text-sm text-text-secondary hover:bg-card-hover transition-colors cursor-pointer"
 		onclick={() => (customizeOpen = !customizeOpen)}
 	>
 		<span class="font-medium">Customize Style</span>
@@ -229,7 +229,7 @@
 			<div class="pl-3 relative font-dropdown">
 				<span class="block text-sm font-medium text-text-secondary mb-1.5">Font</span>
 				<button
-					class="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-border bg-card text-sm text-text-primary hover:bg-card-hover transition-colors cursor-pointer"
+					class="w-full flex items-center justify-between px-3 py-2 rounded-lg border-2 border-border bg-card text-sm text-text-primary hover:bg-card-hover transition-colors cursor-pointer"
 					style="font-family: {selectedFont.family}, system-ui, sans-serif"
 					onclick={() => (fontDropdownOpen = !fontDropdownOpen)}
 				>
@@ -237,7 +237,7 @@
 					<CaretDown size={16} weight="bold" class="text-text-muted transition-transform {fontDropdownOpen ? 'rotate-180' : ''}" />
 				</button>
 				{#if fontDropdownOpen}
-					<div class="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-border bg-card shadow-xl">
+					<div class="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border-2 border-border bg-card shadow-brutal">
 						{#if preferredFont}
 							<button
 								class="w-full flex items-center justify-between px-3 py-2 text-left transition-colors cursor-pointer border-b border-border {fontId === preferredFont.id ? 'bg-accent-light' : 'hover:bg-card-hover'}"

@@ -28,7 +28,7 @@
 <AppShell title="My Trips" showBottomNav logoUrl={profileState.profile?.logoUrl}>
 	<div class="space-y-4">
 		{#if !profileState.loading && !profileState.hasProfile}
-			<div class="bg-accent-light border border-accent text-accent-hover text-sm rounded-lg px-4 py-3 flex items-center justify-between">
+			<div class="bg-accent-light border-2 border-accent text-accent-hover text-sm rounded-lg px-4 py-3 flex items-center justify-between shadow-brutal-sm">
 				<span>Set up your profile to share trips publicly.</span>
 				<button
 					class="text-accent hover:text-accent-hover font-medium text-sm cursor-pointer"

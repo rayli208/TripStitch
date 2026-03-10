@@ -107,7 +107,7 @@
 		</Button>
 
 		<!-- Caption generation -->
-		<div class="bg-card border border-border rounded-lg p-4 w-full space-y-3">
+		<div class="bg-card border-2 border-border rounded-lg p-4 w-full space-y-3">
 			<div class="flex items-center justify-between">
 				<p class="text-sm font-medium text-text-primary">AI Caption</p>
 				{#if captionResult}
@@ -199,7 +199,7 @@
 			<div class="grid grid-cols-3 gap-2">
 				{#if canShareFiles}
 					<button
-						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-border bg-card hover:bg-card-hover transition-colors cursor-pointer"
+						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 border-border bg-card hover:bg-card-hover transition-colors cursor-pointer"
 						onclick={shareToApp}
 					>
 						<InstagramLogo size={24} weight="bold" class="text-pink-500" />
@@ -210,7 +210,7 @@
 						href="https://www.instagram.com"
 						target="_blank"
 						rel="noopener noreferrer"
-						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-border bg-card hover:bg-card-hover transition-colors"
+						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 border-border bg-card hover:bg-card-hover transition-colors"
 					>
 						<InstagramLogo size={24} weight="bold" class="text-pink-500" />
 						<span class="text-xs font-medium text-text-secondary">Instagram</span>
@@ -219,7 +219,7 @@
 
 				{#if canShareFiles}
 					<button
-						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-border bg-card hover:bg-card-hover transition-colors cursor-pointer"
+						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 border-border bg-card hover:bg-card-hover transition-colors cursor-pointer"
 						onclick={shareToApp}
 					>
 						<TiktokLogo size={24} weight="bold" />
@@ -230,7 +230,7 @@
 						href="https://www.tiktok.com/upload"
 						target="_blank"
 						rel="noopener noreferrer"
-						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-border bg-card hover:bg-card-hover transition-colors"
+						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 border-border bg-card hover:bg-card-hover transition-colors"
 					>
 						<TiktokLogo size={24} weight="bold" />
 						<span class="text-xs font-medium text-text-secondary">TikTok</span>
@@ -239,7 +239,7 @@
 
 				{#if canShareFiles}
 					<button
-						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-border bg-card hover:bg-card-hover transition-colors cursor-pointer"
+						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 border-border bg-card hover:bg-card-hover transition-colors cursor-pointer"
 						onclick={shareToApp}
 					>
 						<YoutubeLogo size={24} weight="bold" class="text-red-500" />
@@ -250,7 +250,7 @@
 						href="https://www.youtube.com/upload"
 						target="_blank"
 						rel="noopener noreferrer"
-						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-border bg-card hover:bg-card-hover transition-colors"
+						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 border-border bg-card hover:bg-card-hover transition-colors"
 					>
 						<YoutubeLogo size={24} weight="bold" class="text-red-500" />
 						<span class="text-xs font-medium text-text-secondary">YouTube</span>
@@ -263,14 +263,14 @@
 		</div>
 
 		{#if shareUrl}
-			<div class="bg-card border border-border rounded-lg p-4 w-full">
+			<div class="bg-card border-2 border-border rounded-lg p-4 w-full">
 				<p class="text-sm text-text-secondary mb-2">Share this trip:</p>
 				<div class="flex items-center gap-2">
 					<input
 						type="text"
 						readonly
 						value={shareUrl}
-						class="flex-1 bg-card border border-border rounded-lg px-3 py-2 text-sm text-text-secondary min-w-0"
+						class="flex-1 bg-card border-2 border-border rounded-lg px-3 py-2 text-sm text-text-secondary min-w-0"
 					/>
 					{#if oncopylink}
 						<button

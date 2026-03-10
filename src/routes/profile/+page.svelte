@@ -6,11 +6,12 @@
 	import AppShell from '$lib/components/layout/AppShell.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
+	import ColorPicker from '$lib/components/ui/ColorPicker.svelte';
 	import { FONTS, DEFAULT_FONT_ID, googleFontsUrl } from '$lib/constants/fonts';
 	import { preloadFont } from '$lib/utils/fontLoader';
 	import SkeletonProfile from '$lib/components/ui/SkeletonProfile.svelte';
 	import themeState from '$lib/state/theme.svelte';
-	import { CaretDown, Check, Upload, Sun, Moon, Desktop, Globe, MapTrifold } from 'phosphor-svelte';
+	import { CaretDown, Check, Upload, Sun, Moon, Desktop, Globe, MapTrifold, Camera, Trash } from 'phosphor-svelte';
 	import type { ThemeMode } from '$lib/state/theme.svelte';
 	import type { GlobeStyle, MapDisplay } from '$lib/types';
 
@@ -18,6 +19,13 @@
 		if (authState.loading) return;
 		if (!authState.isSignedIn) goto('/signin');
 		else profileState.load();
+	});
+
+	// ── Entrance animation ──
+	let ready = $state(false);
+	$effect(() => {
+		const t = setTimeout(() => { ready = true; }, 100);
+		return () => clearTimeout(t);
 	});
 
 	// ── Form state ──
@@ -63,6 +71,16 @@
 	let saving = $state(false);
 	let errorMsg = $state<string | null>(null);
 	let logoUploading = $state(false);
+	let avatarUploading = $state(false);
+
+	// ── Dirty tracking ──
+	let initialSnapshot = $state('');
+
+	function currentSnapshot(): string {
+		return JSON.stringify({ username, displayName, bio, instagram, youtube, tiktok, website, primaryColor, secondaryColor, preferredFontId, globeStyle, mapDisplay });
+	}
+
+	const isDirty = $derived(initialSnapshot !== '' && currentSnapshot() !== initialSnapshot);
 
 	// ── Username availability ──
 	let usernameStatus = $state<'idle' | 'checking' | 'available' | 'taken'>('idle');
@@ -120,8 +138,43 @@
 		!saving
 	);
 
-	// ── Populate form when profile loads ──
+	// ── Avatar helpers ──
+	const avatarUrl = $derived(profileState.profile?.avatarUrl || authState.user?.avatarUrl || '');
+	const initials = $derived(
+		(displayName || authState.user?.name || 'U')
+			.split(' ')
+			.map(w => w[0])
+			.slice(0, 2)
+			.join('')
+			.toUpperCase()
+	);
+
+	let avatarInput: HTMLInputElement | undefined;
+
+	async function handleAvatarUpload(e: Event) {
+		const file = (e.target as HTMLInputElement).files?.[0];
+		if (!file) return;
+		avatarUploading = true;
+		const result = await profileState.uploadAvatar(file);
+		avatarUploading = false;
+		if (result.ok) {
+			toast.success('Avatar updated!');
+		} else {
+			errorMsg = result.error ?? 'Failed to upload avatar';
+		}
+	}
+
+	async function handleRemoveAvatar() {
+		avatarUploading = true;
+		await profileState.removeAvatar();
+		avatarUploading = false;
+		toast.success('Avatar removed');
+	}
+
+	// ── Populate form when profile loads (once) ──
+	let formPopulated = $state(false);
 	$effect(() => {
+		if (formPopulated) return;
 		if (profileState.profile) {
 			const p = profileState.profile;
 			username = p.username ?? '';
@@ -136,8 +189,13 @@
 			preferredFontId = p.preferredFontId ?? DEFAULT_FONT_ID;
 			globeStyle = p.globeStyle ?? 'dark';
 			mapDisplay = p.mapDisplay ?? 'globe';
+			formPopulated = true;
+			// Take snapshot after populating (next tick so state has settled)
+			setTimeout(() => { initialSnapshot = currentSnapshot(); }, 0);
 		} else if (!profileState.loading && authState.user) {
 			displayName = authState.user.name;
+			formPopulated = true;
+			setTimeout(() => { initialSnapshot = currentSnapshot(); }, 0);
 		}
 	});
 
@@ -164,6 +222,7 @@
 		if (result.ok) {
 			toast.success('Profile saved!');
 			usernameStatus = 'idle';
+			formPopulated = false; // Allow re-populate from fresh profile data
 		} else {
 			errorMsg = result.error ?? 'Failed to save';
 		}
@@ -177,13 +236,18 @@
 		logoUploading = true;
 		const result = await profileState.uploadLogo(file);
 		logoUploading = false;
-		if (!result.ok) errorMsg = result.error ?? 'Failed to upload logo';
+		if (result.ok) {
+			toast.success('Logo uploaded!');
+		} else {
+			errorMsg = result.error ?? 'Failed to upload logo';
+		}
 	}
 
 	async function handleRemoveLogo() {
 		logoUploading = true;
 		await profileState.removeLogo();
 		logoUploading = false;
+		toast.success('Logo removed');
 	}
 </script>
 
@@ -191,11 +255,30 @@
 	<link rel="stylesheet" href={googleFontsUrl()} />
 </svelte:head>
 
+<style>
+	@keyframes fade-up {
+		from { opacity: 0; transform: translateY(16px); }
+		to { opacity: 1; transform: translateY(0); }
+	}
+	.animate-fade-up { animation: fade-up 0.5s ease-out forwards; }
+	.delay-50 { animation-delay: 0.05s; }
+	.delay-100 { animation-delay: 0.1s; }
+	.delay-150 { animation-delay: 0.15s; }
+	.delay-200 { animation-delay: 0.2s; }
+	.delay-250 { animation-delay: 0.25s; }
+	.delay-350 { animation-delay: 0.35s; }
+	.fill-both { animation-fill-mode: both; }
+
+	@media (prefers-reduced-motion: reduce) {
+		.animate-fade-up { animation: none; opacity: 1; transform: none; }
+	}
+</style>
+
 <AppShell title="Profile" showBottomNav logoUrl={profileState.profile?.logoUrl}>
 	{#if profileState.loading}
 		<SkeletonProfile />
 	{:else}
-		<div class="max-w-lg space-y-2 pb-8">
+		<div class="max-w-lg space-y-2 pb-20">
 			{#if errorMsg}
 				<div class="bg-error-light border border-error text-error text-sm rounded-lg px-4 py-3">
 					{errorMsg}
@@ -203,8 +286,64 @@
 			{/if}
 
 			<!-- ═══════════ SECTION: Account ═══════════ -->
-			<section class="bg-card border border-border rounded-xl p-5 space-y-4">
+			<section class="bg-card border-2 border-border rounded-xl p-5 space-y-4 {ready ? 'animate-fade-up fill-both delay-50' : 'opacity-0'}">
 				<h2 class="text-base font-semibold text-text-primary">Account</h2>
+
+				<!-- Avatar -->
+				<div class="flex items-center gap-4">
+					<div class="relative group">
+						{#if avatarUrl}
+							<img
+								src={avatarUrl}
+								alt={displayName || 'Avatar'}
+								referrerpolicy="no-referrer"
+								class="w-16 h-16 rounded-full border-2 border-border object-cover"
+							/>
+						{:else}
+							<div class="w-16 h-16 rounded-full border-2 border-border bg-accent-light flex items-center justify-center text-accent font-bold text-lg">
+								{initials}
+							</div>
+						{/if}
+
+						<!-- Upload overlay -->
+						<button
+							class="absolute inset-0 rounded-full bg-overlay/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+							onclick={() => avatarInput?.click()}
+							disabled={avatarUploading}
+							aria-label="Change avatar"
+						>
+							{#if avatarUploading}
+								<div class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+							{:else}
+								<Camera size={20} weight="bold" class="text-white" />
+							{/if}
+						</button>
+					</div>
+
+					<div class="flex-1 min-w-0">
+						<p class="text-sm font-medium text-text-primary">Profile photo</p>
+						<div class="flex items-center gap-2 mt-1">
+							<button
+								class="text-xs text-accent hover:text-accent-hover transition-colors cursor-pointer"
+								onclick={() => avatarInput?.click()}
+								disabled={avatarUploading}
+							>
+								{avatarUrl ? 'Change' : 'Upload'}
+							</button>
+							{#if avatarUrl && profileState.profile?.avatarUrl}
+								<button
+									class="text-xs text-error hover:text-error transition-colors cursor-pointer"
+									onclick={handleRemoveAvatar}
+									disabled={avatarUploading}
+								>
+									Remove
+								</button>
+							{/if}
+						</div>
+					</div>
+
+					<input bind:this={avatarInput} type="file" accept="image/*" class="hidden" onchange={handleAvatarUpload} />
+				</div>
 
 				<div>
 					<Input label="Username" placeholder="e.g. raytravel" bind:value={username} oninput={(e: Event) => checkUsernameAvailability((e.target as HTMLInputElement).value)} />
@@ -244,7 +383,7 @@
 			</section>
 
 			<!-- ═══════════ SECTION: Appearance ═══════════ -->
-			<section class="bg-card border border-border rounded-xl p-5 space-y-4">
+			<section class="bg-card border-2 border-border rounded-xl p-5 space-y-4 {ready ? 'animate-fade-up fill-both delay-100' : 'opacity-0'}">
 				<h2 class="text-base font-semibold text-text-primary">Appearance</h2>
 				<div class="grid grid-cols-3 gap-2">
 					{#each [
@@ -270,7 +409,7 @@
 			</section>
 
 			<!-- ═══════════ SECTION: Branding ═══════════ -->
-			<section class="bg-card border border-border rounded-xl overflow-hidden">
+			<section class="bg-card border-2 border-border rounded-xl overflow-hidden {ready ? 'animate-fade-up fill-both delay-150' : 'opacity-0'}">
 				<button
 					class="w-full flex items-center justify-between p-5 cursor-pointer text-left"
 					onclick={() => brandingOpen = !brandingOpen}
@@ -333,46 +472,22 @@
 						<!-- Brand Colors -->
 						<div>
 							<span class="block text-sm font-medium text-text-secondary mb-1.5">Colors</span>
-							<div class="grid grid-cols-2 gap-4">
+							<div class="space-y-4">
 								<div>
-									<span class="block text-xs text-text-muted mb-1">Primary</span>
-									<div class="flex items-center gap-2">
-										<label class="cursor-pointer">
-											<input type="color" bind:value={primaryColor} class="sr-only" />
-											<div
-												class="w-9 h-9 rounded-lg border-2 border-border hover:border-primary-light transition-colors"
-												style="background-color: {primaryColor || '#FFFFFF'}"
-											></div>
-										</label>
-										<span class="text-xs text-text-muted font-mono">{primaryColor || 'none'}</span>
-										{#if primaryColor}
-											<button
-												class="text-xs text-text-muted hover:text-text-primary transition-colors cursor-pointer"
-												onclick={() => primaryColor = ''}
-											>
-												Clear
-											</button>
-										{/if}
-									</div>
+									<ColorPicker
+										bind:selected={primaryColor}
+										label="Primary"
+										showInput
+										allowClear
+									/>
 								</div>
 								<div>
-									<span class="block text-xs text-text-muted mb-1">Secondary</span>
-									<div class="flex items-center gap-2">
-										<label class="cursor-pointer">
-											<input type="color" bind:value={secondaryColor} class="sr-only" />
-											<div
-												class="w-9 h-9 rounded-lg border-2 border-border hover:border-primary-light transition-colors"
-												style="background-color: {secondaryColor}"
-											></div>
-										</label>
-										<span class="text-xs text-text-muted font-mono">{secondaryColor}</span>
-										<button
-											class="text-xs text-text-muted hover:text-text-primary transition-colors cursor-pointer"
-											onclick={() => secondaryColor = '#0a0f1e'}
-										>
-											Reset
-										</button>
-									</div>
+									<ColorPicker
+										bind:selected={secondaryColor}
+										label="Secondary"
+										showInput
+										colors={['#0a0f1e', '#1A1A1A', '#2C3E50', '#1B2A4A', '#0D1B2A', '#2D1B2E', '#1A2F1A', '#3B1C32', '#FFFFFF', '#F5F5F5']}
+									/>
 								</div>
 							</div>
 						</div>
@@ -414,7 +529,7 @@
 			</section>
 
 			<!-- ═══════════ SECTION: Map Display ═══════════ -->
-			<section class="bg-card border border-border rounded-xl overflow-hidden">
+			<section class="bg-card border-2 border-border rounded-xl overflow-hidden {ready ? 'animate-fade-up fill-both delay-200' : 'opacity-0'}">
 				<button
 					class="w-full flex items-center justify-between p-5 cursor-pointer text-left"
 					onclick={() => mapSectionOpen = !mapSectionOpen}
@@ -477,7 +592,7 @@
 			</section>
 
 			<!-- ═══════════ SECTION: Social Links ═══════════ -->
-			<section class="bg-card border border-border rounded-xl overflow-hidden">
+			<section class="bg-card border-2 border-border rounded-xl overflow-hidden {ready ? 'animate-fade-up fill-both delay-250' : 'opacity-0'}">
 				<button
 					class="w-full flex items-center justify-between p-5 cursor-pointer text-left"
 					onclick={() => socialsOpen = !socialsOpen}
@@ -500,12 +615,21 @@
 					</div>
 				{/if}
 			</section>
+		</div>
 
-			<!-- ═══════════ Actions ═══════════ -->
-			<div class="flex gap-3 pt-2">
+		<!-- ═══════════ Sticky bottom save bar ═══════════ -->
+		<div class="fixed bottom-14 left-0 right-0 z-30 border-t-2 border-border bg-page/95 backdrop-blur-sm {ready ? 'animate-fade-up fill-both delay-350' : 'opacity-0'}">
+			<div class="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
 				<Button variant="primary" onclick={handleSave} disabled={!canSave}>
+					{#if saving}
+						<div class="w-4 h-4 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+					{/if}
 					{saving ? 'Saving...' : 'Save Profile'}
 				</Button>
+				{#if isDirty}
+					<span class="text-xs text-warning font-medium">Unsaved changes</span>
+				{/if}
+				<div class="flex-1"></div>
 				<Button variant="secondary" onclick={async () => { await authState.signOut(); goto('/signin'); }}>
 					Sign Out
 				</Button>

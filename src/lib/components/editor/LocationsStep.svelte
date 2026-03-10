@@ -380,7 +380,7 @@
 
 	<!-- Wizard: Location card phase -->
 	{:else if activeLoc}
-		<div class="bg-card border border-border rounded-2xl overflow-hidden">
+		<div class="bg-card border-2 border-border rounded-2xl overflow-hidden">
 			<!-- Location header -->
 			<div class="p-4 border-b border-border">
 				<div class="flex items-center justify-between">
@@ -420,7 +420,7 @@
 						onfinalize={handleDndFinalize}
 					>
 						{#each dndClips as clip (clip.id)}
-							<div class="rounded-lg border border-border bg-card mb-2" animate:flip={{ duration: FLIP_DURATION_MS }}>
+							<div class="rounded-lg border-2 border-border bg-card mb-2" animate:flip={{ duration: FLIP_DURATION_MS }}>
 								<div class="flex items-center gap-2 p-2">
 									<!-- Drag handle -->
 									<div

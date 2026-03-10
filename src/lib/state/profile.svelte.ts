@@ -81,7 +81,7 @@ function createProfileState() {
 				username: newUsername,
 				displayName: updates.displayName,
 				bio: updates.bio,
-				avatarUrl: authState.user?.avatarUrl ?? '',
+				avatarUrl: profile?.avatarUrl || authState.user?.avatarUrl || '',
 				logoUrl: profile?.logoUrl ?? null,
 				socialLinks: updates.socialLinks,
 				brandColors: updates.brandColors ?? profile?.brandColors ?? [],
@@ -151,6 +151,56 @@ function createProfileState() {
 			} catch (err) {
 				console.error('[Profile] Logo upload failed:', err);
 				return { ok: false, error: 'Failed to upload logo' };
+			}
+		},
+
+		/** Upload a custom avatar image. Compresses to WebP, stores in Firebase Storage. */
+		async uploadAvatar(file: File): Promise<{ ok: boolean; error?: string }> {
+			const uid = authState.user?.id;
+			if (!uid) return { ok: false, error: 'Not signed in' };
+
+			try {
+				const compressed = await compressImage(file, 256, 0.85);
+				const ext = imageExtension(compressed);
+				const storageRef = ref(storage, `users/${uid}/avatar.${ext}`);
+				await uploadBytes(storageRef, compressed, {
+					contentType: compressed.type,
+					cacheControl: CACHE_CONTROL
+				});
+				const url = await getDownloadURL(storageRef);
+
+				await setDoc(
+					doc(db, 'users', uid, 'profile', 'main'),
+					{ avatarUrl: url },
+					{ merge: true }
+				);
+
+				await this.load();
+				return { ok: true };
+			} catch (err) {
+				console.error('[Profile] Avatar upload failed:', err);
+				return { ok: false, error: 'Failed to upload avatar' };
+			}
+		},
+
+		/** Remove the custom avatar (reverts to Google avatar or empty) */
+		async removeAvatar(): Promise<void> {
+			const uid = authState.user?.id;
+			if (!uid) return;
+
+			try {
+				try { await deleteObject(ref(storage, `users/${uid}/avatar.webp`)); } catch { /* may not exist */ }
+				try { await deleteObject(ref(storage, `users/${uid}/avatar.jpg`)); } catch { /* may not exist */ }
+
+				const fallbackUrl = authState.user?.avatarUrl ?? '';
+				await setDoc(
+					doc(db, 'users', uid, 'profile', 'main'),
+					{ avatarUrl: fallbackUrl },
+					{ merge: true }
+				);
+				await this.load();
+			} catch (err) {
+				console.error('[Profile] Failed to remove avatar:', err);
 			}
 		},
 

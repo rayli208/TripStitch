@@ -26,6 +26,7 @@
 		src={video.embedUrl}
 		title="Video on {platformLabels[video.platform] ?? video.platform}"
 		loading="lazy"
+		sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
 		allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
 		allowfullscreen
 	></iframe>

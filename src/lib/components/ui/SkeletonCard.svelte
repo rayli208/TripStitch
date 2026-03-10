@@ -4,7 +4,7 @@
 
 <div class="space-y-3">
 	{#each Array(count) as _}
-		<div class="bg-card border border-border rounded-xl p-4 space-y-3 animate-pulse">
+		<div class="bg-card border-2 border-border rounded-xl p-4 space-y-3 shadow-brutal animate-pulse">
 			<!-- Title row -->
 			<div class="flex items-center justify-between">
 				<div class="h-5 w-40 bg-border/50 rounded"></div>
