@@ -81,7 +81,7 @@
 		<div class="relative bg-card rounded-2xl w-full max-w-sm overflow-hidden shadow-xl border border-border" bind:this={dialogEl}>
 			<!-- Gradient hero banner -->
 			<div class="relative bg-gradient-to-br from-primary via-primary-medium to-accent px-6 pt-8 pb-10 text-center">
-				<img src="/logo.png" alt="TripStitch" class="mx-auto w-16 h-16 rounded-2xl shadow-lg mb-4" />
+				<img src="/favicon-192.png" alt="TripStitch" class="mx-auto w-16 h-16 rounded-2xl shadow-lg mb-4" />
 				<h2 class="text-xl font-bold text-white mb-1">Get the TripStitch App</h2>
 				<p class="text-white/80 text-sm">Your trips, one tap away</p>
 			</div>
