@@ -46,7 +46,7 @@
 			</div>
 		</div>
 	</header>
-	<main class="max-w-lg mx-auto px-4 py-6 {showBottomNav ? 'pb-20' : ''}">
+	<main class="max-w-lg mx-auto px-4 py-6 {showBottomNav ? 'pb-28' : ''}">
 		{@render children()}
 	</main>
 	{#if showBottomNav}
