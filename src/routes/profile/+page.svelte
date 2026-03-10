@@ -619,7 +619,7 @@
 
 		<!-- ═══════════ Sticky bottom save bar ═══════════ -->
 		<div class="fixed left-0 right-0 z-30 border-t-2 border-border bg-page/95 backdrop-blur-sm {ready ? 'animate-fade-up fill-both delay-350' : 'opacity-0'}" style="bottom: calc(4rem + env(safe-area-inset-bottom, 0px) + 8px);">
-			<div class="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
+			<div class="max-w-lg mx-auto px-4 pt-3 pb-4 flex items-center gap-3">
 				<Button variant="primary" onclick={handleSave} disabled={!canSave}>
 					{#if saving}
 						<div class="w-4 h-4 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
