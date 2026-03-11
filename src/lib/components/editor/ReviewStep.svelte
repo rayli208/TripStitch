@@ -1,9 +1,10 @@
 <script lang="ts">
-	import type { Location, TransportMode, MapStyle, TripTag, TripVisibility } from '$lib/types';
+	import type { Location, TransportMode, MapStyle, TripTag, TripVisibility, AspectRatio } from '$lib/types';
 	import { haversineDistance, estimateTravelTime, suggestTransportMode } from '$lib/utils/distance';
 	import { TRIP_TAGS } from '$lib/constants/tags';
 	import TransportPicker from './TransportPicker.svelte';
 	import RoutePreviewMap from './RoutePreviewMap.svelte';
+	import VideoPreview from './VideoPreview.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import { DotsSixVertical, X, Star, StarHalf, Microphone, Car, PersonSimpleHike, Buildings, SunHorizon, Backpack, ForkKnife, Mountains, Leaf, Bank, Camera } from 'phosphor-svelte';
 	import type { Component } from 'svelte';
@@ -20,6 +21,21 @@
 		titleColor = '#FFFFFF',
 		tags = $bindable<TripTag[]>([]),
 		visibility = $bindable<TripVisibility>('public'),
+		title = '',
+		titleDescription = '',
+		fontId = 'inter',
+		secondaryColor = '#0a0f1e',
+		titleMediaFile = null,
+		logoUrl = null,
+		showLogoOnTitle = false,
+		aspectRatio = '9:16',
+		username = '',
+		displayName = '',
+		socialLinks = {},
+		estimatedDuration = '',
+		hasOutro = false,
+		canShowOutro = false,
+		includeOutro = $bindable(false),
 		onremove,
 		onmove,
 		ontransport,
@@ -32,6 +48,21 @@
 		titleColor?: string;
 		tags?: TripTag[];
 		visibility?: TripVisibility;
+		title?: string;
+		titleDescription?: string;
+		fontId?: string;
+		secondaryColor?: string;
+		titleMediaFile?: File | null;
+		logoUrl?: string | null;
+		showLogoOnTitle?: boolean;
+		aspectRatio?: AspectRatio;
+		username?: string;
+		displayName?: string;
+		socialLinks?: { instagram?: string; youtube?: string; tiktok?: string; website?: string };
+		estimatedDuration?: string;
+		hasOutro?: boolean;
+		canShowOutro?: boolean;
+		includeOutro?: boolean;
 		onremove: (id: string) => void;
 		onmove: (from: number, to: number) => void;
 		ontransport: (id: string, mode: TransportMode) => void;
@@ -180,10 +211,46 @@
 		</div>
 	</div>
 
+	<!-- Outro toggle -->
+	{#if canShowOutro}
+		<div class="flex items-center justify-between py-3 px-4 bg-card rounded-xl border border-border">
+			<div>
+				<span class="text-sm font-medium text-text-primary">Outro card</span>
+				<p class="text-xs text-text-muted">Show your name & socials at the end</p>
+			</div>
+			<button
+				class="relative w-10 h-6 rounded-full transition-colors cursor-pointer {includeOutro ? 'bg-accent' : 'bg-border'}"
+				onclick={() => (includeOutro = !includeOutro)}
+				title="Toggle outro card"
+			>
+				<span class="absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform {includeOutro ? 'translate-x-4' : ''}"></span>
+			</button>
+		</div>
+	{/if}
+
 	<!-- Map preview -->
 	{#if locations.length >= 2}
 		<RoutePreviewMap {locations} {mapStyle} {titleColor} />
 	{/if}
+
+	<!-- Video preview -->
+	<VideoPreview
+		{title}
+		{titleColor}
+		{titleDescription}
+		{fontId}
+		{secondaryColor}
+		{titleMediaFile}
+		{logoUrl}
+		{showLogoOnTitle}
+		{locations}
+		{aspectRatio}
+		{username}
+		{displayName}
+		{socialLinks}
+		{estimatedDuration}
+		{hasOutro}
+	/>
 
 	<!-- Location list -->
 	<div class="space-y-0">

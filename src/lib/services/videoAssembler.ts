@@ -5,9 +5,11 @@ import {
 	createOffscreenMap,
 	destroyMap,
 	waitForIdle,
+	preWarmTileCache,
 	drawTitleCardToCanvas,
 	drawFlyToToCanvas,
-	drawFinalRouteToCanvas
+	drawFinalRouteToCanvas,
+	drawOutroCardToCanvas
 } from './mapRenderer';
 import {
 	playVideoToCanvas,
@@ -33,7 +35,23 @@ export interface VideoSegmentInfo {
 	label: string;
 	startSec: number;
 	durationSec: number;
-	type: 'title' | 'map' | 'clip' | 'route';
+	type: 'title' | 'map' | 'clip' | 'route' | 'outro';
+}
+
+export interface OutroInfo {
+	username?: string;
+	displayName?: string;
+	socialLinks?: { instagram?: string; youtube?: string; tiktok?: string; website?: string };
+}
+
+/** Returns true if outroInfo has at least one piece of meaningful content to show */
+export function hasOutroContent(info?: OutroInfo): boolean {
+	if (!info) return false;
+	if (info.username) return true;
+	if (info.displayName) return true;
+	const s = info.socialLinks;
+	if (s && (s.instagram || s.youtube || s.tiktok || s.website)) return true;
+	return false;
 }
 
 export interface AssemblyResult {
@@ -52,16 +70,17 @@ export async function assembleVideo(
 	abortSignal?: AbortSignal,
 	mapStyle: MapStyle = 'streets',
 	logoUrl?: string | null,
-	secondaryColor: string = '#0a0f1e'
+	secondaryColor: string = '#0a0f1e',
+	outroInfo?: OutroInfo
 ): Promise<AssemblyResult> {
 	const { width, height } = getResolution(aspectRatio);
 	if (await canUseWebCodecs(width, height)) {
 		console.log('[TripStitch] WebCodecs supported — using fast pipeline');
 		const { assembleVideoWebCodecs } = await import('./videoAssemblerWebCodecs');
-		return assembleVideoWebCodecs(trip, aspectRatio, onProgress, abortSignal, mapStyle, logoUrl, secondaryColor);
+		return assembleVideoWebCodecs(trip, aspectRatio, onProgress, abortSignal, mapStyle, logoUrl, secondaryColor, outroInfo);
 	}
 	console.log('[TripStitch] WebCodecs not available — using MediaRecorder fallback');
-	return assembleVideoMediaRecorder(trip, aspectRatio, onProgress, abortSignal, mapStyle, logoUrl, secondaryColor);
+	return assembleVideoMediaRecorder(trip, aspectRatio, onProgress, abortSignal, mapStyle, logoUrl, secondaryColor, outroInfo);
 }
 
 /** MediaRecorder fallback pipeline: single-pass recording (original implementation) */
@@ -72,7 +91,8 @@ async function assembleVideoMediaRecorder(
 	abortSignal?: AbortSignal,
 	mapStyle: MapStyle = 'streets',
 	logoUrl?: string | null,
-	secondaryColor: string = '#0a0f1e'
+	secondaryColor: string = '#0a0f1e',
+	outroInfo?: OutroInfo
 ): Promise<AssemblyResult> {
 	const assemblyStart = performance.now();
 	console.log('[TripStitch] ═══════════════════════════════════════════════════════');
@@ -88,8 +108,11 @@ async function assembleVideoMediaRecorder(
 
 	const tripFontId = trip.fontId ?? 'inter';
 
+	const showOutro = hasOutroContent(outroInfo);
+
 	// Calculate total steps
 	let totalSteps = 1 + 1 + 1; // title + route + finalize
+	if (showOutro) totalSteps += 1;
 	for (const loc of locations) {
 		totalSteps += 1; // map fly-to
 		if (loc.clips.some((c) => c.file)) {
@@ -211,6 +234,11 @@ async function assembleVideoMediaRecorder(
 		mapContainer = result.container;
 		console.log(`[TripStitch] Reusable map created in ${((performance.now() - mapCreateStart) / 1000).toFixed(1)}s`);
 
+		// Pre-warm tile cache while recorder is paused
+		await preWarmTileCache(map, locations, (msg) => {
+			onProgress?.({ step: 'tiles', message: msg, current: currentStep, total: totalSteps });
+		});
+
 		recorder.resume();
 		console.log(`[TripStitch] Recorder resumed (state: ${recorder.state})`);
 
@@ -262,11 +290,12 @@ async function assembleVideoMediaRecorder(
 				map, ctx, location, prevLocation, transportMode,
 				width, height,
 				trip.titleColor || '#FFFFFF', tripFontId, secondaryColor,
-				frameOverlay, pauseClock
+				frameOverlay, pauseClock,
+				i, locations.length
 			);
 
 			const displayName = location.label || location.name.split(',')[0];
-			const flyDuration = !prevLocation ? 4.0 : 5.9;
+			const flyDuration = !prevLocation ? 3.2 : 4.1;
 			console.log(`[TripStitch]   Fly-to took ${((performance.now() - flyStart) / 1000).toFixed(1)}s wall time`);
 			addToTimeline(`map-${location.id}`, displayName, flyDuration, 'map');
 
@@ -296,10 +325,11 @@ async function assembleVideoMediaRecorder(
 						combinedDuration += dur;
 						console.log(`[TripStitch]   Video clip done: ${dur.toFixed(1)}s`);
 					} else if (clip.type === 'photo' && clip.file) {
-						console.log(`[TripStitch]   Photo animation ${ci + 1}/${clipsWithFiles.length} (${clip.id}, ${clip.animationStyle}, ${clip.file.name})`);
-						await drawPhotoAnimationToCanvas(clip.file, ctx, width, height, clip.animationStyle, 3, frameOverlay, pauseClock);
-						combinedDuration += 3;
-						console.log(`[TripStitch]   Photo clip done: 3.0s`);
+						const photoDur = clip.durationSec ?? 3;
+						console.log(`[TripStitch]   Photo animation ${ci + 1}/${clipsWithFiles.length} (${clip.id}, ${clip.animationStyle}, ${photoDur}s, ${clip.file.name})`);
+						await drawPhotoAnimationToCanvas(clip.file, ctx, width, height, clip.animationStyle, photoDur, frameOverlay, pauseClock);
+						combinedDuration += photoDur;
+						console.log(`[TripStitch]   Photo clip done: ${photoDur.toFixed(1)}s`);
 					}
 				}
 
@@ -371,13 +401,37 @@ async function assembleVideoMediaRecorder(
 			trip.titleColor || '#FFFFFF', tripFontId, secondaryColor,
 			frameOverlay, pauseClock
 		);
-		addToTimeline('route', 'Final Route', 6, 'route');
+		addToTimeline('route', 'Final Route', 4.5, 'route');
 		console.log(`[TripStitch] Final route phase took ${((performance.now() - routePhaseStart) / 1000).toFixed(1)}s total wall time`);
 
 		checkAbort();
 
-		// ── 5. FINALIZE ──
-		console.log('[TripStitch] ── Phase 5: Finalize ──');
+		// ── 5. OUTRO CARD (only if profile has content) ──
+		if (showOutro) {
+			console.log('[TripStitch] ── Phase 5: Outro Card ──');
+			emit('outro', 'Creating outro card...');
+			await drawOutroCardToCanvas(ctx, {
+				title: trip.title || 'My Trip',
+				titleColor: trip.titleColor || '#FFFFFF',
+				aspectRatio,
+				mediaFile: trip.titleMediaFile,
+				logoUrl: logoUrl,
+				showLogo: trip.showLogoOnTitle,
+				fontId: tripFontId,
+				secondaryColor,
+				username: outroInfo?.username,
+				displayName: outroInfo?.displayName,
+				socialLinks: outroInfo?.socialLinks
+			}, frameOverlay, pauseClock);
+			addToTimeline('outro', 'Outro', 3, 'outro');
+		} else {
+			console.log('[TripStitch] Skipping outro card (no profile content)');
+		}
+
+		checkAbort();
+
+		// ── FINALIZE ──
+		console.log('[TripStitch] ── Finalize ──');
 		emit('finalize', 'Finalizing video...');
 		// Small delay to ensure final frame is captured
 		await sleep(100);

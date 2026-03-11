@@ -68,7 +68,13 @@
 		}
 	});
 
-	const durationEstimate = $derived(estimateVideoDuration(editor.locations, videoDurations));
+	const canShowOutro = $derived(
+		!!(profileState.profile?.username || profileState.profile?.displayName ||
+			profileState.profile?.socialLinks?.instagram || profileState.profile?.socialLinks?.youtube ||
+			profileState.profile?.socialLinks?.tiktok || profileState.profile?.socialLinks?.website)
+	);
+	const hasOutro = $derived(canShowOutro && editor.includeOutro);
+	const durationEstimate = $derived(estimateVideoDuration(editor.locations, videoDurations, hasOutro));
 
 	// Export elapsed timer — pauses when tab is hidden so it only counts active stitching time
 	let exportElapsed = $state<number | undefined>(undefined);
@@ -125,6 +131,7 @@
 			}
 		}
 		steps.push({ id: 'route', label: 'Drawing final route', icon: 'route' });
+		if (hasOutro) steps.push({ id: 'outro', label: 'Creating outro card', icon: 'title' });
 		steps.push({ id: 'finalize', label: 'Stitching together', icon: 'finalize' });
 		return steps;
 	});
@@ -200,7 +207,12 @@
 				abortController.signal,
 				editor.mapStyle,
 				profileState.profile?.logoUrl,
-				editor.secondaryColor
+				editor.secondaryColor,
+				{
+					username: profileState.profile?.username,
+					displayName: profileState.profile?.displayName,
+					socialLinks: profileState.profile?.socialLinks
+				}
 			);
 
 			videoBlob = result.blob;
@@ -337,6 +349,7 @@
 			onrating={(id, rating) => editor.updateLocationRating(id, rating)}
 			onpricetier={(id, tier) => editor.updateLocationPriceTier(id, tier)}
 			onclipanimation={(locId, clipId, style) => editor.updateClipAnimation(locId, clipId, style)}
+			onclipduration={(locId, clipId, dur) => editor.updateClipDuration(locId, clipId, dur)}
 			oncliptrim={(locId, clipId, start, end) => editor.updateClipTrim(locId, clipId, start, end)}
 			onnext={() => editor.nextStep()}
 			onback={() => editor.prevStep()}
@@ -348,6 +361,21 @@
 			titleColor={editor.titleColor}
 			bind:tags={editor.tags}
 			bind:visibility={editor.visibility}
+			title={editor.title}
+			titleDescription={editor.titleDescription}
+			fontId={editor.fontId}
+			secondaryColor={editor.secondaryColor}
+			titleMediaFile={editor.titleMediaFile}
+			logoUrl={profileState.profile?.logoUrl}
+			showLogoOnTitle={editor.showLogoOnTitle}
+			aspectRatio={editor.aspectRatio}
+			username={profileState.profile?.username ?? ''}
+			displayName={profileState.profile?.displayName ?? ''}
+			socialLinks={profileState.profile?.socialLinks ?? {}}
+			estimatedDuration={durationEstimate.formatted}
+			{hasOutro}
+			{canShowOutro}
+			bind:includeOutro={editor.includeOutro}
 			onremove={(id) => editor.removeLocation(id)}
 			onmove={(from, to) => editor.moveLocation(from, to)}
 			ontransport={(id, mode) => editor.updateLocationTransport(id, mode)}

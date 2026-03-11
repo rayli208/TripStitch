@@ -25,6 +25,7 @@
 		onrating,
 		onpricetier,
 		onclipanimation,
+		onclipduration,
 		oncliptrim,
 		onnext,
 		onback
@@ -42,6 +43,7 @@
 		onrating: (id: string, rating: number | null) => void;
 		onpricetier: (id: string, tier: PriceTier | null) => void;
 		onclipanimation: (locationId: string, clipId: string, style: AnimationStyle) => void;
+		onclipduration: (locationId: string, clipId: string, durationSec: number) => void;
 		oncliptrim: (locationId: string, clipId: string, start: number, end: number) => void;
 		onnext: () => void;
 		onback: () => void;
@@ -551,17 +553,34 @@
 												<span>{formatTime(trimEnd)}</span>
 											</div>
 										{:else}
-											<span class="text-xs font-medium text-text-secondary capitalize">{clip.type ?? 'unknown'}</span>
+											<div class="flex items-center gap-1.5 flex-wrap">
+												<span class="text-xs font-medium text-text-secondary capitalize">{clip.type ?? 'unknown'}</span>
+												{#if clip.type === 'photo'}
+													<select
+														class="text-xs bg-card border border-border rounded px-1 py-0.5 text-text-muted"
+														value={clip.animationStyle}
+														onchange={(e) => onclipanimation(activeLoc!.id, clip.id, (e.target as HTMLSelectElement).value as AnimationStyle)}
+													>
+														{#each ANIMATION_OPTIONS as opt}
+															<option value={opt.value}>{opt.label}</option>
+														{/each}
+													</select>
+												{/if}
+											</div>
 											{#if clip.type === 'photo'}
-												<select
-													class="ml-2 text-xs bg-card border border-border rounded px-1 py-0.5 text-text-muted"
-													value={clip.animationStyle}
-													onchange={(e) => onclipanimation(activeLoc!.id, clip.id, (e.target as HTMLSelectElement).value as AnimationStyle)}
-												>
-													{#each ANIMATION_OPTIONS as opt}
-														<option value={opt.value}>{opt.label}</option>
-													{/each}
-												</select>
+												{@const photoDur = clip.durationSec ?? 3}
+												<div class="flex items-center gap-1 mt-1">
+													<input
+														type="range"
+														min="1"
+														max="8"
+														step="0.5"
+														value={photoDur}
+														class="photo-duration-range flex-1 h-4"
+														oninput={(e) => onclipduration(activeLoc!.id, clip.id, parseFloat((e.target as HTMLInputElement).value))}
+													/>
+													<span class="text-xs text-text-muted w-6 text-right">{photoDur}s</span>
+												</div>
 											{/if}
 										{/if}
 									</div>
@@ -753,5 +772,42 @@
 	/* Prevent dnd library from adding outlines to the zone */
 	.clip-list {
 		outline: none;
+	}
+
+	.photo-duration-range {
+		-webkit-appearance: none;
+		appearance: none;
+		background: transparent;
+	}
+	.photo-duration-range::-webkit-slider-runnable-track {
+		height: 4px;
+		border-radius: 2px;
+		background: var(--color-border, #334155);
+	}
+	.photo-duration-range::-moz-range-track {
+		height: 4px;
+		border-radius: 2px;
+		background: var(--color-border, #334155);
+	}
+	.photo-duration-range::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		appearance: none;
+		width: 12px;
+		height: 12px;
+		border-radius: 50%;
+		background: var(--color-accent, #3b82f6);
+		border: 1.5px solid white;
+		cursor: pointer;
+		margin-top: -4px;
+		box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+	}
+	.photo-duration-range::-moz-range-thumb {
+		width: 12px;
+		height: 12px;
+		border-radius: 50%;
+		background: var(--color-accent, #3b82f6);
+		border: 1.5px solid white;
+		cursor: pointer;
+		box-shadow: 0 1px 2px rgba(0,0,0,0.3);
 	}
 </style>

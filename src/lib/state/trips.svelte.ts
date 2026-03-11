@@ -35,7 +35,8 @@ function serializeTrip(trip: Trip, userId: string) {
 			id: c.id,
 			order: c.order,
 			type: c.type,
-			animationStyle: c.animationStyle
+			animationStyle: c.animationStyle,
+			...(c.type === 'photo' && c.durationSec && c.durationSec !== 3 ? { durationSec: c.durationSec } : {})
 		})),
 		transportMode: loc.transportMode,
 		rating: loc.rating ?? null,

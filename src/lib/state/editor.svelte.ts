@@ -36,6 +36,7 @@ export function createEditorState(initial?: {
 	let musicSelection = $state<MusicSelection | null>(null);
 	let musicVolume = $state(70);
 	let voiceOverVolume = $state(100);
+	let includeOutro = $state(false);
 	let isExporting = $state(false);
 	let exportDone = $state(false);
 
@@ -153,6 +154,12 @@ export function createEditorState(initial?: {
 		set voiceOverVolume(v: number) {
 			voiceOverVolume = v;
 		},
+		get includeOutro() {
+			return includeOutro;
+		},
+		set includeOutro(v: boolean) {
+			includeOutro = v;
+		},
 		get isExporting() {
 			return isExporting;
 		},
@@ -264,6 +271,16 @@ export function createEditorState(initial?: {
 				return {
 					...l,
 					clips: l.clips.map((c) => (c.id === clipId ? { ...c, trimStartSec, trimEndSec } : c))
+				};
+			});
+		},
+
+		updateClipDuration(locationId: string, clipId: string, durationSec: number) {
+			locations = locations.map((l) => {
+				if (l.id !== locationId) return l;
+				return {
+					...l,
+					clips: l.clips.map((c) => (c.id === clipId ? { ...c, durationSec } : c))
 				};
 			});
 		},

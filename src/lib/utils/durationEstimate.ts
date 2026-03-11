@@ -2,11 +2,12 @@ import type { Location } from '$lib/types';
 
 // Timing constants matching videoAssembler.ts pipeline
 const TITLE_DURATION = 2.5;
-const FIRST_FLY_DURATION = 4; // flyTo (2s) + hold (2s)
-const SUBSEQUENT_FLY_DURATION = 5.9; // zoomOut (1.5s) + pause (0.4s) + zoomIn (2s) + hold (2s)
+const FIRST_FLY_DURATION = 3.2; // flyTo (1.5s) + hold (1.7s)
+const SUBSEQUENT_FLY_DURATION = 4.1; // zoomOut (1s) + pause (0.4s) + zoomIn (1.5s) + hold (1.2s)
 const PHOTO_DURATION = 3; // kenBurns/zoom animation
 const FLASH_DURATION = 0.4;
-const FINAL_ROUTE_DURATION = 6;
+const FINAL_ROUTE_DURATION = 4.5;
+const OUTRO_DURATION = 3;
 
 export interface DurationEstimate {
 	totalSec: number;
@@ -15,7 +16,8 @@ export interface DurationEstimate {
 
 export function estimateVideoDuration(
 	locations: Location[],
-	videoDurations?: Map<string, number>
+	videoDurations?: Map<string, number>,
+	hasOutro = false
 ): DurationEstimate {
 	let totalSec = TITLE_DURATION;
 
@@ -32,12 +34,13 @@ export function estimateVideoDuration(
 				const dur = videoDurations?.get(clip.id) ?? 5;
 				totalSec += dur + FLASH_DURATION;
 			} else {
-				totalSec += PHOTO_DURATION + FLASH_DURATION;
+				totalSec += (clip.durationSec ?? PHOTO_DURATION) + FLASH_DURATION;
 			}
 		}
 	}
 
 	totalSec += FINAL_ROUTE_DURATION;
+	if (hasOutro) totalSec += OUTRO_DURATION;
 
 	const formatted = formatDuration(totalSec);
 	return { totalSec, formatted };

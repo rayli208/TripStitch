@@ -7,8 +7,21 @@ import { loadFont } from '$lib/utils/fontLoader';
 import { STYLE_URLS } from '$lib/constants/map';
 
 const TARGET_FPS = 30;
-const FLY_TO_DURATION = 2000;
-const FINAL_MAP_DURATION = 6000;
+
+// ── Shared timing constants (used by all fly-to / route functions) ──
+const FLY_TO_DURATION = 1500; // first-location fly-in duration
+const FIRST_HOLD_MS = 1700; // hold after first fly-in
+const ZOOM_OUT_MS = 1000; // subsequent: zoom out to overview
+const PAUSE_MS = 400; // subsequent: pause at overview
+const ZOOM_IN_MS = 1500; // subsequent: zoom in to new location
+const HOLD_MS = 1200; // subsequent: hold on new location
+const FINAL_MAP_DURATION = 4500;
+
+// Derived timing helpers
+const FIRST_TOTAL_MS = FLY_TO_DURATION + FIRST_HOLD_MS; // 3200ms
+const ZOOM_IN_AT = ZOOM_OUT_MS + PAUSE_MS; // 1400ms
+const OVERLAY_AT = ZOOM_IN_AT + ZOOM_IN_MS; // 2900ms
+const SUBSEQUENT_TOTAL_MS = OVERLAY_AT + HOLD_MS; // 4100ms
 
 const CYAN = '#00F5FF';
 const MIDNIGHT = '#0F172A';
@@ -114,6 +127,44 @@ export function waitForIdle(map: maplibregl.Map, timeoutMs = 4000): Promise<void
 	});
 }
 
+/** Pre-warm the tile cache by jumping to each location's viewport so tiles
+ *  are already loaded when encoding starts. Bounded by a per-position timeout. */
+export async function preWarmTileCache(
+	map: maplibregl.Map,
+	locations: Location[],
+	onProgress?: (msg: string) => void
+): Promise<void> {
+	const start = performance.now();
+	onProgress?.('Preparing map tiles...');
+	const PER_TIMEOUT = 3000;
+
+	for (const loc of locations) {
+		// Close zoom (same as fly-to destination)
+		map.jumpTo({ center: [loc.lng, loc.lat], zoom: CLOSE_ZOOM });
+		await waitForIdle(map, PER_TIMEOUT);
+
+		// Overview zoom (tiles needed during zoom-out phase)
+		map.jumpTo({ center: [loc.lng, loc.lat], zoom: 8 });
+		await waitForIdle(map, PER_TIMEOUT);
+	}
+
+	// Pre-warm the final route fitBounds viewport
+	if (locations.length >= 2) {
+		const bounds = new maplibregl.LngLatBounds();
+		for (const loc of locations) bounds.extend([loc.lng, loc.lat]);
+		const center = bounds.getCenter();
+		map.jumpTo({ center: [center.lng, center.lat], zoom: 4 });
+		await waitForIdle(map, PER_TIMEOUT);
+	}
+
+	// Reset to first location
+	const first = locations[0];
+	map.jumpTo({ center: [first.lng, first.lat], zoom: 10 });
+	await waitForIdle(map, PER_TIMEOUT);
+
+	console.log(`[MapRenderer] preWarmTileCache: ${locations.length} locations warmed in ${((performance.now() - start) / 1000).toFixed(1)}s`);
+}
+
 /** Record the map canvas for a given duration while an animation runs.
  *  drawOverlays is called every frame AFTER the map canvas is copied,
  *  so overlays (pins, labels, stats) render on top of the map. */
@@ -196,7 +247,9 @@ export async function renderFlyTo(
 	mapStyle: MapStyle = 'streets',
 	titleColor: string = '#FFFFFF',
 	fontId: string = 'inter',
-	secondaryColor: string = '#0a0f1e'
+	secondaryColor: string = '#0a0f1e',
+	locationIndex: number = 0,
+	totalLocations: number = 1
 ): Promise<Blob> {
 	const { width, height } = getResolution(aspectRatio);
 	const displayName = location.label || location.name.split(',')[0];
@@ -210,9 +263,8 @@ export async function renderFlyTo(
 			width, height, [location.lng, location.lat], 10, mapStyle
 		);
 
-		const HOLD = 2000;
 		const blob = await recordMapAnimation(
-			map, container, width, height, FLY_TO_DURATION + HOLD,
+			map, container, width, height, FIRST_TOTAL_MS,
 			() => {
 				map.flyTo({
 					center: [location.lng, location.lat],
@@ -222,11 +274,14 @@ export async function renderFlyTo(
 				});
 			},
 			(ctx, elapsed) => {
+				drawVignette(ctx, width, height);
 				if (elapsed >= FLY_TO_DURATION) {
+					const fadeAlpha = Math.min(1, (elapsed - FLY_TO_DURATION) / 400);
+					ctx.globalAlpha = fadeAlpha;
 					const point = map.project([location.lng, location.lat]);
-					// Pin is just a dot (showLabel=false) since the title bar shows the name
 					drawPinOnCanvas(ctx, point.x, point.y, displayName, titleColor, ff, location.rating, false);
-					drawLocationTitleOnCanvas(ctx, displayName, width, titleColor, ff, location.rating, secondaryColor);
+					drawLocationLowerThird(ctx, width, height, displayName, locationIndex, totalLocations, titleColor, ff, location.rating, null, secondaryColor);
+					ctx.globalAlpha = 1;
 				}
 			}
 		);
@@ -252,19 +307,10 @@ export async function renderFlyTo(
 	const boundsCenter = bounds.getCenter();
 	const overviewCenter: [number, number] = [boundsCenter.lng, boundsCenter.lat];
 
-	// Phase timing
-	const ZOOM_OUT_MS = 1500;
-	const PAUSE_MS = 1200;
-	const ZOOM_IN_MS = 2000;
-	const HOLD_MS = 2000;
-	const zoomInAt = ZOOM_OUT_MS + PAUSE_MS;
-	const overlayAt = zoomInAt + ZOOM_IN_MS;
-	const totalMs = overlayAt + HOLD_MS;
-
 	console.log(`[MapRenderer] Overview zoom: ${overviewZoom.toFixed(1)}, phases: out=${ZOOM_OUT_MS} pause=${PAUSE_MS} in=${ZOOM_IN_MS} hold=${HOLD_MS}`);
 
 	const blob = await recordMapAnimation(
-		map, container, width, height, totalMs,
+		map, container, width, height, SUBSEQUENT_TOTAL_MS,
 		() => {
 			// Phase 1: Zoom out to overview showing both locations
 			map.flyTo({
@@ -281,25 +327,26 @@ export async function renderFlyTo(
 					duration: ZOOM_IN_MS,
 					essential: true
 				});
-			}, zoomInAt);
+			}, ZOOM_IN_AT);
 		},
 		(ctx, elapsed) => {
-			// Show previous location as plain dot while zoomed in (first 400ms)
-			if (elapsed < 400) {
+			drawVignette(ctx, width, height);
+			if (elapsed < 500) {
+				const pinAlpha = Math.max(0, 1 - elapsed / 500);
+				ctx.globalAlpha = pinAlpha;
 				const prevPoint = map.project([prevLocation.lng, prevLocation.lat]);
 				if (prevPoint.x > -50 && prevPoint.x < width + 50 && prevPoint.y > -50 && prevPoint.y < height + 50) {
 					drawPinOnCanvas(ctx, prevPoint.x, prevPoint.y, '', titleColor, ff, null, false);
 				}
+				ctx.globalAlpha = 1;
 			}
-			// After zoom-in completes, show new location overlays
-			if (elapsed >= overlayAt) {
+			if (elapsed >= OVERLAY_AT) {
+				const fadeAlpha = Math.min(1, (elapsed - OVERLAY_AT) / 400);
+				ctx.globalAlpha = fadeAlpha;
 				const point = map.project([location.lng, location.lat]);
-				// Pin is just a dot (showLabel=false) since the title bar shows the name
 				drawPinOnCanvas(ctx, point.x, point.y, displayName, titleColor, ff, location.rating, false);
-				drawLocationTitleOnCanvas(ctx, displayName, width, titleColor, ff, location.rating, secondaryColor);
-				if (transportMode) {
-					drawTransportBadgeOnCanvas(ctx, transportMode, width, height, titleColor, ff, secondaryColor);
-				}
+				drawLocationLowerThird(ctx, width, height, displayName, locationIndex, totalLocations, titleColor, ff, location.rating, transportMode, secondaryColor);
+				ctx.globalAlpha = 1;
 			}
 		}
 	);
@@ -370,13 +417,12 @@ export async function renderFinalRoute(
 			}
 		},
 		(ctx, elapsed) => {
-			// Draw all pins with labels on canvas every frame (final route shows labels)
+			drawVignette(ctx, width, height, 0.7);
 			for (const loc of locations) {
 				const point = map.project([loc.lng, loc.lat]);
 				const label = loc.label || loc.name.split(',')[0];
 				drawPinOnCanvas(ctx, point.x, point.y, label, titleColor, ff, loc.rating, true, hexToRgba(secondaryColor, 0.88));
 			}
-			// Stats visible the entire time
 			drawStatsOnCanvas(ctx, stats, width, height, titleColor, ff, secondaryColor);
 		}
 	);
@@ -516,14 +562,199 @@ function drawPinOnCanvas(
 		ctx.stroke();
 
 		// Label text
-		ctx.fillStyle = textColor;
+		ctx.fillStyle = '#FFFFFF';
 		ctx.fillText(label, x, bgY + bgH / 2);
 	}
 
 	ctx.restore();
 }
 
-/** Draw a large prominent location title at the top of the canvas (during fly-to) */
+/** Draw a cinematic gradient vignette over the map frame */
+function drawVignette(ctx: CanvasRenderingContext2D, width: number, height: number, intensity: number = 1) {
+	// Top gradient: subtle darkening
+	const topGrad = ctx.createLinearGradient(0, 0, 0, height * 0.18);
+	topGrad.addColorStop(0, `rgba(0, 0, 0, ${0.3 * intensity})`);
+	topGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+	ctx.fillStyle = topGrad;
+	ctx.fillRect(0, 0, width, height * 0.18);
+
+	// Bottom gradient: stronger for lower-third readability
+	const botGrad = ctx.createLinearGradient(0, height * 0.5, 0, height);
+	botGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+	botGrad.addColorStop(0.45, `rgba(0, 0, 0, ${0.25 * intensity})`);
+	botGrad.addColorStop(1, `rgba(0, 0, 0, ${0.65 * intensity})`);
+	ctx.fillStyle = botGrad;
+	ctx.fillRect(0, height * 0.5, width, height * 0.5);
+}
+
+/** Draw a cinematic lower-third location card with counter, name, rating, and transport */
+function drawLocationLowerThird(
+	ctx: CanvasRenderingContext2D,
+	width: number,
+	height: number,
+	name: string,
+	locationIndex: number,
+	totalLocations: number,
+	accentColor: string,
+	ff: string,
+	rating: number | null,
+	transportMode: TransportMode | null | undefined,
+	secondaryColor: string
+) {
+	ctx.save();
+
+	// Font sizes proportional to canvas width
+	const nameFontSize = Math.round(width * 0.044);
+	const counterFontSize = Math.round(width * 0.02);
+	const transportFontSize = Math.round(width * 0.022);
+	const starRadius = Math.round(width * 0.011);
+	const maxTextW = width * 0.82;
+
+	// --- Measure all elements ---
+
+	// Name (wrap to max 2 lines)
+	ctx.font = `700 ${nameFontSize}px ${ff}`;
+	let nameLines = wrapText(ctx, name, maxTextW);
+	if (nameLines.length > 2) {
+		nameLines.length = 2;
+		let last = nameLines[1];
+		while (last.length > 1 && ctx.measureText(last + '...').width > maxTextW) {
+			last = last.slice(0, -1);
+		}
+		nameLines[1] = last.trimEnd() + '...';
+	}
+	const nameLineH = nameFontSize * 1.2;
+	const totalNameH = nameLines.length * nameLineH;
+
+	// Counter
+	ctx.font = `600 ${counterFontSize}px ${ff}`;
+	const counterText = `${locationIndex + 1} of ${totalLocations}`;
+	const counterMetrics = ctx.measureText(counterText);
+	const counterPadX = Math.round(counterFontSize * 0.8);
+	const counterPadY = Math.round(counterFontSize * 0.3);
+	const counterPillW = counterMetrics.width + counterPadX * 2;
+	const counterPillH = counterFontSize + counterPadY * 2;
+
+	// Stars
+	const hasRating = rating !== null && rating > 0;
+	const starGap = Math.round(starRadius * 0.4);
+	const starsRowH = hasRating ? starRadius * 2 : 0;
+
+	// Transport
+	const hasTransport = !!transportMode;
+
+	// --- Vertical layout ---
+	const gap = Math.round(height * 0.007);
+	const gapLarge = Math.round(height * 0.01);
+
+	let blockH = counterPillH + gapLarge + totalNameH;
+	if (hasRating) blockH += gap + starsRowH;
+	if (hasTransport) blockH += gap + transportFontSize;
+
+	// Center block around height * 0.80
+	const centerY = height * 0.80;
+	let curY = centerY - blockH / 2;
+
+	// --- Backdrop pill behind entire text block for readability ---
+	const backdropPadX = Math.round(width * 0.05);
+	const backdropPadY = Math.round(height * 0.012);
+	ctx.font = `700 ${nameFontSize}px ${ff}`;
+	let maxContentW = 0;
+	for (const line of nameLines) maxContentW = Math.max(maxContentW, ctx.measureText(line).width);
+	maxContentW = Math.max(maxContentW, counterPillW);
+	const backdropW = maxContentW + backdropPadX * 2;
+	const backdropH = blockH + backdropPadY * 2;
+	const backdropX = width / 2 - backdropW / 2;
+	const backdropY = curY - backdropPadY;
+
+	ctx.shadowColor = 'rgba(0,0,0,0.3)';
+	ctx.shadowBlur = 20;
+	ctx.shadowOffsetY = 4;
+	ctx.fillStyle = hexToRgba(secondaryColor, 0.7);
+	canvasRoundRect(ctx, backdropX, backdropY, backdropW, backdropH, 18);
+	ctx.fill();
+	ctx.shadowColor = 'transparent';
+
+	// Accent-colored left stripe
+	ctx.fillStyle = hexToRgba(accentColor, 0.85);
+	canvasRoundRect(ctx, backdropX, backdropY, 4, backdropH, 2);
+	ctx.fill();
+
+	// --- Draw counter pill (accent-filled) ---
+	const counterCY = curY + counterPillH / 2;
+	const counterPillX = width / 2 - counterPillW / 2;
+
+	ctx.fillStyle = hexToRgba(accentColor, 0.9);
+	canvasRoundRect(ctx, counterPillX - 8, counterCY - counterPillH / 2, counterPillW + 16, counterPillH, counterPillH / 2);
+	ctx.fill();
+
+	ctx.font = `600 ${counterFontSize}px ${ff}`;
+	ctx.textAlign = 'center';
+	ctx.textBaseline = 'middle';
+	ctx.fillStyle = '#FFFFFF';
+	ctx.fillText(counterText, width / 2, counterCY);
+	curY += counterPillH + gapLarge;
+
+	// --- Draw location name ---
+	ctx.font = `700 ${nameFontSize}px ${ff}`;
+	ctx.textAlign = 'center';
+	ctx.textBaseline = 'middle';
+	ctx.fillStyle = '#FFFFFF';
+	for (let i = 0; i < nameLines.length; i++) {
+		ctx.fillText(nameLines[i], width / 2, curY + nameLineH / 2 + i * nameLineH);
+	}
+	curY += totalNameH;
+
+	// --- Draw stars ---
+	if (hasRating) {
+		curY += gap;
+		const starsCY = curY + starRadius;
+		const totalStarsW = 5 * (starRadius * 2) + 4 * starGap;
+		const starsX = width / 2 - totalStarsW / 2;
+
+		for (let i = 0; i < 5; i++) {
+			const cx = starsX + starRadius + i * (starRadius * 2 + starGap);
+			if (rating! >= i + 1) {
+				drawStar(ctx, cx, starsCY, starRadius);
+				ctx.fillStyle = '#FBBF24';
+				ctx.fill();
+			} else if (rating! >= i + 0.5) {
+				drawStar(ctx, cx, starsCY, starRadius);
+				ctx.fillStyle = 'rgba(255,255,255,0.15)';
+				ctx.fill();
+				ctx.save();
+				ctx.beginPath();
+				ctx.rect(cx - starRadius, starsCY - starRadius, starRadius, starRadius * 2);
+				ctx.clip();
+				drawStar(ctx, cx, starsCY, starRadius);
+				ctx.fillStyle = '#FBBF24';
+				ctx.fill();
+				ctx.restore();
+			} else {
+				drawStar(ctx, cx, starsCY, starRadius);
+				ctx.fillStyle = 'rgba(255,255,255,0.15)';
+				ctx.fill();
+			}
+		}
+		curY += starsRowH;
+	}
+
+	// --- Draw transport mode ---
+	if (hasTransport) {
+		curY += gap;
+		const info = TRANSPORT_ICONS[transportMode!];
+		const tText = `${info.icon}  ${info.label}`;
+		ctx.font = `500 ${transportFontSize}px ${ff}`;
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+		ctx.fillText(tText, width / 2, curY + transportFontSize / 2);
+	}
+
+	ctx.restore();
+}
+
+/** Draw a large prominent location title at the top of the canvas (during fly-to) — LEGACY */
 function drawLocationTitleOnCanvas(
 	ctx: CanvasRenderingContext2D,
 	text: string,
@@ -534,13 +765,13 @@ function drawLocationTitleOnCanvas(
 	secondaryColor: string = '#0a0f1e'
 ) {
 	ctx.save();
-	const fontSize = width > 1200 ? 56 : 46;
-	ctx.font = `800 ${fontSize}px ${ff}`;
+	const fontSize = width > 1200 ? 52 : 42;
+	ctx.font = `700 ${fontSize}px ${ff}`;
 	ctx.textAlign = 'center';
 	ctx.textBaseline = 'middle';
 
-	const padX = 44, padY = 20;
-	const maxBgW = width - 40; // 20px margin each side
+	const padX = 48, padY = 22;
+	const maxBgW = width - 60; // 30px margin each side
 
 	// Truncate text with ellipsis if it overflows the canvas
 	let displayText = text;
@@ -558,56 +789,69 @@ function drawLocationTitleOnCanvas(
 	const topOffset = width > 1200 ? 80 : 60;
 	const bgX = width / 2 - bgW / 2;
 
-	// Use accent color for text to match title card styling
-	const textColor = accentColor;
-
-	// Secondary color background with stronger shadow
-	ctx.shadowColor = 'rgba(0,0,0,0.5)';
-	ctx.shadowBlur = 20;
-	ctx.shadowOffsetY = 6;
-	ctx.fillStyle = hexToRgba(secondaryColor, 0.92);
-	canvasRoundRect(ctx, bgX, topOffset, bgW, bgH, 14);
+	// Frosted glass-style background
+	ctx.shadowColor = 'rgba(0,0,0,0.35)';
+	ctx.shadowBlur = 24;
+	ctx.shadowOffsetY = 4;
+	ctx.fillStyle = hexToRgba(secondaryColor, 0.78);
+	canvasRoundRect(ctx, bgX, topOffset, bgW, bgH, 16);
 	ctx.fill();
 
-	// Accent-colored bottom border line
+	// Subtle accent border
 	ctx.shadowColor = 'transparent';
-	const lineY = topOffset + bgH - 3;
-	ctx.fillStyle = hexToRgba(accentColor, 0.8);
-	canvasRoundRect(ctx, bgX + 8, lineY, bgW - 16, 3, 1.5);
+	ctx.strokeStyle = hexToRgba(accentColor, 0.2);
+	ctx.lineWidth = 1.5;
+	canvasRoundRect(ctx, bgX, topOffset, bgW, bgH, 16);
+	ctx.stroke();
+
+	// Accent-colored bottom accent line (thinner, inset more)
+	const lineY = topOffset + bgH - 2.5;
+	ctx.fillStyle = hexToRgba(accentColor, 0.5);
+	canvasRoundRect(ctx, bgX + 16, lineY, bgW - 32, 2.5, 1.25);
 	ctx.fill();
 
-	// Title text with contrast color
-	ctx.fillStyle = textColor;
+	// Title text — white with subtle text shadow for legibility
+	ctx.shadowColor = 'rgba(0,0,0,0.4)';
+	ctx.shadowBlur = 6;
+	ctx.shadowOffsetY = 2;
+	ctx.fillStyle = accentColor;
 	ctx.fillText(displayText, width / 2, topOffset + bgH / 2);
+	ctx.shadowColor = 'transparent';
 
 	// Star rating below the title bar
 	if (rating && rating > 0) {
-		const starSize = 16;
-		const starGap = 6;
+		const starSize = 14;
+		const starGap = 5;
 		const totalStarsW = 5 * (starSize * 2) + 4 * starGap;
-		const starsY = topOffset + bgH + 20 + starSize;
+		const starsY = topOffset + bgH + 18 + starSize;
 
-		// Secondary color pill behind stars
-		const pillW = totalStarsW + 24;
-		const pillH = starSize * 2 + 14;
+		// Matching pill behind stars
+		const pillW = totalStarsW + 28;
+		const pillH = starSize * 2 + 16;
 		const pillX = width / 2 - pillW / 2;
-		const pillY = starsY - starSize - 7;
-		ctx.fillStyle = hexToRgba(secondaryColor, 0.88);
+		const pillY = starsY - starSize - 8;
+		ctx.shadowColor = 'rgba(0,0,0,0.25)';
+		ctx.shadowBlur = 12;
+		ctx.shadowOffsetY = 2;
+		ctx.fillStyle = hexToRgba(secondaryColor, 0.78);
 		canvasRoundRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
 		ctx.fill();
+		ctx.shadowColor = 'transparent';
+		ctx.strokeStyle = hexToRgba(accentColor, 0.15);
+		ctx.lineWidth = 1;
+		canvasRoundRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
+		ctx.stroke();
 
 		const starsX = width / 2 - totalStarsW / 2;
 		for (let i = 0; i < 5; i++) {
 			const cx = starsX + starSize + i * (starSize * 2 + starGap);
 			if (rating >= i + 1) {
-				// Full star
 				drawStar(ctx, cx, starsY, starSize);
 				ctx.fillStyle = '#FBBF24';
 				ctx.fill();
 			} else if (rating >= i + 0.5) {
-				// Half star: draw empty background, then clip left half for filled
 				drawStar(ctx, cx, starsY, starSize);
-				ctx.fillStyle = 'rgba(255,255,255,0.2)';
+				ctx.fillStyle = 'rgba(255,255,255,0.15)';
 				ctx.fill();
 				ctx.save();
 				ctx.beginPath();
@@ -618,9 +862,8 @@ function drawLocationTitleOnCanvas(
 				ctx.fill();
 				ctx.restore();
 			} else {
-				// Empty star
 				drawStar(ctx, cx, starsY, starSize);
-				ctx.fillStyle = 'rgba(255,255,255,0.2)';
+				ctx.fillStyle = 'rgba(255,255,255,0.15)';
 				ctx.fill();
 			}
 		}
@@ -641,38 +884,39 @@ function drawTransportBadgeOnCanvas(
 ) {
 	const info = TRANSPORT_ICONS[mode];
 	const text = `${info.icon} ${info.label}`;
-	// Use accent color for text to match title card styling
-	const textColor = accentColor;
 
 	ctx.save();
-	const fontSize = 32;
-	ctx.font = `700 ${fontSize}px ${ff}`;
+	const fontSize = 28;
+	ctx.font = `600 ${fontSize}px ${ff}`;
 	ctx.textAlign = 'center';
 	ctx.textBaseline = 'middle';
 
 	const metrics = ctx.measureText(text);
-	const padX = 28, padY = 14;
+	const padX = 26, padY = 12;
 	const bgW = metrics.width + padX * 2;
 	const bgH = fontSize + padY * 2;
 	const bgX = width / 2 - bgW / 2;
 	const bgY = height - height * 0.12 - bgH;
 
-	// Secondary color background
-	ctx.shadowColor = 'rgba(0,0,0,0.4)';
-	ctx.shadowBlur = 12;
+	// Frosted glass-style background matching title bar
+	ctx.shadowColor = 'rgba(0,0,0,0.3)';
+	ctx.shadowBlur = 16;
 	ctx.shadowOffsetY = 3;
-	ctx.fillStyle = hexToRgba(secondaryColor, 0.92);
+	ctx.fillStyle = hexToRgba(secondaryColor, 0.78);
 	canvasRoundRect(ctx, bgX, bgY, bgW, bgH, bgH / 2);
 	ctx.fill();
 
-	// Accent border
+	// Subtle accent border
 	ctx.shadowColor = 'transparent';
-	ctx.strokeStyle = hexToRgba(accentColor, 0.4);
-	ctx.lineWidth = 1.5;
+	ctx.strokeStyle = hexToRgba(accentColor, 0.2);
+	ctx.lineWidth = 1;
 	canvasRoundRect(ctx, bgX, bgY, bgW, bgH, bgH / 2);
 	ctx.stroke();
 
-	ctx.fillStyle = textColor;
+	ctx.shadowColor = 'rgba(0,0,0,0.3)';
+	ctx.shadowBlur = 4;
+	ctx.shadowOffsetY = 1;
+	ctx.fillStyle = accentColor;
 	ctx.fillText(text, width / 2, bgY + bgH / 2);
 
 	ctx.restore();
@@ -691,12 +935,10 @@ function drawStatsOnCanvas(
 	const milesStr = stats.miles < 10 ? stats.miles.toFixed(1) : Math.round(stats.miles).toString();
 	const minsStr = Math.round(stats.minutes).toString();
 	const text = `${stats.stops} stops \u00B7 ${milesStr} mi \u00B7 ~${minsStr} min`;
-	// Use accent color for text to match title card styling
-	const textColor = accentColor;
 
 	ctx.save();
-	const fontSize = width > 1200 ? 44 : 36;
-	ctx.font = `700 ${fontSize}px ${ff}`;
+	const fontSize = width > 1200 ? 40 : 34;
+	ctx.font = `600 ${fontSize}px ${ff}`;
 	ctx.textAlign = 'center';
 	ctx.textBaseline = 'middle';
 
@@ -708,27 +950,29 @@ function drawStatsOnCanvas(
 	// Position well above the bottom edge so it's not hidden by video controls
 	const bgY = Math.round(height * 0.87 - bgH);
 
-	// Secondary color background for max contrast
-	ctx.shadowColor = 'rgba(0,0,0,0.6)';
+	// Frosted glass-style background matching other overlays
+	ctx.shadowColor = 'rgba(0,0,0,0.35)';
 	ctx.shadowBlur = 24;
 	ctx.shadowOffsetY = 4;
-	ctx.fillStyle = hexToRgba(secondaryColor, 0.95);
-	canvasRoundRect(ctx, bgX, bgY, bgW, bgH, 14);
+	ctx.fillStyle = hexToRgba(secondaryColor, 0.82);
+	canvasRoundRect(ctx, bgX, bgY, bgW, bgH, 16);
 	ctx.fill();
 
-	// Accent-colored top border line
+	// Accent left stripe
 	ctx.shadowColor = 'transparent';
-	ctx.fillStyle = hexToRgba(accentColor, 0.7);
-	canvasRoundRect(ctx, bgX + 8, bgY, bgW - 16, 3, 1.5);
+	ctx.fillStyle = hexToRgba(accentColor, 0.85);
+	canvasRoundRect(ctx, bgX, bgY, 4, bgH, 2);
 	ctx.fill();
 
-	// Subtle outer border
-	ctx.strokeStyle = hexToRgba(accentColor, 0.15);
-	ctx.lineWidth = 1;
-	canvasRoundRect(ctx, bgX, bgY, bgW, bgH, 14);
-	ctx.stroke();
+	// Accent-colored top accent line
+	ctx.fillStyle = hexToRgba(accentColor, 0.7);
+	canvasRoundRect(ctx, bgX + 16, bgY, bgW - 32, 3, 1.5);
+	ctx.fill();
 
-	ctx.fillStyle = textColor;
+	ctx.shadowColor = 'rgba(0,0,0,0.3)';
+	ctx.shadowBlur = 4;
+	ctx.shadowOffsetY = 1;
+	ctx.fillStyle = '#FFFFFF';
 	ctx.fillText(text, width / 2, bgY + bgH / 2);
 
 	ctx.restore();
@@ -950,7 +1194,7 @@ export async function renderTitleCard(opts: TitleCardOpts): Promise<Blob> {
 		ctx.font = `700 ${fontSize}px ${ff}`;
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
-		ctx.fillStyle = titleColor;
+		ctx.fillStyle = '#FFFFFF';
 		for (let i = 0; i < titleLines.length; i++) {
 			ctx.fillText(titleLines[i], width / 2, blockStartY + i * titleLineHeight);
 		}
@@ -959,14 +1203,14 @@ export async function renderTitleCard(opts: TitleCardOpts): Promise<Blob> {
 			const descStartY = blockStartY + totalTitleHeight + descGap;
 			ctx.font = `400 ${descFontSize}px ${ff}`;
 			ctx.globalAlpha = 0.7;
-			ctx.fillStyle = titleColor;
+			ctx.fillStyle = '#FFFFFF';
 			for (let i = 0; i < descLines.length; i++) {
 				ctx.fillText(descLines[i], width / 2, descStartY + i * descLineHeight);
 			}
 			ctx.globalAlpha = 1;
 		} else {
 			const lineY = blockStartY + totalTitleHeight + fontSize * 0.4;
-			ctx.strokeStyle = titleColor;
+			ctx.strokeStyle = '#FFFFFF';
 			ctx.globalAlpha = 0.4;
 			ctx.lineWidth = 2;
 			ctx.beginPath();
@@ -1106,7 +1350,6 @@ export async function drawTitleCardToCanvas(
 
 	const durationSec = opts.durationSec ?? 2.5;
 	const secColor = opts.secondaryColor ?? '#0a0f1e';
-	// titleColor is used directly for text (user's chosen color)
 
 	function drawTextOverlay() {
 		ctx.save();
@@ -1134,10 +1377,15 @@ export async function drawTitleCardToCanvas(
 		canvasRoundRect(ctx, bgX, bgY, bgW, bgH, 16);
 		ctx.fill();
 
+		// Accent left stripe
+		ctx.fillStyle = hexToRgba(titleColor, 0.85);
+		canvasRoundRect(ctx, bgX, bgY, 4, bgH, 2);
+		ctx.fill();
+
 		ctx.font = `700 ${fontSize}px ${ff}`;
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
-		ctx.fillStyle = titleColor;
+		ctx.fillStyle = '#FFFFFF';
 		for (let i = 0; i < titleLines.length; i++) {
 			ctx.fillText(titleLines[i], width / 2, blockStartY + i * titleLineHeight);
 		}
@@ -1146,7 +1394,7 @@ export async function drawTitleCardToCanvas(
 			const descStartY = blockStartY + totalTitleHeight + descGap;
 			ctx.font = `400 ${descFontSize}px ${ff}`;
 			ctx.globalAlpha = 0.7;
-			ctx.fillStyle = titleColor;
+			ctx.fillStyle = '#FFFFFF';
 			for (let i = 0; i < descLines.length; i++) {
 				ctx.fillText(descLines[i], width / 2, descStartY + i * descLineHeight);
 			}
@@ -1154,7 +1402,7 @@ export async function drawTitleCardToCanvas(
 		} else {
 			const lineY = blockStartY + totalTitleHeight + fontSize * 0.4;
 			ctx.strokeStyle = titleColor;
-			ctx.globalAlpha = 0.4;
+			ctx.globalAlpha = 0.6;
 			ctx.lineWidth = 2;
 			ctx.beginPath();
 			ctx.moveTo(width * 0.35, lineY);
@@ -1237,7 +1485,9 @@ export async function drawFlyToToCanvas(
 	fontId: string = 'inter',
 	secondaryColor: string = '#0a0f1e',
 	frameCallback?: FrameCallback,
-	pauseClock?: PauseClock
+	pauseClock?: PauseClock,
+	locationIndex: number = 0,
+	totalLocations: number = 1
 ): Promise<void> {
 	const displayName = location.label || location.name.split(',')[0];
 	const ff = fontFamily(fontId);
@@ -1254,9 +1504,8 @@ export async function drawFlyToToCanvas(
 
 	if (!prevLocation) {
 		// First location: fly in from zoom 10 → CLOSE_ZOOM
-		console.log(`[MapRenderer] drawFlyToToCanvas (first): "${location.name}" — flyTo=${FLY_TO_DURATION}ms + hold=2000ms`);
-		const HOLD = 2000;
-		const totalMs = FLY_TO_DURATION + HOLD;
+		console.log(`[MapRenderer] drawFlyToToCanvas (first): "${location.name}" — flyTo=${FLY_TO_DURATION}ms + hold=${FIRST_HOLD_MS}ms`);
+		const totalMs = FIRST_TOTAL_MS;
 
 		map.flyTo({
 			center: [location.lng, location.lat],
@@ -1273,10 +1522,14 @@ export async function drawFlyToToCanvas(
 				if (elapsed >= totalMs) { resolve(); return; }
 				if (document.hidden) { requestAnimationFrame(frame); return; }
 				drawMapFrame(elapsed, (ctx2, el) => {
+					drawVignette(ctx2, width, height);
 					if (el >= FLY_TO_DURATION) {
+						const fadeAlpha = Math.min(1, (el - FLY_TO_DURATION) / 400);
+						ctx2.globalAlpha = fadeAlpha;
 						const point = map.project([location.lng, location.lat]);
 						drawPinOnCanvas(ctx2, point.x, point.y, displayName, titleColor, ff, location.rating, false);
-						drawLocationTitleOnCanvas(ctx2, displayName, width, titleColor, ff, location.rating, secondaryColor);
+						drawLocationLowerThird(ctx2, width, height, displayName, locationIndex, totalLocations, titleColor, ff, location.rating, null, secondaryColor);
+						ctx2.globalAlpha = 1;
 					}
 				});
 				frameCount++;
@@ -1286,9 +1539,10 @@ export async function drawFlyToToCanvas(
 		});
 		// Draw final frame
 		drawMapFrame(totalMs, (ctx2) => {
+			drawVignette(ctx2, width, height);
 			const point = map.project([location.lng, location.lat]);
 			drawPinOnCanvas(ctx2, point.x, point.y, displayName, titleColor, ff, location.rating, false);
-			drawLocationTitleOnCanvas(ctx2, displayName, width, titleColor, ff, location.rating, secondaryColor);
+			drawLocationLowerThird(ctx2, width, height, displayName, locationIndex, totalLocations, titleColor, ff, location.rating, null, secondaryColor);
 		});
 		frameCount++;
 		const wallTime = ((performance.now() - startTime) / 1000).toFixed(1);
@@ -1308,14 +1562,6 @@ export async function drawFlyToToCanvas(
 	const boundsCenter = bounds.getCenter();
 	const overviewCenter: [number, number] = [boundsCenter.lng, boundsCenter.lat];
 
-	const ZOOM_OUT_MS = 1500;
-	const PAUSE_MS = 1200;
-	const ZOOM_IN_MS = 2000;
-	const HOLD_MS = 2000;
-	const zoomInAt = ZOOM_OUT_MS + PAUSE_MS;
-	const overlayAt = zoomInAt + ZOOM_IN_MS;
-	const totalMs = overlayAt + HOLD_MS;
-
 	console.log(`[MapRenderer] Overview zoom: ${overviewZoom.toFixed(1)}, phases: out=${ZOOM_OUT_MS} pause=${PAUSE_MS} in=${ZOOM_IN_MS} hold=${HOLD_MS}`);
 
 	// Start phase 1: zoom out
@@ -1334,13 +1580,13 @@ export async function drawFlyToToCanvas(
 	await new Promise<void>((resolve) => {
 		const frame = () => {
 			const elapsed = performance.now() - startTime - (pauseClock?.get() ?? 0);
-			if (elapsed >= totalMs) { resolve(); return; }
+			if (elapsed >= SUBSEQUENT_TOTAL_MS) { resolve(); return; }
 			if (document.hidden) { requestAnimationFrame(frame); return; }
 
 			// Trigger phase 2 zoom-in at the right elapsed time
-			if (elapsed >= zoomInAt && !phase2Started) {
+			if (elapsed >= ZOOM_IN_AT && !phase2Started) {
 				phase2Started = true;
-				console.log(`[MapRenderer] drawFlyToToCanvas: phase 2 zoom-in triggered at elapsed=${elapsed.toFixed(0)}ms (target: ${zoomInAt}ms)`);
+				console.log(`[MapRenderer] drawFlyToToCanvas: phase 2 zoom-in triggered at elapsed=${elapsed.toFixed(0)}ms (target: ${ZOOM_IN_AT}ms)`);
 				map.flyTo({
 					center: [location.lng, location.lat],
 					zoom: CLOSE_ZOOM,
@@ -1350,19 +1596,23 @@ export async function drawFlyToToCanvas(
 			}
 
 			drawMapFrame(elapsed, (ctx2, el) => {
-				if (el < 400) {
+				drawVignette(ctx2, width, height);
+				if (el < 500) {
+					const pinAlpha = Math.max(0, 1 - el / 500);
+					ctx2.globalAlpha = pinAlpha;
 					const prevPoint = map.project([prevLocation.lng, prevLocation.lat]);
 					if (prevPoint.x > -50 && prevPoint.x < width + 50 && prevPoint.y > -50 && prevPoint.y < height + 50) {
 						drawPinOnCanvas(ctx2, prevPoint.x, prevPoint.y, '', titleColor, ff, null, false);
 					}
+					ctx2.globalAlpha = 1;
 				}
-				if (el >= overlayAt) {
+				if (el >= OVERLAY_AT) {
+					const fadeAlpha = Math.min(1, (el - OVERLAY_AT) / 400);
+					ctx2.globalAlpha = fadeAlpha;
 					const point = map.project([location.lng, location.lat]);
 					drawPinOnCanvas(ctx2, point.x, point.y, displayName, titleColor, ff, location.rating, false);
-					drawLocationTitleOnCanvas(ctx2, displayName, width, titleColor, ff, location.rating, secondaryColor);
-					if (transportMode) {
-						drawTransportBadgeOnCanvas(ctx2, transportMode, width, height, titleColor, ff, secondaryColor);
-					}
+					drawLocationLowerThird(ctx2, width, height, displayName, locationIndex, totalLocations, titleColor, ff, location.rating, transportMode, secondaryColor);
+					ctx2.globalAlpha = 1;
 				}
 			});
 			frameCount++;
@@ -1371,13 +1621,11 @@ export async function drawFlyToToCanvas(
 		frame();
 	});
 	// Draw final frame
-	drawMapFrame(totalMs, (ctx2) => {
+	drawMapFrame(SUBSEQUENT_TOTAL_MS, (ctx2) => {
+		drawVignette(ctx2, width, height);
 		const point = map.project([location.lng, location.lat]);
 		drawPinOnCanvas(ctx2, point.x, point.y, displayName, titleColor, ff, location.rating, false);
-		drawLocationTitleOnCanvas(ctx2, displayName, width, titleColor, ff, location.rating, secondaryColor);
-		if (transportMode) {
-			drawTransportBadgeOnCanvas(ctx2, transportMode, width, height, titleColor, ff, secondaryColor);
-		}
+		drawLocationLowerThird(ctx2, width, height, displayName, locationIndex, totalLocations, titleColor, ff, location.rating, transportMode, secondaryColor);
 	});
 	frameCount++;
 	const wallTime = ((performance.now() - startTime) / 1000).toFixed(1);
@@ -1435,7 +1683,7 @@ export async function drawFinalRouteToCanvas(
 
 			ctx.clearRect(0, 0, width, height);
 			ctx.drawImage(mapCanvas, 0, 0, width, height);
-			// Draw pins with labels
+			drawVignette(ctx, width, height, 0.7);
 			for (const loc of locations) {
 				const point = map.project([loc.lng, loc.lat]);
 				const label = loc.label || loc.name.split(',')[0];
@@ -1451,6 +1699,7 @@ export async function drawFinalRouteToCanvas(
 	// Draw final frame
 	ctx.clearRect(0, 0, width, height);
 	ctx.drawImage(mapCanvas, 0, 0, width, height);
+	drawVignette(ctx, width, height, 0.7);
 	for (const loc of locations) {
 		const point = map.project([loc.lng, loc.lat]);
 		const label = loc.label || loc.name.split(',')[0];
@@ -1540,10 +1789,15 @@ export async function generateTitleCardFrames(
 		canvasRoundRect(ctx, bgX, bgY, bgW, bgH, 16);
 		ctx.fill();
 
+		// Accent left stripe
+		ctx.fillStyle = hexToRgba(titleColor, 0.85);
+		canvasRoundRect(ctx, bgX, bgY, 4, bgH, 2);
+		ctx.fill();
+
 		ctx.font = `700 ${fontSize}px ${ff}`;
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
-		ctx.fillStyle = titleColor;
+		ctx.fillStyle = '#FFFFFF';
 		for (let i = 0; i < titleLines.length; i++) {
 			ctx.fillText(titleLines[i], width / 2, blockStartY + i * titleLineHeight);
 		}
@@ -1552,7 +1806,7 @@ export async function generateTitleCardFrames(
 			const descStartY = blockStartY + totalTitleHeight + descGap;
 			ctx.font = `400 ${descFontSize}px ${ff}`;
 			ctx.globalAlpha = 0.7;
-			ctx.fillStyle = titleColor;
+			ctx.fillStyle = '#FFFFFF';
 			for (let i = 0; i < descLines.length; i++) {
 				ctx.fillText(descLines[i], width / 2, descStartY + i * descLineHeight);
 			}
@@ -1560,7 +1814,7 @@ export async function generateTitleCardFrames(
 		} else {
 			const lineY = blockStartY + totalTitleHeight + fontSize * 0.4;
 			ctx.strokeStyle = titleColor;
-			ctx.globalAlpha = 0.4;
+			ctx.globalAlpha = 0.6;
 			ctx.lineWidth = 2;
 			ctx.beginPath();
 			ctx.moveTo(width * 0.35, lineY);
@@ -1627,7 +1881,9 @@ export async function drawFlyToWithEncoder(
 	fontId: string,
 	secondaryColor: string,
 	onFrame: (canvas: HTMLCanvasElement) => void,
-	frameCallback?: FrameCallback
+	frameCallback?: FrameCallback,
+	locationIndex: number = 0,
+	totalLocations: number = 1
 ): Promise<void> {
 	const displayName = location.label || location.name.split(',')[0];
 	const ff = fontFamily(fontId);
@@ -1644,9 +1900,6 @@ export async function drawFlyToWithEncoder(
 	}
 
 	if (!prevLocation) {
-		const HOLD = 2000;
-		const totalMs = FLY_TO_DURATION + HOLD;
-
 		map.flyTo({
 			center: [location.lng, location.lat],
 			zoom: CLOSE_ZOOM,
@@ -1661,14 +1914,18 @@ export async function drawFlyToWithEncoder(
 			const frame = () => {
 				const now = performance.now();
 				const elapsed = now - startTime;
-				if (elapsed >= totalMs) { resolve(); return; }
+				if (elapsed >= FIRST_TOTAL_MS) { resolve(); return; }
 				if (document.hidden) { requestAnimationFrame(frame); return; }
 				if (now - lastFrameTime >= frameIntervalMs) {
 					drawMapFrame(elapsed, (ctx2, el) => {
+						drawVignette(ctx2, width, height);
 						if (el >= FLY_TO_DURATION) {
+							const fadeAlpha = Math.min(1, (el - FLY_TO_DURATION) / 400);
+							ctx2.globalAlpha = fadeAlpha;
 							const point = map.project([location.lng, location.lat]);
 							drawPinOnCanvas(ctx2, point.x, point.y, displayName, titleColor, ff, location.rating, false);
-							drawLocationTitleOnCanvas(ctx2, displayName, width, titleColor, ff, location.rating, secondaryColor);
+							drawLocationLowerThird(ctx2, width, height, displayName, locationIndex, totalLocations, titleColor, ff, location.rating, null, secondaryColor);
+							ctx2.globalAlpha = 1;
 						}
 					});
 					onFrame(canvas);
@@ -1680,10 +1937,11 @@ export async function drawFlyToWithEncoder(
 			frame();
 		});
 		// Final frame
-		drawMapFrame(totalMs, (ctx2) => {
+		drawMapFrame(FIRST_TOTAL_MS, (ctx2) => {
+			drawVignette(ctx2, width, height);
 			const point = map.project([location.lng, location.lat]);
 			drawPinOnCanvas(ctx2, point.x, point.y, displayName, titleColor, ff, location.rating, false);
-			drawLocationTitleOnCanvas(ctx2, displayName, width, titleColor, ff, location.rating, secondaryColor);
+			drawLocationLowerThird(ctx2, width, height, displayName, locationIndex, totalLocations, titleColor, ff, location.rating, null, secondaryColor);
 		});
 		onFrame(canvas);
 		frameCount++;
@@ -1701,14 +1959,6 @@ export async function drawFlyToWithEncoder(
 	const boundsCenter = bounds.getCenter();
 	const overviewCenter: [number, number] = [boundsCenter.lng, boundsCenter.lat];
 
-	const ZOOM_OUT_MS = 1500;
-	const PAUSE_MS = 1200;
-	const ZOOM_IN_MS = 2000;
-	const HOLD_MS = 2000;
-	const zoomInAt = ZOOM_OUT_MS + PAUSE_MS;
-	const overlayAt = zoomInAt + ZOOM_IN_MS;
-	const totalMs = overlayAt + HOLD_MS;
-
 	map.flyTo({
 		center: overviewCenter,
 		zoom: overviewZoom,
@@ -1725,10 +1975,10 @@ export async function drawFlyToWithEncoder(
 		const frame = () => {
 			const now = performance.now();
 			const elapsed = now - startTime;
-			if (elapsed >= totalMs) { resolve(); return; }
+			if (elapsed >= SUBSEQUENT_TOTAL_MS) { resolve(); return; }
 			if (document.hidden) { requestAnimationFrame(frame); return; }
 
-			if (elapsed >= zoomInAt && !phase2Started) {
+			if (elapsed >= ZOOM_IN_AT && !phase2Started) {
 				phase2Started = true;
 				map.flyTo({
 					center: [location.lng, location.lat],
@@ -1740,19 +1990,23 @@ export async function drawFlyToWithEncoder(
 
 			if (now - lastFrameTime >= frameIntervalMs) {
 				drawMapFrame(elapsed, (ctx2, el) => {
-					if (el < 400) {
+					drawVignette(ctx2, width, height);
+					if (el < 500) {
+						const pinAlpha = Math.max(0, 1 - el / 500);
+						ctx2.globalAlpha = pinAlpha;
 						const prevPoint = map.project([prevLocation.lng, prevLocation.lat]);
 						if (prevPoint.x > -50 && prevPoint.x < width + 50 && prevPoint.y > -50 && prevPoint.y < height + 50) {
 							drawPinOnCanvas(ctx2, prevPoint.x, prevPoint.y, '', titleColor, ff, null, false);
 						}
+						ctx2.globalAlpha = 1;
 					}
-					if (el >= overlayAt) {
+					if (el >= OVERLAY_AT) {
+						const fadeAlpha = Math.min(1, (el - OVERLAY_AT) / 400);
+						ctx2.globalAlpha = fadeAlpha;
 						const point = map.project([location.lng, location.lat]);
 						drawPinOnCanvas(ctx2, point.x, point.y, displayName, titleColor, ff, location.rating, false);
-						drawLocationTitleOnCanvas(ctx2, displayName, width, titleColor, ff, location.rating, secondaryColor);
-						if (transportMode) {
-							drawTransportBadgeOnCanvas(ctx2, transportMode, width, height, titleColor, ff, secondaryColor);
-						}
+						drawLocationLowerThird(ctx2, width, height, displayName, locationIndex, totalLocations, titleColor, ff, location.rating, transportMode, secondaryColor);
+						ctx2.globalAlpha = 1;
 					}
 				});
 				onFrame(canvas);
@@ -1764,13 +2018,11 @@ export async function drawFlyToWithEncoder(
 		frame();
 	});
 	// Final frame
-	drawMapFrame(totalMs, (ctx2) => {
+	drawMapFrame(SUBSEQUENT_TOTAL_MS, (ctx2) => {
+		drawVignette(ctx2, width, height);
 		const point = map.project([location.lng, location.lat]);
 		drawPinOnCanvas(ctx2, point.x, point.y, displayName, titleColor, ff, location.rating, false);
-		drawLocationTitleOnCanvas(ctx2, displayName, width, titleColor, ff, location.rating, secondaryColor);
-		if (transportMode) {
-			drawTransportBadgeOnCanvas(ctx2, transportMode, width, height, titleColor, ff, secondaryColor);
-		}
+		drawLocationLowerThird(ctx2, width, height, displayName, locationIndex, totalLocations, titleColor, ff, location.rating, transportMode, secondaryColor);
 	});
 	onFrame(canvas);
 	frameCount++;
@@ -1830,6 +2082,7 @@ export async function drawFinalRouteWithEncoder(
 			if (now - lastFrameTime >= frameIntervalMs) {
 				ctx.clearRect(0, 0, width, height);
 				ctx.drawImage(mapCanvas, 0, 0, width, height);
+				drawVignette(ctx, width, height, 0.7);
 				for (const loc of locations) {
 					const point = map.project([loc.lng, loc.lat]);
 					const label = loc.label || loc.name.split(',')[0];
@@ -1848,6 +2101,7 @@ export async function drawFinalRouteWithEncoder(
 	// Final frame
 	ctx.clearRect(0, 0, width, height);
 	ctx.drawImage(mapCanvas, 0, 0, width, height);
+	drawVignette(ctx, width, height, 0.7);
 	for (const loc of locations) {
 		const point = map.project([loc.lng, loc.lat]);
 		const label = loc.label || loc.name.split(',')[0];
@@ -1859,6 +2113,364 @@ export async function drawFinalRouteWithEncoder(
 	frameCount++;
 
 	console.log(`[MapRenderer] drawFinalRouteWithEncoder done: ${frameCount} frames, ${segmentsAdded}/${totalSegments} segments`);
+}
+
+// ─── Outro Card ───
+
+export interface OutroCardOpts {
+	title: string;
+	titleColor: string;
+	aspectRatio: AspectRatio;
+	mediaFile?: File | null;
+	logoUrl?: string | null;
+	showLogo?: boolean;
+	fontId?: string;
+	secondaryColor?: string;
+	username?: string;
+	displayName?: string;
+	socialLinks?: { instagram?: string; youtube?: string; tiktok?: string; website?: string };
+	durationSec?: number;
+}
+
+/** Build the social handles text lines from profile data */
+function buildSocialLines(opts: OutroCardOpts): string[] {
+	const lines: string[] = [];
+	if (opts.displayName) lines.push(opts.displayName);
+	else if (opts.username) lines.push(`@${opts.username}`);
+	const socials: string[] = [];
+	if (opts.socialLinks?.instagram) socials.push(`@${opts.socialLinks.instagram.replace(/^@/, '')}`);
+	if (opts.socialLinks?.youtube) socials.push(opts.socialLinks.youtube);
+	if (opts.socialLinks?.tiktok) socials.push(`@${opts.socialLinks.tiktok.replace(/^@/, '')}`);
+	if (opts.socialLinks?.website) socials.push(opts.socialLinks.website.replace(/^https?:\/\//, ''));
+	// Put each social on its own line to avoid overflow
+	for (const s of socials) lines.push(s);
+	return lines;
+}
+
+/** Draw an outro card directly to a provided canvas context (MediaRecorder path). */
+export async function drawOutroCardToCanvas(
+	ctx: CanvasRenderingContext2D,
+	opts: OutroCardOpts,
+	frameCallback?: FrameCallback,
+	pauseClock?: PauseClock
+): Promise<void> {
+	const { title, titleColor, aspectRatio, mediaFile } = opts;
+	const { width, height } = getResolution(aspectRatio);
+	const fId = opts.fontId ?? 'inter';
+	const ff = fontFamily(fId);
+	await loadFont(fId);
+
+	const fontSize = Math.round(width * 0.05);
+	const socialFontSize = Math.round(fontSize * 0.5);
+	const secColor = opts.secondaryColor ?? '#0a0f1e';
+	const durationSec = opts.durationSec ?? 3;
+
+	// Title lines
+	ctx.font = `700 ${fontSize}px ${ff}`;
+	const maxWidth = width * 0.8;
+	const titleLines = wrapText(ctx, title, maxWidth);
+	const titleLineHeight = fontSize * 1.3;
+	const totalTitleHeight = titleLines.length * titleLineHeight;
+
+	// Social lines
+	const socialLines = buildSocialLines(opts);
+	ctx.font = `400 ${socialFontSize}px ${ff}`;
+	const socialLineHeight = socialFontSize * 1.6;
+	const totalSocialHeight = socialLines.length * socialLineHeight;
+
+	// Layout
+	const separatorGap = fontSize * 0.6;
+	const socialGap = fontSize * 0.5;
+	const totalBlockHeight = totalTitleHeight + separatorGap + totalSocialHeight + (socialLines.length > 0 ? socialGap : 0);
+	const blockStartY = (height - totalBlockHeight) / 2 + titleLineHeight / 2;
+
+	let bgImage: HTMLImageElement | null = null;
+	if (mediaFile) bgImage = await loadImageFromFile(mediaFile);
+
+	let logoImage: HTMLImageElement | null = null;
+	if (opts.showLogo && opts.logoUrl) {
+		try { logoImage = await loadImageFromUrl(opts.logoUrl); } catch { /* skip */ }
+	}
+
+	function drawContent() {
+		ctx.save();
+
+		// Background pill
+		const padX = Math.round(width * 0.06);
+		const padY = Math.round(fontSize * 0.6);
+		const maxContentW = width * 0.85;
+		ctx.font = `700 ${fontSize}px ${ff}`;
+		let maxLineW = 0;
+		for (const line of titleLines) maxLineW = Math.max(maxLineW, ctx.measureText(line).width);
+		ctx.font = `400 ${socialFontSize}px ${ff}`;
+		for (const line of socialLines) maxLineW = Math.max(maxLineW, ctx.measureText(line).width);
+		maxLineW = Math.min(maxLineW, maxContentW - padX * 2);
+
+		const bgW = Math.min(maxLineW + padX * 2, maxContentW);
+		const bgH = totalBlockHeight + padY * 2;
+		const bgX = width / 2 - bgW / 2;
+		const bgY = blockStartY - titleLineHeight / 2 - padY;
+
+		ctx.fillStyle = hexToRgba(secColor, 0.75);
+		canvasRoundRect(ctx, bgX, bgY, bgW, bgH, 16);
+		ctx.fill();
+
+		// Accent left stripe
+		ctx.fillStyle = hexToRgba(titleColor, 0.85);
+		canvasRoundRect(ctx, bgX, bgY, 4, bgH, 2);
+		ctx.fill();
+
+		// Title
+		ctx.font = `700 ${fontSize}px ${ff}`;
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		ctx.fillStyle = '#FFFFFF';
+		for (let i = 0; i < titleLines.length; i++) {
+			ctx.fillText(titleLines[i], width / 2, blockStartY + i * titleLineHeight);
+		}
+
+		// Decorative separator (accent-colored)
+		const lineY = blockStartY + totalTitleHeight + separatorGap * 0.5;
+		ctx.strokeStyle = titleColor;
+		ctx.globalAlpha = 0.6;
+		ctx.lineWidth = 2;
+		const sepW = Math.min(bgW * 0.5, width * 0.3);
+		ctx.beginPath();
+		ctx.moveTo(width / 2 - sepW / 2, lineY);
+		ctx.lineTo(width / 2 + sepW / 2, lineY);
+		ctx.stroke();
+		ctx.globalAlpha = 1;
+
+		// Social text
+		if (socialLines.length > 0) {
+			const socialStartY = blockStartY + totalTitleHeight + separatorGap + socialGap;
+			ctx.font = `400 ${socialFontSize}px ${ff}`;
+			ctx.globalAlpha = 0.7;
+			ctx.fillStyle = '#FFFFFF';
+			const maxTextW = bgW - padX * 2;
+			for (let i = 0; i < socialLines.length; i++) {
+				let line = socialLines[i];
+				// Truncate if still too wide
+				if (ctx.measureText(line).width > maxTextW) {
+					while (line.length > 1 && ctx.measureText(line + '...').width > maxTextW) {
+						line = line.slice(0, -1);
+					}
+					line = line.trimEnd() + '...';
+				}
+				ctx.fillText(line, width / 2, socialStartY + i * socialLineHeight);
+			}
+			ctx.globalAlpha = 1;
+		}
+
+		ctx.restore();
+	}
+
+	function drawLogo() {
+		if (!logoImage) return;
+		const logoSize = Math.round(width * 0.12);
+		const margin = Math.round(width * 0.04);
+		const scale = Math.min(logoSize / logoImage.naturalWidth, logoSize / logoImage.naturalHeight);
+		const drawW = logoImage.naturalWidth * scale;
+		const drawH = logoImage.naturalHeight * scale;
+		const x = width - margin - drawW;
+		const y = height - margin - drawH;
+		ctx.save();
+		ctx.globalAlpha = 0.8;
+		ctx.drawImage(logoImage, x, y, drawW, drawH);
+		ctx.restore();
+	}
+
+	function drawFrame() {
+		ctx.clearRect(0, 0, width, height);
+		if (bgImage) {
+			drawCoverFit(ctx, bgImage, width, height);
+			ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+			ctx.fillRect(0, 0, width, height);
+		} else {
+			const gradient = ctx.createLinearGradient(0, 0, 0, height);
+			gradient.addColorStop(0, '#0a0a0a');
+			gradient.addColorStop(0.5, '#1a1a2e');
+			gradient.addColorStop(1, '#0a0a0a');
+			ctx.fillStyle = gradient;
+			ctx.fillRect(0, 0, width, height);
+		}
+		drawContent();
+		drawLogo();
+		frameCallback?.(ctx);
+	}
+
+	const durationMs = durationSec * 1000;
+	const startTime = performance.now();
+	let frameCount = 0;
+	console.log(`[MapRenderer] drawOutroCardToCanvas: starting (${durationSec}s)`);
+	await new Promise<void>((resolve) => {
+		const frame = () => {
+			const elapsed = performance.now() - startTime - (pauseClock?.get() ?? 0);
+			if (elapsed >= durationMs) { resolve(); return; }
+			if (document.hidden) { requestAnimationFrame(frame); return; }
+			drawFrame();
+			frameCount++;
+			requestAnimationFrame(frame);
+		};
+		frame();
+	});
+	drawFrame(); // final frame
+	frameCount++;
+	console.log(`[MapRenderer] drawOutroCardToCanvas done: ${frameCount} frames`);
+}
+
+/** Generate outro card frames offline (WebCodecs path). */
+export async function generateOutroCardFrames(
+	canvas: HTMLCanvasElement,
+	ctx: CanvasRenderingContext2D,
+	opts: OutroCardOpts,
+	fps: number,
+	onFrame: (canvas: HTMLCanvasElement) => void,
+	frameCallback?: FrameCallback
+): Promise<void> {
+	const { title, titleColor, aspectRatio, mediaFile } = opts;
+	const { width, height } = getResolution(aspectRatio);
+	const fId = opts.fontId ?? 'inter';
+	const ff = fontFamily(fId);
+	await loadFont(fId);
+
+	const fontSize = Math.round(width * 0.05);
+	const socialFontSize = Math.round(fontSize * 0.5);
+	const secColor = opts.secondaryColor ?? '#0a0f1e';
+	const durationSec = opts.durationSec ?? 3;
+
+	ctx.font = `700 ${fontSize}px ${ff}`;
+	const maxWidth = width * 0.8;
+	const titleLines = wrapText(ctx, title, maxWidth);
+	const titleLineHeight = fontSize * 1.3;
+	const totalTitleHeight = titleLines.length * titleLineHeight;
+
+	const socialLines = buildSocialLines(opts);
+	ctx.font = `400 ${socialFontSize}px ${ff}`;
+	const socialLineHeight = socialFontSize * 1.6;
+	const totalSocialHeight = socialLines.length * socialLineHeight;
+
+	const separatorGap = fontSize * 0.6;
+	const socialGap = fontSize * 0.5;
+	const totalBlockHeight = totalTitleHeight + separatorGap + totalSocialHeight + (socialLines.length > 0 ? socialGap : 0);
+	const blockStartY = (height - totalBlockHeight) / 2 + titleLineHeight / 2;
+
+	let bgImage: HTMLImageElement | null = null;
+	if (mediaFile) bgImage = await loadImageFromFile(mediaFile);
+
+	let logoImage: HTMLImageElement | null = null;
+	if (opts.showLogo && opts.logoUrl) {
+		try { logoImage = await loadImageFromUrl(opts.logoUrl); } catch { /* skip */ }
+	}
+
+	function drawContent() {
+		ctx.save();
+		const padX = Math.round(width * 0.06);
+		const padY = Math.round(fontSize * 0.6);
+		const maxContentW = width * 0.85;
+		ctx.font = `700 ${fontSize}px ${ff}`;
+		let maxLineW = 0;
+		for (const line of titleLines) maxLineW = Math.max(maxLineW, ctx.measureText(line).width);
+		ctx.font = `400 ${socialFontSize}px ${ff}`;
+		for (const line of socialLines) maxLineW = Math.max(maxLineW, ctx.measureText(line).width);
+		maxLineW = Math.min(maxLineW, maxContentW - padX * 2);
+
+		const bgW = Math.min(maxLineW + padX * 2, maxContentW);
+		const bgH = totalBlockHeight + padY * 2;
+		const bgX = width / 2 - bgW / 2;
+		const bgY = blockStartY - titleLineHeight / 2 - padY;
+
+		ctx.fillStyle = hexToRgba(secColor, 0.75);
+		canvasRoundRect(ctx, bgX, bgY, bgW, bgH, 16);
+		ctx.fill();
+
+		// Accent left stripe
+		ctx.fillStyle = hexToRgba(titleColor, 0.85);
+		canvasRoundRect(ctx, bgX, bgY, 4, bgH, 2);
+		ctx.fill();
+
+		ctx.font = `700 ${fontSize}px ${ff}`;
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		ctx.fillStyle = '#FFFFFF';
+		for (let i = 0; i < titleLines.length; i++) {
+			ctx.fillText(titleLines[i], width / 2, blockStartY + i * titleLineHeight);
+		}
+
+		// Decorative separator (accent-colored)
+		const lineY = blockStartY + totalTitleHeight + separatorGap * 0.5;
+		ctx.strokeStyle = titleColor;
+		ctx.globalAlpha = 0.6;
+		ctx.lineWidth = 2;
+		const sepW = Math.min(bgW * 0.5, width * 0.3);
+		ctx.beginPath();
+		ctx.moveTo(width / 2 - sepW / 2, lineY);
+		ctx.lineTo(width / 2 + sepW / 2, lineY);
+		ctx.stroke();
+		ctx.globalAlpha = 1;
+
+		if (socialLines.length > 0) {
+			const socialStartY = blockStartY + totalTitleHeight + separatorGap + socialGap;
+			ctx.font = `400 ${socialFontSize}px ${ff}`;
+			ctx.globalAlpha = 0.7;
+			ctx.fillStyle = '#FFFFFF';
+			const maxTextW = bgW - padX * 2;
+			for (let i = 0; i < socialLines.length; i++) {
+				let line = socialLines[i];
+				if (ctx.measureText(line).width > maxTextW) {
+					while (line.length > 1 && ctx.measureText(line + '...').width > maxTextW) {
+						line = line.slice(0, -1);
+					}
+					line = line.trimEnd() + '...';
+				}
+				ctx.fillText(line, width / 2, socialStartY + i * socialLineHeight);
+			}
+			ctx.globalAlpha = 1;
+		}
+
+		ctx.restore();
+	}
+
+	function drawLogo() {
+		if (!logoImage) return;
+		const logoSize = Math.round(width * 0.12);
+		const margin = Math.round(width * 0.04);
+		const scale = Math.min(logoSize / logoImage.naturalWidth, logoSize / logoImage.naturalHeight);
+		const drawW = logoImage.naturalWidth * scale;
+		const drawH = logoImage.naturalHeight * scale;
+		const x = width - margin - drawW;
+		const y = height - margin - drawH;
+		ctx.save();
+		ctx.globalAlpha = 0.8;
+		ctx.drawImage(logoImage, x, y, drawW, drawH);
+		ctx.restore();
+	}
+
+	function drawFrame() {
+		ctx.clearRect(0, 0, width, height);
+		if (bgImage) {
+			drawCoverFit(ctx, bgImage, width, height);
+			ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+			ctx.fillRect(0, 0, width, height);
+		} else {
+			const gradient = ctx.createLinearGradient(0, 0, 0, height);
+			gradient.addColorStop(0, '#0a0a0a');
+			gradient.addColorStop(0.5, '#1a1a2e');
+			gradient.addColorStop(1, '#0a0a0a');
+			ctx.fillStyle = gradient;
+			ctx.fillRect(0, 0, width, height);
+		}
+		drawContent();
+		drawLogo();
+		frameCallback?.(ctx);
+	}
+
+	const totalFrames = Math.round(durationSec * fps);
+	console.log(`[MapRenderer] generateOutroCardFrames: ${totalFrames} frames (${durationSec}s @ ${fps}fps)`);
+	for (let i = 0; i < totalFrames; i++) {
+		drawFrame();
+		onFrame(canvas);
+	}
 }
 
 function sleep(ms: number): Promise<void> {
