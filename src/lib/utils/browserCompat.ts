@@ -54,22 +54,30 @@ export function getFileExtension(mimeType: string): string {
 
 /** Async check: can this browser use WebCodecs (VideoEncoder + H.264) at the given resolution? */
 export async function canUseWebCodecs(w: number, h: number): Promise<boolean> {
-	if (typeof VideoEncoder === 'undefined') return false;
-	if (typeof isSecureContext !== 'undefined' && !isSecureContext) return false;
-	// Safari's WebCodecs H.264 encoder ignores bitrate settings, producing
-	// 20x oversized files (~500MB instead of ~25MB). Fall back to MediaRecorder.
-	if (/^Apple/.test(navigator.vendor)) return false;
+	if (typeof VideoEncoder === 'undefined') {
+		console.log('[WebCodecs] VideoEncoder not available');
+		return false;
+	}
+	if (typeof isSecureContext !== 'undefined' && !isSecureContext) {
+		console.log('[WebCodecs] Not in secure context');
+		return false;
+	}
+	const isApple = /^Apple/.test(navigator.vendor);
+	console.log(`[WebCodecs] Checking support: ${w}x${h}, isApple=${isApple}, vendor=${navigator.vendor}`);
 	try {
-		const { supported } = await VideoEncoder.isConfigSupported({
+		const config = {
 			codec: 'avc1.4d0028',
 			width: w,
 			height: h,
 			bitrate: 5_000_000,
 			framerate: 30,
-			avc: { format: 'avc' }
-		});
+			avc: { format: 'avc' as const }
+		};
+		const { supported } = await VideoEncoder.isConfigSupported(config);
+		console.log(`[WebCodecs] isConfigSupported=${supported}`);
 		return supported === true;
-	} catch {
+	} catch (err) {
+		console.warn('[WebCodecs] isConfigSupported check failed:', err);
 		return false;
 	}
 }

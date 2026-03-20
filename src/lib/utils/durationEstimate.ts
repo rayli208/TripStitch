@@ -2,11 +2,11 @@ import type { Location } from '$lib/types';
 
 // Timing constants matching videoAssembler.ts pipeline
 const TITLE_DURATION = 2.5;
-const FIRST_FLY_DURATION = 3.2; // flyTo (1.5s) + hold (1.7s)
-const SUBSEQUENT_FLY_DURATION = 4.1; // zoomOut (1s) + pause (0.4s) + zoomIn (1.5s) + hold (1.2s)
+const FIRST_FLY_DURATION = 4.5; // flyTo (2s) + hold (2.5s)
+const SUBSEQUENT_FLY_DURATION = 5.8; // zoomOut (1.2s) + pause (0.6s) + zoomIn (1.8s) + hold (2.2s)
 const PHOTO_DURATION = 3; // kenBurns/zoom animation
 const FLASH_DURATION = 0.4;
-const FINAL_ROUTE_DURATION = 4.5;
+const FINAL_ROUTE_DURATION = 5.0;
 const OUTRO_DURATION = 3;
 
 export interface DurationEstimate {

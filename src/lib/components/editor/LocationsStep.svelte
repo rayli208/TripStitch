@@ -14,6 +14,8 @@
 	let {
 		locations,
 		canAdd,
+		maxClipsPerLocation = 5,
+		maxLocations = 10,
 		onadd,
 		onremove,
 		onaddclip,
@@ -32,6 +34,8 @@
 	}: {
 		locations: Location[];
 		canAdd: boolean;
+		maxClipsPerLocation?: number;
+		maxLocations?: number;
 		onadd: (loc: { name: string; lat: number; lng: number; city: string | null; state: string | null; country: string | null }) => void;
 		onremove: (id: string) => void;
 		onaddclip: (locationId: string, file: File, durationSec?: number) => void;
@@ -66,6 +70,7 @@
 	let canProceed = $derived(locations.length >= 2 && allLocsHaveClips);
 	let activeLoc = $derived(locations[activeIndex] as Location | undefined);
 	let activeLocHasClips = $derived(activeLoc ? activeLoc.clips.length > 0 : false);
+	let canAddClip = $derived(activeLoc ? activeLoc.clips.length < maxClipsPerLocation : false);
 
 	// Local mutable copy of clips for svelte-dnd-action (it needs to mutate items)
 	let dndClips = $state<Clip[]>([]);
@@ -599,11 +604,18 @@
 					</div>
 				{/if}
 
-				<!-- Add clip button (always present) -->
-				<MediaUpload
-					previewUrl={null}
-					onfile={(file) => handleAddClip(activeLoc!.id, file)}
-				/>
+				<!-- Add clip button -->
+				{#if canAddClip}
+					<MediaUpload
+						previewUrl={null}
+						onfile={(file) => handleAddClip(activeLoc!.id, file)}
+					/>
+				{:else}
+					<div class="w-full py-3 border-2 border-dashed border-warning/40 rounded-xl text-center">
+						<p class="text-sm text-warning font-medium">Clip limit reached ({maxClipsPerLocation} per stop)</p>
+						<p class="text-xs text-text-muted mt-1">Upgrade to Pro for more clips per location.</p>
+					</div>
+				{/if}
 				{#if clipError}
 					<div class="mt-2 p-3 bg-error/10 border border-error/30 rounded-lg">
 						<p class="text-sm text-error">{clipError}</p>
@@ -700,7 +712,10 @@
 				</div>
 			{/if}
 		{:else}
-			<p class="text-sm text-warning text-center">Maximum of 10 locations reached.</p>
+			<div class="w-full py-3 border-2 border-dashed border-warning/40 rounded-xl text-center">
+				<p class="text-sm text-warning font-medium">Location limit reached ({maxLocations} stops)</p>
+				<p class="text-xs text-text-muted mt-1">Upgrade to Pro for more locations.</p>
+			</div>
 		{/if}
 
 	{:else}

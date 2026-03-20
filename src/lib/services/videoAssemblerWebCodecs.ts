@@ -211,7 +211,7 @@ export async function assembleVideoWebCodecs(
 			);
 
 			const displayName = location.label || location.name.split(',')[0];
-			const flyDuration = !prevLocation ? 3.2 : 4.1;
+			const flyDuration = !prevLocation ? 4.5 : 5.8;
 			console.log(`[TripStitch/WebCodecs] Fly-to: ${((performance.now() - flyStart) / 1000).toFixed(1)}s wall`);
 			addToTimeline(`map-${location.id}`, displayName, flyDuration, 'map');
 
@@ -235,10 +235,12 @@ export async function assembleVideoWebCodecs(
 					const clip = clipsWithFiles[ci];
 					checkAbort();
 					if (clip.type === 'video' && clip.file) {
-						console.log(`[TripStitch/WebCodecs] Video clip ${ci + 1}/${clipsWithFiles.length} (4x accelerated)`);
+						const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+						const accelRate = isMobileDevice ? 1 : 4;
+						console.log(`[TripStitch/WebCodecs] Video clip ${ci + 1}/${clipsWithFiles.length} (${accelRate}x${isMobileDevice ? ' mobile' : ' accelerated'})`);
 						const dur = await playVideoAccelerated(
 							clip.file, canvas, width, height,
-							30, TARGET_FPS, 4,
+							30, TARGET_FPS, accelRate,
 							onFrame, frameOverlay,
 							clip.trimStartSec ?? 0, clip.trimEndSec
 						);
@@ -253,6 +255,8 @@ export async function assembleVideoWebCodecs(
 						);
 						combinedDuration += photoDur;
 					}
+					// GC yield between clips — let browser reclaim memory
+					await sleep(50);
 				}
 
 				addToTimeline(`clip-${location.id}`, displayName, combinedDuration, 'clip');

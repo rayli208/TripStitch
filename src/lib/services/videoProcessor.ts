@@ -430,7 +430,9 @@ export async function playVideoToCanvas(
 	const video = document.createElement('video');
 	video.muted = true;
 	video.playsInline = true;
-	video.src = URL.createObjectURL(file);
+	video.preload = 'auto';
+	const blobUrl = URL.createObjectURL(file);
+	video.src = blobUrl;
 
 	await new Promise<void>((resolve, reject) => {
 		video.onloadedmetadata = () => resolve();
@@ -439,14 +441,43 @@ export async function playVideoToCanvas(
 
 	const endTime = Math.min(trimEndSec ?? video.duration, trimStartSec + maxDurationSec, video.duration);
 	const duration = endTime - trimStartSec;
-	console.log(`[VideoProcessor] Video loaded: ${video.videoWidth}x${video.videoHeight}, duration: ${video.duration.toFixed(1)}s (using ${trimStartSec.toFixed(1)}s-${endTime.toFixed(1)}s = ${duration.toFixed(1)}s)`);
+	console.log(`[VideoProcessor] Video loaded: ${video.videoWidth}x${video.videoHeight}, duration: ${video.duration.toFixed(1)}s (using ${trimStartSec.toFixed(1)}s-${endTime.toFixed(1)}s = ${duration.toFixed(1)}s), readyState=${video.readyState}`);
 
-	video.currentTime = trimStartSec;
 	if (trimStartSec > 0) {
+		video.currentTime = trimStartSec;
+		console.log(`[VideoProcessor] Seeking to ${trimStartSec.toFixed(1)}s...`);
 		await new Promise<void>((resolve) => { video.onseeked = () => resolve(); });
+		console.log(`[VideoProcessor] Seek complete, readyState=${video.readyState}`);
 	}
-	await video.play();
-	console.log(`[VideoProcessor] playVideoToCanvas: playback started (duration target: ${duration.toFixed(1)}s)`);
+
+	// On iOS Safari, calling play() on a muted video forces it to buffer and start.
+	// Don't wait for canplay first — iOS often won't fire it for blob URLs until play() is called.
+	console.log(`[VideoProcessor] Calling play() (readyState=${video.readyState})...`);
+	try {
+		await Promise.race([
+			video.play(),
+			new Promise<void>((_, reject) => setTimeout(() => reject(new Error('play() timeout')), 15000))
+		]);
+	} catch (playErr: any) {
+		console.warn(`[VideoProcessor] play() failed: ${playErr.message}, readyState=${video.readyState}. Retrying with load()...`);
+		// Full reload: re-set source and try again
+		video.src = '';
+		video.load();
+		await new Promise(r => setTimeout(r, 100));
+		video.src = blobUrl;
+		video.load();
+		await new Promise<void>((resolve, reject) => {
+			video.oncanplaythrough = () => resolve();
+			video.onerror = () => reject(new Error('Failed to reload video'));
+			setTimeout(() => reject(new Error('reload timeout after 15s')), 15000);
+		});
+		if (trimStartSec > 0) {
+			video.currentTime = trimStartSec;
+			await new Promise<void>((resolve) => { video.onseeked = () => resolve(); });
+		}
+		await video.play();
+	}
+	console.log(`[VideoProcessor] playVideoToCanvas: playback started (duration target: ${duration.toFixed(1)}s, readyState=${video.readyState})`);
 
 	const startTime = performance.now();
 	let frameCount = 0;
@@ -470,7 +501,9 @@ export async function playVideoToCanvas(
 	const wallTime = performance.now() - startTime;
 	const pausedTime = pauseClock?.get() ?? 0;
 	const actualDuration = (wallTime - pausedTime) / 1000;
-	URL.revokeObjectURL(video.src);
+	video.src = '';
+	video.load();
+	URL.revokeObjectURL(blobUrl);
 	console.log(`[VideoProcessor] playVideoToCanvas done: ${frameCount} frames drawn, ${hiddenFrames} hidden skips, wall=${(wallTime/1000).toFixed(1)}s, paused=${(pausedTime/1000).toFixed(1)}s, effective=${actualDuration.toFixed(1)}s`);
 	return actualDuration;
 }
@@ -678,7 +711,9 @@ export async function playVideoAccelerated(
 	const video = document.createElement('video');
 	video.muted = true;
 	video.playsInline = true;
-	video.src = URL.createObjectURL(file);
+	video.preload = 'auto';
+	const blobUrl = URL.createObjectURL(file);
+	video.src = blobUrl;
 
 	await new Promise<void>((resolve, reject) => {
 		video.onloadedmetadata = () => resolve();
@@ -688,14 +723,40 @@ export async function playVideoAccelerated(
 	const endTime = Math.min(trimEndSec ?? video.duration, trimStartSec + maxDurationSec, video.duration);
 	const duration = endTime - trimStartSec;
 
-	console.log(`[VideoProcessor] playVideoAccelerated: ${file.name}, duration=${duration.toFixed(1)}s (${trimStartSec.toFixed(1)}s-${endTime.toFixed(1)}s), rate=${playbackRate}x`);
+	console.log(`[VideoProcessor] playVideoAccelerated: ${file.name}, duration=${duration.toFixed(1)}s (${trimStartSec.toFixed(1)}s-${endTime.toFixed(1)}s), rate=${playbackRate}x, readyState=${video.readyState}`);
 
-	video.currentTime = trimStartSec;
 	if (trimStartSec > 0) {
+		video.currentTime = trimStartSec;
 		await new Promise<void>((resolve) => { video.onseeked = () => resolve(); });
 	}
 	video.playbackRate = playbackRate;
-	await video.play();
+
+	console.log(`[VideoProcessor] playVideoAccelerated calling play() (readyState=${video.readyState})...`);
+	try {
+		await Promise.race([
+			video.play(),
+			new Promise<void>((_, reject) => setTimeout(() => reject(new Error('play() timeout')), 15000))
+		]);
+	} catch (playErr: any) {
+		console.warn(`[VideoProcessor] playVideoAccelerated play() failed: ${playErr.message}. Retrying...`);
+		video.src = '';
+		video.load();
+		await new Promise(r => setTimeout(r, 100));
+		video.src = blobUrl;
+		video.load();
+		await new Promise<void>((resolve, reject) => {
+			video.oncanplaythrough = () => resolve();
+			video.onerror = () => reject(new Error('Failed to reload video'));
+			setTimeout(() => reject(new Error('reload timeout after 15s')), 15000);
+		});
+		if (trimStartSec > 0) {
+			video.currentTime = trimStartSec;
+			await new Promise<void>((resolve) => { video.onseeked = () => resolve(); });
+		}
+		video.playbackRate = playbackRate;
+		await video.play();
+	}
+	console.log(`[VideoProcessor] playVideoAccelerated: playback started (readyState=${video.readyState})`);
 
 	let frameCount = 0;
 	const frameInterval = 1 / fps; // seconds of video time per output frame
@@ -741,7 +802,9 @@ export async function playVideoAccelerated(
 	});
 
 	video.pause();
-	URL.revokeObjectURL(video.src);
+	video.src = '';
+	video.load();
+	URL.revokeObjectURL(blobUrl);
 	console.log(`[VideoProcessor] playVideoAccelerated done: ${frameCount} frames encoded, ${duration.toFixed(1)}s of video`);
 	return duration;
 }

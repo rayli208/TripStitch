@@ -3,7 +3,7 @@
 	import type { Location } from '$lib/types';
 	import { generateCaption, type CaptionResult } from '$lib/services/captionService';
 	import toast from '$lib/state/toast.svelte';
-	import { MusicNote, Sparkle, InstagramLogo, TiktokLogo, YoutubeLogo } from 'phosphor-svelte';
+	import { MusicNote, Sparkle, ShareNetwork } from 'phosphor-svelte';
 
 	let {
 		videoUrl,
@@ -34,18 +34,71 @@
 	} = $props();
 
 	let canShareFiles = $derived.by(() => {
-		if (typeof navigator === 'undefined' || !navigator.share || !navigator.canShare) return false;
+		if (typeof navigator === 'undefined' || !navigator.share || !navigator.canShare) {
+			console.log('[ExportResult] Web Share API not available', {
+				hasNavigator: typeof navigator !== 'undefined',
+				hasShare: typeof navigator !== 'undefined' && !!navigator.share,
+				hasCanShare: typeof navigator !== 'undefined' && !!navigator.canShare
+			});
+			return false;
+		}
 		try {
 			const testFile = new File([new Blob([''])], 'test.mp4', { type: 'video/mp4' });
-			return navigator.canShare({ files: [testFile] });
-		} catch {
+			const result = navigator.canShare({ files: [testFile] });
+			console.log('[ExportResult] canShareFiles:', result);
+			return result;
+		} catch (err) {
+			console.warn('[ExportResult] canShare check failed:', err);
 			return false;
 		}
 	});
 
-	function shareToApp() {
-		const file = new File([videoBlob], `${tripTitle || 'tripstitch'}.mp4`, { type: videoBlob.type });
-		navigator.share({ files: [file] }).catch(() => {});
+	// Detect iOS for share behavior
+	const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+	$effect(() => {
+		console.log('[ExportResult] Video blob info:', {
+			blobType: videoBlob.type,
+			blobSize: `${(videoBlob.size / 1024 / 1024).toFixed(1)} MB`,
+			urlPrefix: videoUrl.substring(0, 30),
+			canShareFiles,
+			isIOS,
+			userAgent: navigator.userAgent
+		});
+	});
+
+	async function shareToApp(platform: string) {
+		// Always share as video/mp4 — Instagram/TikTok/iOS reject WebM
+		const shareType = 'video/mp4';
+		const filename = `${tripTitle || 'tripstitch'}.mp4`;
+
+		console.log('[ExportResult] shareToApp called', {
+			platform,
+			originalBlobType: videoBlob.type,
+			shareAsType: shareType,
+			filename,
+			blobSize: `${(videoBlob.size / 1024 / 1024).toFixed(1)} MB`
+		});
+
+		try {
+			const file = new File([videoBlob], filename, { type: shareType });
+			console.log('[ExportResult] File created:', {
+				name: file.name,
+				type: file.type,
+				size: file.size,
+				canShare: navigator.canShare({ files: [file] })
+			});
+
+			await navigator.share({ files: [file] });
+			console.log('[ExportResult] Share completed successfully');
+		} catch (err: any) {
+			if (err?.name === 'AbortError') {
+				console.log('[ExportResult] Share cancelled by user');
+			} else {
+				console.error('[ExportResult] Share failed:', err);
+				toast.error('Sharing failed. Try downloading instead.');
+			}
+		}
 	}
 
 	// Caption generation
@@ -193,74 +246,14 @@
 			{/if}
 		</div>
 
-		<!-- Share to platforms -->
-		<div class="space-y-2 mt-2">
-			<p class="text-sm font-medium text-text-secondary text-center">Share to</p>
-			<div class="grid grid-cols-3 gap-2">
-				{#if canShareFiles}
-					<button
-						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 border-border bg-card hover:bg-card-hover transition-colors cursor-pointer"
-						onclick={shareToApp}
-					>
-						<InstagramLogo size={24} weight="bold" class="text-pink-500" />
-						<span class="text-xs font-medium text-text-secondary">Instagram</span>
-					</button>
-				{:else}
-					<a
-						href="https://www.instagram.com"
-						target="_blank"
-						rel="noopener noreferrer"
-						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 border-border bg-card hover:bg-card-hover transition-colors"
-					>
-						<InstagramLogo size={24} weight="bold" class="text-pink-500" />
-						<span class="text-xs font-medium text-text-secondary">Instagram</span>
-					</a>
-				{/if}
-
-				{#if canShareFiles}
-					<button
-						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 border-border bg-card hover:bg-card-hover transition-colors cursor-pointer"
-						onclick={shareToApp}
-					>
-						<TiktokLogo size={24} weight="bold" />
-						<span class="text-xs font-medium text-text-secondary">TikTok</span>
-					</button>
-				{:else}
-					<a
-						href="https://www.tiktok.com/upload"
-						target="_blank"
-						rel="noopener noreferrer"
-						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 border-border bg-card hover:bg-card-hover transition-colors"
-					>
-						<TiktokLogo size={24} weight="bold" />
-						<span class="text-xs font-medium text-text-secondary">TikTok</span>
-					</a>
-				{/if}
-
-				{#if canShareFiles}
-					<button
-						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 border-border bg-card hover:bg-card-hover transition-colors cursor-pointer"
-						onclick={shareToApp}
-					>
-						<YoutubeLogo size={24} weight="bold" class="text-red-500" />
-						<span class="text-xs font-medium text-text-secondary">YouTube</span>
-					</button>
-				{:else}
-					<a
-						href="https://www.youtube.com/upload"
-						target="_blank"
-						rel="noopener noreferrer"
-						class="flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 border-border bg-card hover:bg-card-hover transition-colors"
-					>
-						<YoutubeLogo size={24} weight="bold" class="text-red-500" />
-						<span class="text-xs font-medium text-text-secondary">YouTube</span>
-					</a>
-				{/if}
-			</div>
-			{#if !canShareFiles}
-				<p class="text-xs text-text-muted text-center">Download the video first, then upload to your platform</p>
-			{/if}
-		</div>
+		{#if canShareFiles}
+			<Button variant="ghost" onclick={() => shareToApp('share')}>
+				<span class="flex items-center gap-2">
+					<ShareNetwork size={16} weight="bold" />
+					Share
+				</span>
+			</Button>
+		{/if}
 
 		{#if shareUrl}
 			<div class="bg-card border-2 border-border rounded-lg p-4 w-full">

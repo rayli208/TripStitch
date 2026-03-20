@@ -1,3 +1,5 @@
+import { uuid } from '$lib/utils/uuid';
+
 export interface Toast {
 	id: string;
 	message: string;
@@ -13,7 +15,7 @@ function createToastState() {
 		},
 
 		show(message: string, type: Toast['type'] = 'info', duration = 3000) {
-			const id = crypto.randomUUID();
+			const id = uuid();
 			toasts = [...toasts, { id, message, type }];
 			setTimeout(() => {
 				toasts = toasts.filter((t) => t.id !== id);

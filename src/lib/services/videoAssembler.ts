@@ -295,7 +295,7 @@ async function assembleVideoMediaRecorder(
 			);
 
 			const displayName = location.label || location.name.split(',')[0];
-			const flyDuration = !prevLocation ? 3.2 : 4.1;
+			const flyDuration = !prevLocation ? 4.5 : 5.8;
 			console.log(`[TripStitch]   Fly-to took ${((performance.now() - flyStart) / 1000).toFixed(1)}s wall time`);
 			addToTimeline(`map-${location.id}`, displayName, flyDuration, 'map');
 
@@ -331,6 +331,8 @@ async function assembleVideoMediaRecorder(
 						combinedDuration += photoDur;
 						console.log(`[TripStitch]   Photo clip done: ${photoDur.toFixed(1)}s`);
 					}
+					// GC yield between clips
+					await new Promise(r => setTimeout(r, 50));
 				}
 
 				addToTimeline(`clip-${location.id}`, displayName, combinedDuration, 'clip');

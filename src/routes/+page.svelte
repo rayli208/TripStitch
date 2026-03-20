@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import authState from '$lib/state/auth.svelte';
-	import { ArrowRight, CaretDown, MapTrifold, Palette, Camera, Sparkle, FrameCorners, ShareNetwork, ShieldCheck, DeviceMobile, Timer, Download } from 'phosphor-svelte';
+	import { ArrowRight, CaretDown, MapTrifold, Palette, Camera, Sparkle, FrameCorners, ShareNetwork, ShieldCheck, DeviceMobile, Timer, Download, Check, X, Crown, CloudArrowUp, PaintBrush } from 'phosphor-svelte';
 
 	// Redirect authenticated users straight to dashboard
 	$effect(() => {
@@ -53,7 +53,10 @@
 		"description": "Turn your travel photos into cinematic videos with animated map transitions, custom branding, and voice-over — all in your browser.",
 		"applicationCategory": "MultimediaApplication",
 		"operatingSystem": "Any",
-		"offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+		"offers": [
+			{ "@type": "Offer", "name": "Free", "price": "0", "priceCurrency": "USD" },
+			{ "@type": "Offer", "name": "Pro", "price": "0", "priceCurrency": "USD", "description": "Coming soon" }
+		],
 		"featureList": [
 			"Animated map transitions",
 			"Ken Burns photo animations",
@@ -206,7 +209,7 @@
 		<div class="relative z-10 max-w-4xl mx-auto px-6 pt-16 pb-12 sm:pt-24 sm:pb-16 text-center">
 			<div class="{ready ? 'animate-fade-up fill-both delay-100' : 'opacity-0'}">
 				<span class="inline-block px-4 py-1.5 rounded-lg text-xs font-bold tracking-wide uppercase bg-warning text-black border-2 border-border shadow-[2px_2px_0_var(--color-border)] mb-6">
-					Free to use — sign up in seconds
+					Free to start — sign up in seconds
 				</span>
 			</div>
 
@@ -416,8 +419,8 @@
 					<div class="w-10 h-10 rounded-lg bg-success-light border-2 border-border flex items-center justify-center mx-auto mb-3">
 						<ShieldCheck size={20} weight="bold" />
 					</div>
-					<p class="font-bold text-text-primary text-sm">Free Forever</p>
-					<p class="text-xs text-text-muted mt-1">No subscriptions, no paywalls</p>
+					<p class="font-bold text-text-primary text-sm">Free to Start</p>
+					<p class="text-xs text-text-muted mt-1">No credit card required</p>
 				</div>
 				<div class="text-center">
 					<div class="w-10 h-10 rounded-lg bg-accent-light border-2 border-border flex items-center justify-center mx-auto mb-3">
@@ -521,19 +524,134 @@
 		</div>
 	</section>
 
+	<!-- Pricing -->
+	<section id="pricing" class="bg-warning/20 border-y-3 border-border">
+		<div class="max-w-5xl mx-auto px-6 py-20 sm:py-28">
+			<div class="text-center mb-16 reveal">
+				<h2 class="text-3xl sm:text-4xl font-bold text-text-primary">Simple pricing, powerful results</h2>
+				<p class="mt-4 text-text-secondary text-lg max-w-xl mx-auto">Start free, upgrade when you're ready to go bigger.</p>
+			</div>
+
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto reveal">
+				<!-- Free Tier -->
+				<div class="bg-card border-2 border-border rounded-2xl p-7 shadow-[4px_4px_0_var(--color-border)] flex flex-col">
+					<div class="mb-6">
+						<h3 class="text-xl font-bold text-text-primary mb-1">Free</h3>
+						<p class="text-3xl font-extrabold text-text-primary">$0<span class="text-base font-normal text-text-muted">/forever</span></p>
+						<p class="text-sm text-text-secondary mt-2">Everything you need for quick trip videos.</p>
+					</div>
+
+					<ul class="space-y-3 mb-8 flex-1">
+						<li class="flex items-start gap-2.5 text-sm text-text-secondary">
+							<Check size={18} weight="bold" class="text-success flex-shrink-0 mt-0.5" />
+							<span>Up to <strong>8 locations</strong> per trip (5 on mobile)</span>
+						</li>
+						<li class="flex items-start gap-2.5 text-sm text-text-secondary">
+							<Check size={18} weight="bold" class="text-success flex-shrink-0 mt-0.5" />
+							<span>Up to <strong>5 clips</strong> per location (3 on mobile)</span>
+						</li>
+						<li class="flex items-start gap-2.5 text-sm text-text-secondary">
+							<Check size={18} weight="bold" class="text-success flex-shrink-0 mt-0.5" />
+							<span><strong>1080p</strong> export (720p on mobile)</span>
+						</li>
+						<li class="flex items-start gap-2.5 text-sm text-text-secondary">
+							<Check size={18} weight="bold" class="text-success flex-shrink-0 mt-0.5" />
+							<span>All 6 map styles</span>
+						</li>
+						<li class="flex items-start gap-2.5 text-sm text-text-secondary">
+							<Check size={18} weight="bold" class="text-success flex-shrink-0 mt-0.5" />
+							<span>AI-powered captions</span>
+						</li>
+						<li class="flex items-start gap-2.5 text-sm text-text-secondary">
+							<Check size={18} weight="bold" class="text-success flex-shrink-0 mt-0.5" />
+							<span>Music library</span>
+						</li>
+						<li class="flex items-start gap-2.5 text-sm text-text-muted">
+							<X size={18} weight="bold" class="text-text-muted flex-shrink-0 mt-0.5" />
+							<span>TripStitch watermark included</span>
+						</li>
+						<li class="flex items-start gap-2.5 text-sm text-text-muted">
+							<X size={18} weight="bold" class="text-text-muted flex-shrink-0 mt-0.5" />
+							<span>No custom logo or branding</span>
+						</li>
+					</ul>
+
+					<a
+						href="/signin"
+						class="block text-center px-6 py-3 rounded-xl font-bold border-2 border-border shadow-[3px_3px_0_var(--color-border)] hover:shadow-[1px_1px_0_var(--color-border)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+					>
+						Get Started Free
+					</a>
+				</div>
+
+				<!-- Pro Tier -->
+				<div class="relative bg-card border-3 border-accent rounded-2xl p-7 shadow-[4px_4px_0_var(--color-accent)] flex flex-col">
+					<div class="absolute -top-3 right-6 bg-accent text-white text-xs font-bold px-3 py-1 rounded-lg border-2 border-border shadow-[2px_2px_0_var(--color-border)] flex items-center gap-1">
+						<Crown size={14} weight="fill" />
+						Coming Soon
+					</div>
+
+					<div class="mb-6">
+						<h3 class="text-xl font-bold text-text-primary mb-1">Pro</h3>
+						<p class="text-3xl font-extrabold text-accent">TBD<span class="text-base font-normal text-text-muted">/month</span></p>
+						<p class="text-sm text-text-secondary mt-2">For creators who want the full experience.</p>
+					</div>
+
+					<ul class="space-y-3 mb-8 flex-1">
+						<li class="flex items-start gap-2.5 text-sm text-text-secondary">
+							<Check size={18} weight="bold" class="text-accent flex-shrink-0 mt-0.5" />
+							<span><strong>Unlimited locations</strong> per trip</span>
+						</li>
+						<li class="flex items-start gap-2.5 text-sm text-text-secondary">
+							<Check size={18} weight="bold" class="text-accent flex-shrink-0 mt-0.5" />
+							<span><strong>Unlimited clips</strong> per location</span>
+						</li>
+						<li class="flex items-start gap-2.5 text-sm text-text-secondary">
+							<Check size={18} weight="bold" class="text-accent flex-shrink-0 mt-0.5" />
+							<span>Up to <strong>4K</strong> export resolution</span>
+						</li>
+						<li class="flex items-start gap-2.5 text-sm text-text-secondary">
+							<PaintBrush size={18} weight="bold" class="text-accent flex-shrink-0 mt-0.5" />
+							<span><strong>Custom branding</strong> — your logo, your colors, no watermark</span>
+						</li>
+						<li class="flex items-start gap-2.5 text-sm text-text-secondary">
+							<CloudArrowUp size={18} weight="bold" class="text-accent flex-shrink-0 mt-0.5" />
+							<span><strong>Cloud export</strong> — process videos on our servers, faster and more reliable</span>
+						</li>
+						<li class="flex items-start gap-2.5 text-sm text-text-secondary">
+							<CloudArrowUp size={18} weight="bold" class="text-accent flex-shrink-0 mt-0.5" />
+							<span><strong>Video hosting</strong> — we host your exported videos so you can share them anywhere</span>
+						</li>
+						<li class="flex items-start gap-2.5 text-sm text-text-secondary">
+							<Check size={18} weight="bold" class="text-accent flex-shrink-0 mt-0.5" />
+							<span>Everything in Free</span>
+						</li>
+					</ul>
+
+					<button
+						class="block w-full text-center px-6 py-3 rounded-xl bg-accent/20 text-accent font-bold border-2 border-accent/30 cursor-default"
+						disabled
+					>
+						Coming Soon
+					</button>
+				</div>
+			</div>
+		</div>
+	</section>
+
 	<!-- CTA -->
 	<section class="max-w-4xl mx-auto px-6 py-24 sm:py-32 text-center reveal">
 		<h2 class="text-3xl sm:text-5xl font-bold text-text-primary mb-6">
 			Ready to stitch your next trip?
 		</h2>
 		<p class="text-lg text-text-secondary mb-10 max-w-lg mx-auto">
-			Sign in with Google and create your first video in minutes. It's completely free.
+			Start for free — no credit card, no commitment. Create your first travel video in minutes.
 		</p>
 		<a
 			href="/signin"
 			class="inline-flex items-center gap-2 px-10 py-4 rounded-xl bg-accent text-white font-bold text-lg border-2 border-border shadow-[4px_4px_0_var(--color-border)] hover:shadow-[2px_2px_0_var(--color-border)] hover:translate-x-[2px] hover:translate-y-[2px] active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all"
 		>
-			Start Creating
+			Start Creating Free
 			<ArrowRight size={20} weight="bold" />
 		</a>
 	</section>
@@ -559,6 +677,7 @@
 					<ul class="space-y-2 text-sm text-text-secondary">
 						<li><a href="/signin" class="hover:text-accent transition-colors">Get Started</a></li>
 						<li><a href="#features" class="hover:text-accent transition-colors">Features</a></li>
+						<li><a href="#pricing" class="hover:text-accent transition-colors">Pricing</a></li>
 						<li><a href="/explore" class="hover:text-accent transition-colors">Explore Trips</a></li>
 					</ul>
 				</div>
@@ -578,7 +697,7 @@
 		<div class="border-t-2 border-border">
 			<div class="max-w-6xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
 				<p class="text-xs text-text-muted">&copy; {new Date().getFullYear()} TripStitch. All rights reserved.</p>
-				<p class="text-xs text-text-muted">No server-side processing — your media never leaves your device.</p>
+				<p class="text-xs text-text-muted">Free tier processes everything on your device. Pro tier adds optional cloud export.</p>
 			</div>
 		</div>
 	</footer>

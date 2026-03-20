@@ -8,6 +8,7 @@
 	import type { ExportStepItem } from '$lib/types';
 	import { checkBrowserSupport, getSupportedMimeType, getFileExtension } from '$lib/utils/browserCompat';
 	import { getShareUrl } from '$lib/services/shareService';
+	import { uuid } from '$lib/utils/uuid';
 	import { estimateVideoDuration } from '$lib/utils/durationEstimate';
 	import toast from '$lib/state/toast.svelte';
 	import { DEFAULT_BRAND_COLORS } from '$lib/constants/fonts';
@@ -18,10 +19,30 @@
 	import ReviewStep from '$lib/components/editor/ReviewStep.svelte';
 	import ExportStep from '$lib/components/editor/ExportStep.svelte';
 
+	// If the page reloads after iOS backgrounding during share/download,
+	// redirect to the saved trip's edit page instead of showing a blank create form.
+	const SAVED_TRIP_KEY = 'tripstitch_export_tripId';
+	$effect(() => {
+		const savedId = sessionStorage.getItem(SAVED_TRIP_KEY);
+		if (savedId && !isExporting && !exportDone) {
+			sessionStorage.removeItem(SAVED_TRIP_KEY);
+			console.log('[Create] Restoring after page reload — redirecting to saved trip', savedId);
+			goto(`/trip/${savedId}/edit`, { replaceState: true });
+		}
+	});
+
 	$effect(() => {
 		if (authState.loading) return;
-		if (!authState.isSignedIn) goto('/signin');
-		else profileState.load();
+		if (!authState.isSignedIn) {
+			// Don't redirect during export — Firebase auth can briefly flicker on unstable connections
+			if (isExporting || exportDone) {
+				console.warn('[Create] Auth state flickered to signed-out during export, ignoring redirect');
+				return;
+			}
+			goto('/signin');
+		} else {
+			profileState.load();
+		}
 	});
 
 	const editor = createEditorState({
@@ -169,7 +190,7 @@
 
 		// Save trip to Firestore first
 		const tripData = {
-			id: crypto.randomUUID(),
+			id: uuid(),
 			title: editor.title || 'Untitled Trip',
 			titleColor: editor.titleColor,
 			titleDescription: editor.titleDescription,
@@ -222,6 +243,8 @@
 			exportDone = true;
 			progress = { step: 'done', message: 'Your video is ready!', current: 1, total: 1 };
 			shareUrl = docId ? getShareUrl(docId) : null;
+			// Persist trip ID so if iOS kills the tab during share, we can redirect back
+			if (docId) sessionStorage.setItem(SAVED_TRIP_KEY, docId);
 		} catch (err) {
 			isExporting = false;
 			if ((err as Error).message === 'Export cancelled') {
@@ -299,6 +322,7 @@
 	}
 
 	function handleDashboard() {
+		sessionStorage.removeItem(SAVED_TRIP_KEY);
 		if (videoUrl) URL.revokeObjectURL(videoUrl);
 		goto('/trips');
 	}
@@ -338,6 +362,8 @@
 		<LocationsStep
 			locations={editor.locations}
 			canAdd={editor.canAddLocation}
+			maxClipsPerLocation={editor.limits.maxClipsPerLocation}
+			maxLocations={editor.limits.maxLocations}
 			onadd={(loc) => editor.addLocation({ name: loc.name, lat: loc.lat, lng: loc.lng, city: loc.city, state: loc.state, country: loc.country })}
 			onremove={(id) => editor.removeLocation(id)}
 			onaddclip={(locId, file, dur) => editor.addClipToLocation(locId, file, dur)}

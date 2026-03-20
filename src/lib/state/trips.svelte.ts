@@ -1,4 +1,5 @@
 import type { Trip, VideoLinks } from '$lib/types';
+import { uuid } from '$lib/utils/uuid';
 import { db, storage } from '$lib/firebase';
 import authState from './auth.svelte';
 import {
@@ -118,7 +119,7 @@ function createTripsState() {
 								}));
 							} else if (loc.mediaType) {
 								clips = [{
-									id: crypto.randomUUID(),
+									id: uuid(),
 									order: 0,
 									type: loc.mediaType,
 									animationStyle: loc.animationStyle ?? 'kenBurns',

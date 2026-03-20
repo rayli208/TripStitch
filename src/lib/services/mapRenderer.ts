@@ -9,36 +9,32 @@ import { STYLE_URLS } from '$lib/constants/map';
 const TARGET_FPS = 30;
 
 // ── Shared timing constants (used by all fly-to / route functions) ──
-const FLY_TO_DURATION = 1500; // first-location fly-in duration
-const FIRST_HOLD_MS = 1700; // hold after first fly-in
-const ZOOM_OUT_MS = 1000; // subsequent: zoom out to overview
-const PAUSE_MS = 400; // subsequent: pause at overview
-const ZOOM_IN_MS = 1500; // subsequent: zoom in to new location
-const HOLD_MS = 1200; // subsequent: hold on new location
-const FINAL_MAP_DURATION = 4500;
+const FLY_TO_DURATION = 2000; // first-location fly-in duration
+const FIRST_HOLD_MS = 2500; // hold after first fly-in
+const ZOOM_OUT_MS = 1200; // subsequent: zoom out to overview
+const PAUSE_MS = 600; // subsequent: pause at overview (shows distance context)
+const ZOOM_IN_MS = 1800; // subsequent: zoom in to new location
+const HOLD_MS = 2200; // subsequent: hold on new location
+const FINAL_MAP_DURATION = 5000;
 
 // Derived timing helpers
-const FIRST_TOTAL_MS = FLY_TO_DURATION + FIRST_HOLD_MS; // 3200ms
-const ZOOM_IN_AT = ZOOM_OUT_MS + PAUSE_MS; // 1400ms
-const OVERLAY_AT = ZOOM_IN_AT + ZOOM_IN_MS; // 2900ms
-const SUBSEQUENT_TOTAL_MS = OVERLAY_AT + HOLD_MS; // 4100ms
+const FIRST_TOTAL_MS = FLY_TO_DURATION + FIRST_HOLD_MS; // 4500ms
+const ZOOM_IN_AT = ZOOM_OUT_MS + PAUSE_MS; // 1800ms
+const OVERLAY_AT = ZOOM_IN_AT + ZOOM_IN_MS; // 3600ms
+const SUBSEQUENT_TOTAL_MS = OVERLAY_AT + HOLD_MS; // 5800ms
 
 const CYAN = '#00F5FF';
 const MIDNIGHT = '#0F172A';
+
+import { getResolutionForTier, type UserTier } from '$lib/constants/limits';
 
 interface ResolutionMap {
 	width: number;
 	height: number;
 }
 
-const RESOLUTIONS: Record<AspectRatio, ResolutionMap> = {
-	'9:16': { width: 1080, height: 1920 },
-	'1:1': { width: 1080, height: 1080 },
-	'16:9': { width: 1920, height: 1080 }
-};
-
-export function getResolution(aspectRatio: AspectRatio): ResolutionMap {
-	return RESOLUTIONS[aspectRatio];
+export function getResolution(aspectRatio: AspectRatio, tier: UserTier = 'free'): ResolutionMap {
+	return getResolutionForTier(aspectRatio, tier);
 }
 
 const TRANSPORT_ICONS: Record<TransportMode, { icon: string; label: string }> = {

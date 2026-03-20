@@ -3,6 +3,7 @@
 	import type { MusicTrackDef } from '$lib/constants/music';
 	import { MUSIC_MOODS, MUSIC_TRACKS, getTracksByMood } from '$lib/constants/music';
 	import { getTrackUrl, fetchTrackBlob, createTrackPreview } from '$lib/services/musicService';
+	import { uuid } from '$lib/utils/uuid';
 	import Button from '$lib/components/ui/Button.svelte';
 	import { MusicNote, CaretDown, Play, Pause, SpeakerHigh, Upload, ArrowsClockwise, Mountains, Coffee, FilmSlate, Confetti, Heart, Lightning } from 'phosphor-svelte';
 	import type { Component } from 'svelte';
@@ -161,7 +162,7 @@
 		audio.onloadedmetadata = () => {
 			const dur = audio.duration;
 			musicSelection = {
-				trackId: 'custom-' + crypto.randomUUID().slice(0, 8),
+				trackId: 'custom-' + uuid().slice(0, 8),
 				title: file.name.replace(/\.[^.]+$/, ''),
 				mood: 'custom',
 				audioBlob: file,
@@ -172,7 +173,7 @@
 		};
 		audio.onerror = () => {
 			musicSelection = {
-				trackId: 'custom-' + crypto.randomUUID().slice(0, 8),
+				trackId: 'custom-' + uuid().slice(0, 8),
 				title: file.name.replace(/\.[^.]+$/, ''),
 				mood: 'custom',
 				audioBlob: file,

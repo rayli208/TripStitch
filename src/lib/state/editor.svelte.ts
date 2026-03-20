@@ -1,4 +1,6 @@
 import type { Location, Clip, TransportMode, AspectRatio, AnimationStyle, MapStyle, MusicSelection, TripTag, TripVisibility, PriceTier } from '$lib/types';
+import { uuid } from '$lib/utils/uuid';
+import { getLimits, type UserTier } from '$lib/constants/limits';
 
 export function createEditorState(initial?: {
 	title?: string;
@@ -40,7 +42,9 @@ export function createEditorState(initial?: {
 	let isExporting = $state(false);
 	let exportDone = $state(false);
 
-	let canAddLocation = $derived(locations.length < 10);
+	let userTier = $state<UserTier>('free');
+	const limits = $derived(getLimits(userTier));
+	let canAddLocation = $derived(locations.length < limits.maxLocations);
 	let canExport = $derived(locations.length >= 2);
 	let hasContent = $derived(title.trim().length > 0 || locations.length > 0);
 	const stepLabels = ['Details', 'Locations', 'Review', 'Stitch'];
@@ -178,6 +182,15 @@ export function createEditorState(initial?: {
 		get stepLabels() {
 			return stepLabels;
 		},
+		get userTier() {
+			return userTier;
+		},
+		set userTier(v: UserTier) {
+			userTier = v;
+		},
+		get limits() {
+			return limits;
+		},
 
 		nextStep() {
 			if (currentStep < 3) currentStep++;
@@ -189,7 +202,7 @@ export function createEditorState(initial?: {
 		addLocation(loc: { name: string; lat: number; lng: number; city: string | null; state: string | null; country: string | null }) {
 			if (!canAddLocation) return;
 			const newLoc: Location = {
-				id: crypto.randomUUID(),
+				id: uuid(),
 				order: locations.length,
 				name: loc.name,
 				label: loc.name.split(',')[0],
@@ -218,11 +231,20 @@ export function createEditorState(initial?: {
 			locations = copy.map((l, i) => ({ ...l, order: i }));
 		},
 
+		canAddClip(locationId: string): boolean {
+			const loc = locations.find((l) => l.id === locationId);
+			if (!loc) return false;
+			return loc.clips.length < limits.maxClipsPerLocation;
+		},
+
 		addClipToLocation(locationId: string, file: File, durationSec?: number) {
+			const loc = locations.find((l) => l.id === locationId);
+			if (loc && loc.clips.length >= limits.maxClipsPerLocation) return;
+
 			const isVideo = file.type.startsWith('video/');
 			const previewUrl = URL.createObjectURL(file);
 			const clip: Clip = {
-				id: crypto.randomUUID(),
+				id: uuid(),
 				order: 0,
 				file,
 				previewUrl,
