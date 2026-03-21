@@ -100,7 +100,8 @@
 				{#each tripsState.trips as trip (trip.id)}
 					<TripCard
 						{trip}
-						onlinks={() => goto(`/trip/${trip.id}/edit`)}
+						onedit={() => goto(`/trip/${trip.id}/edit`)}
+						onlinks={() => goto(`/trip/${trip.id}/links`)}
 						onshare={() => {
 							navigator.clipboard.writeText(getShareUrl(trip.id));
 							toast.success('Link copied!');

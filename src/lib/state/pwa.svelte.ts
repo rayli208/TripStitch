@@ -1,12 +1,38 @@
+export type InstallPlatform =
+	| 'ios-safari'
+	| 'ios-chrome'
+	| 'ios-other'
+	| 'android'
+	| 'desktop-chrome'
+	| 'desktop-safari'
+	| 'desktop-other';
+
+function detectPlatform(): InstallPlatform {
+	if (typeof navigator === 'undefined') return 'desktop-other';
+
+	const ua = navigator.userAgent;
+	const isIOS = /iPad|iPhone|iPod/.test(ua);
+	const isSafari = /^Apple/.test(navigator.vendor) && !/CriOS|FxiOS/.test(ua);
+	const isChrome = /Chrome/.test(ua) && !/Edg/.test(ua);
+	const isAndroid = /Android/.test(ua);
+
+	if (isIOS) {
+		if (isSafari) return 'ios-safari';
+		if (/CriOS/.test(ua)) return 'ios-chrome';
+		return 'ios-other';
+	}
+	if (isAndroid) return 'android';
+	if (isSafari) return 'desktop-safari';
+	if (isChrome) return 'desktop-chrome';
+	return 'desktop-other';
+}
+
 function createPwaState() {
 	let deferredPrompt = $state<any>(null);
 	let isStandalone = $state(false);
 	let dismissed = $state(false);
 
-	const isIOS =
-		typeof navigator !== 'undefined' &&
-		/iPad|iPhone|iPod/.test(navigator.userAgent) &&
-		!(navigator as any).standalone;
+	const platform = detectPlatform();
 
 	if (typeof window !== 'undefined') {
 		isStandalone =
@@ -37,7 +63,10 @@ function createPwaState() {
 			return dismissed;
 		},
 		get isIOS() {
-			return isIOS;
+			return platform.startsWith('ios');
+		},
+		get platform() {
+			return platform;
 		},
 
 		async install() {

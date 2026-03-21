@@ -283,28 +283,12 @@
 		handleExport();
 	}
 
-	async function handleDownload() {
+	function handleDownload() {
 		if (!videoBlob || !videoUrl) return;
 		const mimeType = videoBlob.type || getSupportedMimeType();
 		const ext = getFileExtension(mimeType);
 		const filename = `${editor.title || 'tripstitch'}-${Date.now()}.${ext}`;
 
-		// On mobile / devices with native share: use share sheet so users can Save to Camera Roll
-		if (navigator.share && navigator.canShare) {
-			try {
-				const file = new File([videoBlob], filename, { type: mimeType });
-				if (navigator.canShare({ files: [file] })) {
-					await navigator.share({ files: [file] });
-					return;
-				}
-			} catch (err) {
-				// User cancelled share — that's fine, don't fall through to download
-				if ((err as Error).name === 'AbortError') return;
-				// Other error — fall through to anchor download
-			}
-		}
-
-		// Standard download via anchor tag (Chrome, Firefox, desktop Safari 14.5+)
 		const url = URL.createObjectURL(new Blob([videoBlob], { type: mimeType }));
 		const a = document.createElement('a');
 		a.href = url;

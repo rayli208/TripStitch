@@ -8,7 +8,7 @@
 	import Button from './Button.svelte';
 	import pwaState from '$lib/state/pwa.svelte';
 	import authState from '$lib/state/auth.svelte';
-	import { Lightning, DownloadSimple, Desktop, DotsThreeVertical, Export } from 'phosphor-svelte';
+	import { Lightning, DownloadSimple, Desktop, DotsThree, Export, CaretDown, List } from 'phosphor-svelte';
 
 	let {
 		button = true,
@@ -89,7 +89,7 @@
 			<!-- Content -->
 			<div class="px-6 pt-5 pb-6">
 				{#if pwaState.canInstall}
-					<!-- Feature benefits -->
+					<!-- Native install prompt (Chrome/Edge on desktop & Android) -->
 					<div class="space-y-3 mb-6">
 						<div class="flex items-start gap-3">
 							<div class="w-8 h-8 rounded-lg bg-accent-light flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -125,7 +125,8 @@
 						<Button variant="ghost" onclick={handleDismiss}>Maybe later</Button>
 					</div>
 
-				{:else if pwaState.isIOS}
+				{:else if pwaState.platform === 'ios-safari'}
+					<!-- iOS Safari: Share button → Add to Home Screen -->
 					<p class="text-sm text-text-secondary mb-4">
 						Add TripStitch to your home screen for instant, fullscreen access:
 					</p>
@@ -133,14 +134,14 @@
 						<div class="flex items-center gap-3">
 							<div class="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">1</div>
 							<p class="text-sm text-text-primary">
-								Tap
+								Tap the
 								<Export size={16} weight="bold" class="inline -mt-0.5 text-accent" />
-								<strong>Share</strong> in the toolbar
+								<strong>Share</strong> button in the toolbar
 							</p>
 						</div>
 						<div class="flex items-center gap-3">
 							<div class="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">2</div>
-							<p class="text-sm text-text-primary">Scroll down, tap <strong>"Add to Home Screen"</strong></p>
+							<p class="text-sm text-text-primary">Scroll down and tap <strong>"Add to Home Screen"</strong></p>
 						</div>
 						<div class="flex items-center gap-3">
 							<div class="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">3</div>
@@ -149,18 +150,128 @@
 					</div>
 					<div class="[&_button]:w-full"><Button variant="secondary" onclick={handleDismiss}>Got it</Button></div>
 
-				{:else}
+				{:else if pwaState.platform === 'ios-chrome'}
+					<!-- iOS Chrome: Three dots → Share → Add to Home Screen -->
 					<p class="text-sm text-text-secondary mb-4">
 						Add TripStitch to your home screen for instant, fullscreen access:
 					</p>
 					<div class="space-y-3 mb-6">
 						<div class="flex items-center gap-3">
 							<div class="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">1</div>
-							<p class="text-sm text-text-primary">Open your browser menu <DotsThreeVertical size={18} weight="bold" class="inline -mt-0.5" /></p>
+							<p class="text-sm text-text-primary">
+								Tap
+								<DotsThree size={18} weight="bold" class="inline -mt-0.5" />
+								<strong>More</strong> at the bottom right
+							</p>
 						</div>
 						<div class="flex items-center gap-3">
 							<div class="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">2</div>
-							<p class="text-sm text-text-primary">Tap <strong>"Install app"</strong> or <strong>"Add to Home Screen"</strong></p>
+							<p class="text-sm text-text-primary">
+								Tap
+								<Export size={16} weight="bold" class="inline -mt-0.5 text-accent" />
+								<strong>Share...</strong>
+							</p>
+						</div>
+						<div class="flex items-center gap-3">
+							<div class="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">3</div>
+							<p class="text-sm text-text-primary">
+								Scroll down, tap
+								<CaretDown size={14} weight="bold" class="inline -mt-0.5" />
+								<strong>"Add to Home Screen"</strong>
+							</p>
+						</div>
+						<div class="flex items-center gap-3">
+							<div class="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">4</div>
+							<p class="text-sm text-text-primary">Tap <strong>"Add"</strong> to confirm</p>
+						</div>
+					</div>
+					<div class="[&_button]:w-full"><Button variant="secondary" onclick={handleDismiss}>Got it</Button></div>
+
+				{:else if pwaState.platform === 'ios-other'}
+					<!-- iOS other browser (Firefox, etc) -->
+					<p class="text-sm text-text-secondary mb-4">
+						For the best experience, open TripStitch in <strong>Safari</strong> to add it to your home screen:
+					</p>
+					<div class="space-y-3 mb-6">
+						<div class="flex items-center gap-3">
+							<div class="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">1</div>
+							<p class="text-sm text-text-primary">Open this page in <strong>Safari</strong></p>
+						</div>
+						<div class="flex items-center gap-3">
+							<div class="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">2</div>
+							<p class="text-sm text-text-primary">
+								Tap the
+								<Export size={16} weight="bold" class="inline -mt-0.5 text-accent" />
+								<strong>Share</strong> button
+							</p>
+						</div>
+						<div class="flex items-center gap-3">
+							<div class="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">3</div>
+							<p class="text-sm text-text-primary">Scroll down, tap <strong>"Add to Home Screen"</strong></p>
+						</div>
+					</div>
+					<div class="[&_button]:w-full"><Button variant="secondary" onclick={handleDismiss}>Got it</Button></div>
+
+				{:else if pwaState.platform === 'desktop-chrome'}
+					<!-- Chrome desktop without native prompt (already installed or dismissed) -->
+					<p class="text-sm text-text-secondary mb-4">
+						Install TripStitch as a desktop app:
+					</p>
+					<div class="space-y-3 mb-6">
+						<div class="flex items-center gap-3">
+							<div class="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">1</div>
+							<p class="text-sm text-text-primary">
+								Look for the
+								<DownloadSimple size={16} weight="bold" class="inline -mt-0.5 text-accent" />
+								<strong>install icon</strong> in the address bar
+							</p>
+						</div>
+						<div class="flex items-center gap-3">
+							<div class="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">2</div>
+							<p class="text-sm text-text-primary">
+								Or click
+								<List size={16} weight="bold" class="inline -mt-0.5" />
+								<strong>Menu</strong> &rarr; <strong>"Install TripStitch..."</strong>
+							</p>
+						</div>
+					</div>
+					<div class="[&_button]:w-full"><Button variant="secondary" onclick={handleDismiss}>Got it</Button></div>
+
+				{:else if pwaState.platform === 'desktop-safari'}
+					<!-- Safari on macOS (Sonoma+) -->
+					<p class="text-sm text-text-secondary mb-4">
+						Add TripStitch to your Dock for quick access:
+					</p>
+					<div class="space-y-3 mb-6">
+						<div class="flex items-center gap-3">
+							<div class="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">1</div>
+							<p class="text-sm text-text-primary">Click <strong>File</strong> in the menu bar</p>
+						</div>
+						<div class="flex items-center gap-3">
+							<div class="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">2</div>
+							<p class="text-sm text-text-primary">Click <strong>"Add to Dock"</strong></p>
+						</div>
+					</div>
+					<div class="[&_button]:w-full"><Button variant="secondary" onclick={handleDismiss}>Got it</Button></div>
+
+				{:else}
+					<!-- Generic fallback (Firefox desktop, Edge without prompt, etc.) -->
+					<p class="text-sm text-text-secondary mb-4">
+						Install TripStitch for quick access:
+					</p>
+					<div class="space-y-3 mb-6">
+						<div class="flex items-center gap-3">
+							<div class="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">1</div>
+							<p class="text-sm text-text-primary">
+								Open your browser menu
+								<List size={16} weight="bold" class="inline -mt-0.5" />
+							</p>
+						</div>
+						<div class="flex items-center gap-3">
+							<div class="w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">2</div>
+							<p class="text-sm text-text-primary">
+								Look for <strong>"Install app"</strong> or <strong>"Add to Home Screen"</strong>
+							</p>
 						</div>
 					</div>
 					<div class="[&_button]:w-full"><Button variant="secondary" onclick={handleDismiss}>Got it</Button></div>

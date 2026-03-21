@@ -11,7 +11,8 @@
 	import { preloadFont } from '$lib/utils/fontLoader';
 	import SkeletonProfile from '$lib/components/ui/SkeletonProfile.svelte';
 	import themeState from '$lib/state/theme.svelte';
-	import { CaretDown, Check, Upload, Sun, Moon, Desktop, Globe, MapTrifold, Camera, Trash } from 'phosphor-svelte';
+	import { CaretDown, Check, Upload, Sun, Moon, Desktop, Globe, MapTrifold, Camera, Trash, Warning } from 'phosphor-svelte';
+	import tripsState from '$lib/state/trips.svelte';
 	import type { ThemeMode } from '$lib/state/theme.svelte';
 	import type { GlobeStyle, MapDisplay } from '$lib/types';
 
@@ -225,6 +226,22 @@
 			formPopulated = false; // Allow re-populate from fresh profile data
 		} else {
 			errorMsg = result.error ?? 'Failed to save';
+		}
+	}
+
+	// ── Delete account ──
+	let deleteStep = $state<'idle' | 'confirm' | 'deleting'>('idle');
+
+	async function handleDeleteAccount() {
+		deleteStep = 'deleting';
+		tripsState.unsubscribe();
+		const result = await profileState.deleteAccount();
+		if (result.ok) {
+			toast.success('Account deleted');
+			goto('/signin');
+		} else {
+			toast.error(result.error ?? 'Failed to delete account');
+			deleteStep = 'idle';
 		}
 	}
 
@@ -612,6 +629,51 @@
 								<p class="text-xs text-error mt-1">{websiteError}</p>
 							{/if}
 						</div>
+					</div>
+				{/if}
+			</section>
+
+			<!-- ═══════════ SECTION: Delete Account ═══════════ -->
+			<section class="bg-card border-2 border-error/30 rounded-xl p-5 {ready ? 'animate-fade-up fill-both delay-350' : 'opacity-0'}">
+				{#if deleteStep === 'idle'}
+					<button
+						class="w-full flex items-center justify-between cursor-pointer text-left"
+						onclick={() => deleteStep = 'confirm'}
+					>
+						<div class="flex items-center gap-2">
+							<Trash size={16} weight="bold" class="text-error" />
+							<span class="text-sm font-medium text-error">Delete Account</span>
+						</div>
+						<CaretDown size={16} weight="bold" class="text-text-muted" />
+					</button>
+				{:else if deleteStep === 'confirm'}
+					<div class="space-y-3">
+						<div class="flex items-start gap-3">
+							<Warning size={20} weight="fill" class="text-error flex-shrink-0 mt-0.5" />
+							<div>
+								<p class="text-sm font-semibold text-error">Are you sure?</p>
+								<p class="text-xs text-text-muted mt-1">This will permanently delete your account, all your trips, media, and profile data. This action cannot be undone.</p>
+							</div>
+						</div>
+						<div class="flex gap-2">
+							<button
+								class="flex-1 text-sm py-2 rounded-lg bg-error hover:bg-error/80 text-white font-bold transition-colors cursor-pointer"
+								onclick={handleDeleteAccount}
+							>
+								Yes, delete everything
+							</button>
+							<button
+								class="flex-1 text-sm py-2 rounded-lg bg-border hover:bg-primary-light text-text-secondary transition-colors cursor-pointer"
+								onclick={() => deleteStep = 'idle'}
+							>
+								Cancel
+							</button>
+						</div>
+					</div>
+				{:else}
+					<div class="flex items-center justify-center gap-3 py-2">
+						<div class="w-4 h-4 border-2 border-error/30 border-t-error rounded-full animate-spin"></div>
+						<span class="text-sm text-text-muted">Deleting account...</span>
 					</div>
 				{/if}
 			</section>

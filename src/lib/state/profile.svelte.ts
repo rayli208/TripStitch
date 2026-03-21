@@ -2,8 +2,10 @@ import type { UserProfile, SocialLinks, GlobeStyle, MapDisplay } from '$lib/type
 import { DEFAULT_FONT_ID } from '$lib/constants/fonts';
 import { db, storage } from '$lib/firebase';
 import authState from './auth.svelte';
-import { doc, getDoc, setDoc, deleteDoc, runTransaction } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { doc, getDoc, setDoc, deleteDoc, runTransaction, collection, query, where, getDocs } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject, listAll } from 'firebase/storage';
+import { deleteUser } from 'firebase/auth';
+import { auth } from '$lib/firebase';
 import { compressImage, imageExtension } from '$lib/utils/imageUtils';
 
 const CACHE_CONTROL = 'public, max-age=31536000';
@@ -250,6 +252,64 @@ function createProfileState() {
 			const snap = await getDoc(doc(db, 'users', uid, 'profile', 'main'));
 			if (snap.exists()) return snap.data() as UserProfile;
 			return null;
+		},
+
+		/** Delete the entire account and all associated data */
+		async deleteAccount(): Promise<{ ok: boolean; error?: string }> {
+			const currentUser = auth.currentUser;
+			if (!currentUser) return { ok: false, error: 'Not signed in' };
+			const uid = currentUser.uid;
+
+			try {
+				// 1. Find and delete all user's trips (storage + Firestore)
+				const tripsQuery = query(collection(db, 'trips'), where('userId', '==', uid));
+				const tripsSnap = await getDocs(tripsQuery);
+
+				for (const tripDoc of tripsSnap.docs) {
+					// Delete trip storage files
+					try {
+						const folderRef = ref(storage, `trips/${tripDoc.id}`);
+						const list = await listAll(folderRef);
+						await Promise.all(list.items.map((item) => deleteObject(item)));
+					} catch { /* folder may not exist */ }
+
+					// Delete trip document
+					await deleteDoc(doc(db, 'trips', tripDoc.id));
+				}
+
+				// 2. Delete user storage files (avatar, logo)
+				try {
+					const userFolder = ref(storage, `users/${uid}`);
+					const userFiles = await listAll(userFolder);
+					await Promise.all(userFiles.items.map((item) => deleteObject(item)));
+				} catch { /* folder may not exist */ }
+
+				// 3. Delete username entry
+				const username = profile?.username;
+				if (username) {
+					try {
+						await deleteDoc(doc(db, 'usernames', username));
+					} catch { /* may not exist */ }
+				}
+
+				// 4. Delete profile document
+				try {
+					await deleteDoc(doc(db, 'users', uid, 'profile', 'main'));
+				} catch { /* may not exist */ }
+
+				// 5. Delete Firebase Auth user (must be last — can't access data after this)
+				await deleteUser(currentUser);
+
+				profile = null;
+				return { ok: true };
+			} catch (err: unknown) {
+				const firebaseErr = err as { code?: string };
+				if (firebaseErr.code === 'auth/requires-recent-login') {
+					return { ok: false, error: 'Please sign out and sign back in before deleting your account' };
+				}
+				const msg = err instanceof Error ? err.message : 'Failed to delete account';
+				return { ok: false, error: msg };
+			}
 		}
 	};
 }

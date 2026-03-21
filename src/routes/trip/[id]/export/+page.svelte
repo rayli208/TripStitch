@@ -115,60 +115,19 @@
 	}
 
 	function handleDownload() {
-		if (!videoBlob || !videoUrl) {
-			console.warn('[Export] handleDownload called but no blob/url', { hasBlob: !!videoBlob, hasUrl: !!videoUrl });
-			return;
-		}
-
-		const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+		if (!videoBlob || !videoUrl) return;
 		const mimeType = videoBlob.type || getSupportedMimeType();
 		const ext = getFileExtension(mimeType);
 		const filename = `${trip?.title || 'tripstitch'}-${Date.now()}.${ext}`;
 
-		console.log('[Export] handleDownload', {
-			blobType: videoBlob.type,
-			detectedMimeType: mimeType,
-			ext,
-			filename,
-			blobSize: `${(videoBlob.size / 1024 / 1024).toFixed(1)} MB`,
-			isIOS,
-			userAgent: navigator.userAgent,
-			hasShareAPI: !!navigator.share,
-			hasCanShare: !!(navigator as any).canShare
-		});
-
-		// On iOS, <a download> saves to Files app, not Photos.
-		// Use Web Share API if available — it lets the user "Save Video" to Camera Roll.
-		if (isIOS && navigator.share && (navigator as any).canShare) {
-			const shareType = 'video/mp4';
-			const file = new File([videoBlob], filename.replace(/\.webm$/, '.mp4'), { type: shareType });
-			const canShare = (navigator as any).canShare({ files: [file] });
-			console.log('[Export] iOS detected, attempting share for save-to-photos', { shareType, canShare });
-
-			if (canShare) {
-				navigator.share({ files: [file] })
-					.then(() => console.log('[Export] iOS share-save completed'))
-					.catch((err: any) => {
-						if (err?.name === 'AbortError') {
-							console.log('[Export] iOS share-save cancelled by user');
-						} else {
-							console.warn('[Export] iOS share-save failed, falling back to <a download>', err);
-							downloadViaAnchor(videoUrl!, filename);
-						}
-					});
-				return;
-			}
-		}
-
-		downloadViaAnchor(videoUrl, filename);
-	}
-
-	function downloadViaAnchor(url: string, filename: string) {
-		console.log('[Export] Using <a download> fallback', { filename });
+		const url = URL.createObjectURL(new Blob([videoBlob], { type: mimeType }));
 		const a = document.createElement('a');
 		a.href = url;
 		a.download = filename;
+		document.body.appendChild(a);
 		a.click();
+		document.body.removeChild(a);
+		setTimeout(() => URL.revokeObjectURL(url), 10000);
 	}
 
 	function handleDashboard() {

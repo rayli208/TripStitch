@@ -301,7 +301,7 @@
 					<a
 						href={getTripHref(selectedTrip.id)}
 						class="block text-center px-3.5 py-1.5 rounded-md text-[13px] font-semibold no-underline transition-opacity hover:opacity-85"
-						style="background: #3b82f6; color: #ffffff"
+						style="background: var(--color-accent); color: #ffffff"
 					>
 						View Trip
 					</a>

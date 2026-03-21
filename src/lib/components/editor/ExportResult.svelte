@@ -34,68 +34,24 @@
 	} = $props();
 
 	let canShareFiles = $derived.by(() => {
-		if (typeof navigator === 'undefined' || !navigator.share || !navigator.canShare) {
-			console.log('[ExportResult] Web Share API not available', {
-				hasNavigator: typeof navigator !== 'undefined',
-				hasShare: typeof navigator !== 'undefined' && !!navigator.share,
-				hasCanShare: typeof navigator !== 'undefined' && !!navigator.canShare
-			});
-			return false;
-		}
+		if (typeof navigator === 'undefined' || !navigator.share || !navigator.canShare) return false;
 		try {
 			const testFile = new File([new Blob([''])], 'test.mp4', { type: 'video/mp4' });
-			const result = navigator.canShare({ files: [testFile] });
-			console.log('[ExportResult] canShareFiles:', result);
-			return result;
-		} catch (err) {
-			console.warn('[ExportResult] canShare check failed:', err);
+			return navigator.canShare({ files: [testFile] });
+		} catch {
 			return false;
 		}
 	});
 
-	// Detect iOS for share behavior
-	const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-	$effect(() => {
-		console.log('[ExportResult] Video blob info:', {
-			blobType: videoBlob.type,
-			blobSize: `${(videoBlob.size / 1024 / 1024).toFixed(1)} MB`,
-			urlPrefix: videoUrl.substring(0, 30),
-			canShareFiles,
-			isIOS,
-			userAgent: navigator.userAgent
-		});
-	});
-
-	async function shareToApp(platform: string) {
+	async function shareToApp() {
 		// Always share as video/mp4 — Instagram/TikTok/iOS reject WebM
-		const shareType = 'video/mp4';
 		const filename = `${tripTitle || 'tripstitch'}.mp4`;
-
-		console.log('[ExportResult] shareToApp called', {
-			platform,
-			originalBlobType: videoBlob.type,
-			shareAsType: shareType,
-			filename,
-			blobSize: `${(videoBlob.size / 1024 / 1024).toFixed(1)} MB`
-		});
-
 		try {
-			const file = new File([videoBlob], filename, { type: shareType });
-			console.log('[ExportResult] File created:', {
-				name: file.name,
-				type: file.type,
-				size: file.size,
-				canShare: navigator.canShare({ files: [file] })
-			});
-
+			const file = new File([videoBlob], filename, { type: 'video/mp4' });
 			await navigator.share({ files: [file] });
-			console.log('[ExportResult] Share completed successfully');
 		} catch (err: any) {
-			if (err?.name === 'AbortError') {
-				console.log('[ExportResult] Share cancelled by user');
-			} else {
-				console.error('[ExportResult] Share failed:', err);
+			if (err?.name !== 'AbortError') {
 				toast.error('Sharing failed. Try downloading instead.');
 			}
 		}
@@ -247,7 +203,7 @@
 		</div>
 
 		{#if canShareFiles}
-			<Button variant="ghost" onclick={() => shareToApp('share')}>
+			<Button variant="ghost" onclick={shareToApp}>
 				<span class="flex items-center gap-2">
 					<ShareNetwork size={16} weight="bold" />
 					Share

@@ -1,14 +1,16 @@
 <script lang="ts">
 	import type { Trip } from '$lib/types';
-	import { Link, Trash, CaretRight } from 'phosphor-svelte';
+	import { Link, Trash, CaretRight, Copy } from 'phosphor-svelte';
 
 	let {
 		trip,
+		onedit,
 		onlinks,
 		ondelete,
 		onshare
 	}: {
 		trip: Trip;
+		onedit: () => void;
 		onlinks: () => void;
 		ondelete: () => void;
 		onshare?: () => void;
@@ -74,9 +76,16 @@
 		<div class="flex gap-2">
 			<button
 				class="flex-1 text-sm py-2 rounded-lg bg-accent text-white font-bold border-2 border-border shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
-				onclick={onlinks}
+				onclick={onedit}
 			>
-				{hasLinks ? 'Edit Link' : 'Add Link'}
+				Edit & Re-export
+			</button>
+			<button
+				class="text-sm py-2 px-3 rounded-lg bg-card border-2 border-border text-text-primary shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
+				onclick={onlinks}
+				title={hasLinks ? 'Edit video link' : 'Add video link'}
+			>
+				<Link size={16} weight="bold" />
 			</button>
 			{#if onshare}
 				<button
@@ -84,7 +93,7 @@
 					onclick={onshare}
 					title="Copy share link"
 				>
-					<Link size={16} weight="bold" />
+					<Copy size={16} weight="bold" />
 				</button>
 			{/if}
 			<button
