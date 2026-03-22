@@ -132,7 +132,7 @@
 	});
 
 	const hasValidationErrors = $derived(!!usernameError || !!displayNameError || !!websiteError);
-	const canSave = $derived(isDirty && !saving && usernameStatus !== 'checking');
+	const canSave = $derived(isDirty && !saving && !hasValidationErrors && usernameStatus !== 'checking');
 
 	// ── Avatar helpers ──
 	const avatarUrl = $derived(profileState.profile?.avatarUrl || authState.user?.avatarUrl || '');
@@ -270,6 +270,7 @@
 </script>
 
 <svelte:head>
+	<title>Profile | TripStitch</title>
 	<link rel="stylesheet" href={googleFontsUrl()} />
 </svelte:head>
 
@@ -395,7 +396,7 @@
 						bind:value={bio}
 						placeholder="Tell people about your travels..."
 						rows="2"
-						class="w-full rounded-lg border border-border bg-page px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+						class="w-full rounded-lg bg-card border-2 border-border text-sm text-text-primary px-3 py-2 placeholder-text-muted shadow-[2px_2px_0_var(--color-border)] focus:outline-none focus:shadow-[4px_4px_0_var(--color-accent)] focus:border-border transition-shadow resize-none"
 					></textarea>
 				</div>
 			</section>
@@ -527,7 +528,7 @@
 								type="text"
 								placeholder="Search fonts..."
 								bind:value={fontSearch}
-								class="w-full rounded-lg border border-border bg-page px-3 py-1.5 text-sm text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent mb-2"
+								class="w-full rounded-lg bg-card border-2 border-border text-sm text-text-primary px-3 py-1.5 placeholder-text-muted shadow-[2px_2px_0_var(--color-border)] focus:outline-none focus:shadow-[4px_4px_0_var(--color-accent)] focus:border-border transition-shadow mb-2"
 							/>
 							<div class="max-h-40 overflow-y-auto rounded-lg border border-border bg-page">
 								{#each FONTS.filter(f => f.id !== preferredFontId && f.name.toLowerCase().includes(fontSearch.toLowerCase())) as font (font.id)}
@@ -638,14 +639,11 @@
 			<section class="bg-card border-2 border-error/30 rounded-xl p-5 {ready ? 'animate-fade-up fill-both delay-350' : 'opacity-0'}">
 				{#if deleteStep === 'idle'}
 					<button
-						class="w-full flex items-center justify-between cursor-pointer text-left"
+						class="text-sm font-medium text-error hover:text-error/80 transition-colors cursor-pointer flex items-center gap-2"
 						onclick={() => deleteStep = 'confirm'}
 					>
-						<div class="flex items-center gap-2">
-							<Trash size={16} weight="bold" class="text-error" />
-							<span class="text-sm font-medium text-error">Delete Account</span>
-						</div>
-						<CaretDown size={16} weight="bold" class="text-text-muted" />
+						<Trash size={16} weight="bold" />
+						Delete Account
 					</button>
 				{:else if deleteStep === 'confirm'}
 					<div class="space-y-3">

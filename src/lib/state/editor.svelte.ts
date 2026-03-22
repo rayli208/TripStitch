@@ -47,7 +47,7 @@ export function createEditorState(initial?: {
 	let canAddLocation = $derived(locations.length < limits.maxLocations);
 	let canExport = $derived(locations.length >= 2);
 	let hasContent = $derived(title.trim().length > 0 || locations.length > 0);
-	const stepLabels = ['Details', 'Locations', 'Review', 'Stitch'];
+	const stepLabels = ['Details', 'Locations', 'Review', 'Stitch', 'Audio', 'Share'];
 
 	return {
 		get currentStep() {
@@ -193,7 +193,7 @@ export function createEditorState(initial?: {
 		},
 
 		nextStep() {
-			if (currentStep < 3) currentStep++;
+			if (currentStep < 5) currentStep++;
 		},
 		prevStep() {
 			if (currentStep > 0) currentStep--;

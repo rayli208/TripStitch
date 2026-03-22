@@ -16,13 +16,15 @@
 		secondaryColor = '#0a0f1e',
 		fontId = 'inter',
 		brandColors = [] as string[],
-		logoUrl = null as string | null
+		logoUrl = null as string | null,
+		onexportchange
 	}: {
 		accentColor?: string;
 		secondaryColor?: string;
 		fontId?: string;
 		brandColors?: string[];
 		logoUrl?: string | null;
+		onexportchange?: (exporting: boolean) => void;
 	} = $props();
 
 	const PLACES_API_KEY = PUBLIC_GOOGLE_PLACES_API_KEY;
@@ -289,6 +291,7 @@
 		if (isExporting || !selectedTown?.boundaryGeoJSON || !selectedLocation) return;
 
 		isExporting = true;
+		onexportchange?.(true);
 		exportDone = false;
 		error = null;
 		progressMsg = 'Starting...';
@@ -329,6 +332,7 @@
 			console.error('[Spotlight] Export error:', err);
 		} finally {
 			abortController = null;
+			onexportchange?.(false);
 		}
 	}
 

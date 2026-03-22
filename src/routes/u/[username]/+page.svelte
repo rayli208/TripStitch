@@ -198,7 +198,7 @@
 			<div class="max-w-3xl mx-auto px-6 sm:px-8 py-4 flex items-center justify-between">
 				<button
 					class="text-sm text-text-muted hover:text-text-primary transition-colors cursor-pointer flex items-center gap-1 font-medium"
-					onclick={() => history.back()}
+					onclick={() => { if (window.history.length > 1) history.back(); else window.location.href = '/'; }}
 				>
 					<CaretLeft size={16} weight="bold" />
 					Back

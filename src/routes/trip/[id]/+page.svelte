@@ -5,9 +5,10 @@
 	import { getFontById, fontFamily } from '$lib/constants/fonts';
 	import { STYLE_URLS } from '$lib/constants/map';
 	import { parseAllVideoLinks } from '$lib/utils/videoEmbed';
+	import { fetchRouteGeometry } from '$lib/services/routeService';
 	import VideoEmbed from '$lib/components/ui/VideoEmbed.svelte';
 	import authState from '$lib/state/auth.svelte';
-	import { Star, StarHalf, Car, PersonSimpleHike, Buildings, SunHorizon, Backpack, ForkKnife, Mountains, Leaf, Bank, Camera, CaretLeft, MapPin, ArrowRight, NavigationArrow, ShareNetwork, Check, Bicycle } from 'phosphor-svelte';
+	import { Star, StarHalf, Car, PersonSimpleHike, Buildings, SunHorizon, Backpack, ForkKnife, Mountains, Leaf, Bank, Camera, CaretLeft, MapPin, ArrowRight, NavigationArrow, ShareNetwork, Check, Bicycle, FilePdf } from 'phosphor-svelte';
 	import type { Component } from 'svelte';
 
 	const TAG_ICONS: Record<string, Component> = {
@@ -21,6 +22,10 @@
 		drove: { icon: Car, label: 'Drove' },
 		biked: { icon: Bicycle, label: 'Biked' }
 	};
+
+	function escapeHtml(str: string): string {
+		return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+	}
 
 	const tripId = page.params.id!;
 
@@ -73,6 +78,33 @@
 		setTimeout(() => { linkCopied = false; }, 2000);
 	}
 
+	// PDF export
+	let pdfGenerating = $state(false);
+	async function downloadPdf() {
+		if (!trip || pdfGenerating) return;
+		pdfGenerating = true;
+		try {
+			const { exportTripToPdf } = await import('$lib/services/pdfExportService');
+			await exportTripToPdf(trip, overallRating);
+		} catch (err) {
+			console.error('PDF export failed:', err);
+		}
+		pdfGenerating = false;
+	}
+
+	// Title contrast — compute text-shadow based on title color luminance
+	const titleTextShadow = $derived.by(() => {
+		if (!trip) return 'none';
+		const hex = trip.titleColor;
+		const r = parseInt(hex.slice(1, 3), 16) / 255;
+		const g = parseInt(hex.slice(3, 5), 16) / 255;
+		const b = parseInt(hex.slice(5, 7), 16) / 255;
+		const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+		if (lum > 0.7) return '0 2px 8px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.4)';
+		if (lum > 0.4) return '0 1px 4px rgba(0,0,0,0.3)';
+		return '0 1px 2px rgba(0,0,0,0.15)';
+	});
+
 	const tripFont = $derived(trip ? getFontById(trip.fontId ?? 'inter') : null);
 	const tripFontFamily = $derived(trip ? fontFamily(trip.fontId ?? 'inter') : '');
 	const tripFontUrl = $derived(() => {
@@ -87,6 +119,7 @@
 	let mapLoaded = $state(false);
 	let mapError = $state(false);
 	let highlightedLocationId = $state<string | null>(null);
+	let initialBounds: any = null;
 
 	$effect(() => {
 		if (!trip || !mapContainer || mapLoaded || mapError) return;
@@ -151,6 +184,12 @@
 		highlightMarker(loc.id);
 	}
 
+	function resetMapView() {
+		if (!mapInstance || !initialBounds) return;
+		unhighlightMarker();
+		mapInstance.fitBounds(initialBounds, { padding: 60, duration: 800 });
+	}
+
 	async function initMap() {
 		if (!trip) return;
 		let maplibregl: typeof import('maplibre-gl').default;
@@ -166,6 +205,7 @@
 			for (const loc of trip.locations) {
 				bounds.extend([loc.lng, loc.lat]);
 			}
+			initialBounds = bounds;
 
 			const styleUrl = STYLE_URLS[trip.mapStyle] ?? STYLE_URLS.streets;
 
@@ -183,14 +223,39 @@
 
 			map.on('error', () => { mapError = true; });
 
-			map.on('load', () => {
+			map.on('load', async () => {
 				const sorted = [...trip!.locations].sort((a, b) => a.order - b.order);
 				const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-				// Animate route by progressively adding coordinates
+				// Fetch road-following route geometries for each segment
 				const allCoords: [number, number][] = [];
-				for (let i = 0; i < sorted.length; i++) {
-					allCoords.push([sorted[i].lng, sorted[i].lat]);
+				if (sorted.length >= 2) {
+					const routePromises = sorted.slice(0, -1).map((from, i) => {
+						const to = sorted[i + 1];
+						const mode = to.transportMode ?? 'drove';
+						return fetchRouteGeometry(from as any, to as any, mode);
+					});
+					const routeResults = await Promise.all(routePromises);
+					for (let i = 0; i < routeResults.length; i++) {
+						const geo = routeResults[i];
+						if (geo?.coordinates?.length) {
+							// Use road-following geometry
+							if (allCoords.length === 0) {
+								allCoords.push(...(geo.coordinates as [number, number][]));
+							} else {
+								// Skip first point to avoid duplicate at junction
+								allCoords.push(...(geo.coordinates.slice(1) as [number, number][]));
+							}
+						} else {
+							// Fallback: straight line for this segment
+							if (allCoords.length === 0) {
+								allCoords.push([sorted[i].lng, sorted[i].lat]);
+							}
+							allCoords.push([sorted[i + 1].lng, sorted[i + 1].lat]);
+						}
+					}
+				} else if (sorted.length === 1) {
+					allCoords.push([sorted[0].lng, sorted[0].lat]);
 				}
 
 				const routeSource: any = {
@@ -198,7 +263,7 @@
 					data: {
 						type: 'Feature',
 						properties: {},
-						geometry: { type: 'LineString', coordinates: reducedMotion ? allCoords : [allCoords[0], allCoords[0]] }
+						geometry: { type: 'LineString', coordinates: (reducedMotion || allCoords.length < 2) ? allCoords : [allCoords[0], allCoords[0]] }
 					}
 				};
 
@@ -228,34 +293,18 @@
 					}
 				});
 
-				// Animate route: interpolate extra points between waypoints for smooth drawing
+				// Animate route drawing
 				if (!reducedMotion && allCoords.length >= 2) {
-					// Build a dense set of interpolated points along the route
-					const denseCoords: [number, number][] = [];
-					const pointsPerSegment = 20;
-					for (let i = 0; i < allCoords.length - 1; i++) {
-						const from = allCoords[i];
-						const to = allCoords[i + 1];
-						for (let j = 0; j < pointsPerSegment; j++) {
-							const t = j / pointsPerSegment;
-							denseCoords.push([
-								from[0] + (to[0] - from[0]) * t,
-								from[1] + (to[1] - from[1]) * t
-							]);
-						}
-					}
-					denseCoords.push(allCoords[allCoords.length - 1]);
-
-					const totalFrames = denseCoords.length;
-					let frame = 2; // start with at least 2 points
+					const totalFrames = allCoords.length;
+					let frame = 2;
 					function animateRoute() {
-						frame = Math.min(frame + 1, totalFrames);
+						frame = Math.min(frame + Math.max(1, Math.floor(totalFrames / 60)), totalFrames);
 						const src = map.getSource('route-full') as any;
 						if (!src) return;
 						src.setData({
 							type: 'Feature',
 							properties: {},
-							geometry: { type: 'LineString', coordinates: denseCoords.slice(0, frame) }
+							geometry: { type: 'LineString', coordinates: allCoords.slice(0, frame) }
 						});
 						if (frame < totalFrames) {
 							requestAnimationFrame(animateRoute);
@@ -312,7 +361,7 @@
 						? `<div style="margin-top:3px;display:flex;align-items:center">${starsHtml}${price}</div>`
 						: '';
 					const desc = loc.description
-						? `<div style="font-size:11px;color:#94a3b8;margin-top:2px;max-width:180px">${loc.description}</div>`
+						? `<div style="font-size:11px;color:#94a3b8;margin-top:2px;max-width:180px">${escapeHtml(loc.description)}</div>`
 						: '';
 
 					const popup = new maplibregl.Popup({
@@ -320,7 +369,7 @@
 						closeButton: false,
 						className: 'ts-popup'
 					}).setHTML(
-						`<div style="font-weight:600;font-size:13px;color:#f1f5f9">${label}</div>${ratingLine}${desc}`
+						`<div style="font-weight:600;font-size:13px;color:#f1f5f9">${escapeHtml(label)}</div>${ratingLine}${desc}`
 					);
 
 					// Click marker -> scroll to location in list
@@ -479,12 +528,26 @@
 			<div class="max-w-3xl mx-auto px-6 sm:px-8 py-4 flex items-center justify-between">
 				<button
 					class="text-sm text-text-muted hover:text-text-primary transition-colors cursor-pointer flex items-center gap-1 font-medium"
-					onclick={() => history.back()}
+					onclick={() => { if (window.history.length > 1) history.back(); else window.location.href = '/'; }}
 				>
 					<CaretLeft size={16} weight="bold" />
 					Back
 				</button>
-				<div class="flex items-center gap-3">
+				<div class="flex items-center gap-2 sm:gap-3">
+					<!-- PDF download -->
+					<button
+						class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-border text-xs font-bold bg-page hover:bg-accent-light hover:border-accent transition-all shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+						onclick={downloadPdf}
+						disabled={pdfGenerating}
+					>
+						{#if pdfGenerating}
+							<div class="w-3.5 h-3.5 border-2 border-accent/30 border-t-accent rounded-full animate-spin"></div>
+							<span class="hidden sm:inline">Saving...</span>
+						{:else}
+							<FilePdf size={14} weight="bold" class="text-accent" />
+							<span class="hidden sm:inline">PDF</span>
+						{/if}
+					</button>
 					<!-- Share button -->
 					<button
 						class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-border text-xs font-bold bg-page hover:bg-accent-light hover:border-accent transition-all shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer"
@@ -519,28 +582,32 @@
 				/>
 				<div class="absolute inset-0 bg-gradient-to-t from-page via-page/40 to-transparent"></div>
 				<div class="absolute bottom-0 left-0 right-0 p-6 sm:p-8 max-w-3xl mx-auto">
-					{#if formattedDate}
-						<p class="text-sm text-white/70 font-medium mb-2">{formattedDate}</p>
-					{/if}
-					<h1 class="text-3xl sm:text-4xl font-extrabold text-text-primary" style="color: {trip.titleColor}; font-family: {tripFontFamily}">
-						{trip.title}
-					</h1>
-					{#if trip.titleDescription}
-						<p class="text-base sm:text-lg text-text-secondary mt-1" style="font-family: {tripFontFamily}">{trip.titleDescription}</p>
-					{/if}
+					<div class="inline-block px-4 py-3 -mx-4 rounded-xl bg-black/35 backdrop-blur-sm border-2 border-white/10">
+						{#if formattedDate}
+							<p class="text-sm text-white/70 font-medium mb-2">{formattedDate}</p>
+						{/if}
+						<h1 class="text-3xl sm:text-4xl font-extrabold" style="color: {trip.titleColor}; font-family: {tripFontFamily}; text-shadow: {titleTextShadow}">
+							{trip.title}
+						</h1>
+						{#if trip.titleDescription}
+							<p class="text-base sm:text-lg text-white/80 mt-1" style="font-family: {tripFontFamily}">{trip.titleDescription}</p>
+						{/if}
+					</div>
 				</div>
 			</div>
 		{:else}
 			<div class="max-w-3xl mx-auto px-6 sm:px-8 pt-10 pb-4 {ready ? 'animate-fade-up fill-both' : 'opacity-0'}">
-				{#if formattedDate}
-					<p class="text-sm text-text-muted font-medium mb-2">{formattedDate}</p>
-				{/if}
-				<h1 class="text-3xl sm:text-4xl font-extrabold" style="color: {trip.titleColor}; font-family: {tripFontFamily}">
-					{trip.title}
-				</h1>
-				{#if trip.titleDescription}
-					<p class="text-base sm:text-lg text-text-secondary mt-2" style="font-family: {tripFontFamily}">{trip.titleDescription}</p>
-				{/if}
+				<div class="inline-block px-4 py-3 -mx-4 rounded-xl" style="background: {trip.titleColor}10; border-left: 4px solid {trip.titleColor}">
+					{#if formattedDate}
+						<p class="text-sm text-text-muted font-medium mb-2">{formattedDate}</p>
+					{/if}
+					<h1 class="text-3xl sm:text-4xl font-extrabold" style="color: {trip.titleColor}; font-family: {tripFontFamily}; text-shadow: {titleTextShadow}">
+						{trip.title}
+					</h1>
+					{#if trip.titleDescription}
+						<p class="text-base sm:text-lg text-text-secondary mt-2" style="font-family: {tripFontFamily}">{trip.titleDescription}</p>
+					{/if}
+				</div>
 			</div>
 		{/if}
 
@@ -702,7 +769,11 @@
 
 		<!-- Map + Route -->
 		<div class="max-w-3xl mx-auto px-6 sm:px-8 pb-8 {ready ? 'animate-fade-up fill-both delay-200' : 'opacity-0'}">
-			<div class="bg-card border-2 border-border rounded-2xl shadow-brutal overflow-hidden">
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="bg-card border-2 border-border rounded-2xl shadow-brutal overflow-hidden"
+				onmouseleave={resetMapView}
+			>
 				<!-- Map -->
 				{#if mapError}
 					<div class="w-full h-64 sm:h-80 flex items-center justify-center bg-page">

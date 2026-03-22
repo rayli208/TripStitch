@@ -23,6 +23,10 @@
 		musicVolume = $bindable(70),
 		keepOriginalAudio = $bindable(true),
 		voiceOverVolume = $bindable(100),
+		title = 'Edit Audio',
+		applyLabel = 'Apply Audio & Save',
+		skipLabel,
+		showBackArrow = true,
 		onback,
 		onapply
 	}: {
@@ -34,6 +38,10 @@
 		musicVolume?: number;
 		keepOriginalAudio?: boolean;
 		voiceOverVolume?: number;
+		title?: string;
+		applyLabel?: string;
+		skipLabel?: string;
+		showBackArrow?: boolean;
 		onback: () => void;
 		onapply: (mergedBlob: Blob | null, mergedUrl: string | null) => void;
 	} = $props();
@@ -481,14 +489,16 @@
 	<!-- Audio editor -->
 	<div class="flex flex-col items-center py-6 gap-5">
 		<div class="flex items-center gap-3 w-full">
-			<button
-				class="text-text-muted hover:text-text-primary transition-colors cursor-pointer p-1"
-				onclick={onback}
-				aria-label="Back"
-			>
-				<CaretLeft size={20} weight="bold" />
-			</button>
-			<h3 class="text-xl font-semibold text-text-primary">Edit Audio</h3>
+			{#if showBackArrow}
+				<button
+					class="text-text-muted hover:text-text-primary transition-colors cursor-pointer p-1"
+					onclick={onback}
+					aria-label="Back"
+				>
+					<CaretLeft size={20} weight="bold" />
+				</button>
+			{/if}
+			<h3 class="text-xl font-semibold text-text-primary">{title}</h3>
 		</div>
 
 		<!-- Segment timeline (during recording) -->
@@ -700,14 +710,14 @@
 			<div class="flex flex-col gap-3 w-full">
 				{#if hasAnyAudio}
 					<Button variant="primary" onclick={handleApplyAndSave}>
-						Apply Audio & Save
+						{applyLabel}
 					</Button>
 				{/if}
 				<button
 					class="text-sm text-text-muted hover:text-text-secondary cursor-pointer transition-colors text-center"
 					onclick={onback}
 				>
-					{hasAnyAudio ? 'Back without applying' : 'Back to video'}
+					{skipLabel ?? (hasAnyAudio ? 'Back without applying' : 'Back to video')}
 				</button>
 			</div>
 		{/if}

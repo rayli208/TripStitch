@@ -17,6 +17,8 @@
 	import LocationsStep from '$lib/components/editor/LocationsStep.svelte';
 	import ReviewStep from '$lib/components/editor/ReviewStep.svelte';
 	import ExportStep from '$lib/components/editor/ExportStep.svelte';
+	import AudioEditor from '$lib/components/editor/AudioEditor.svelte';
+	import ExportResult from '$lib/components/editor/ExportResult.svelte';
 
 	const tripId = page.params.id!;
 
@@ -261,6 +263,8 @@
 			exportDone = true;
 			progress = { step: 'done', message: 'Your video is ready!', current: 1, total: 1 };
 			shareUrl = getShareUrl(tripId);
+			// Auto-advance to Audio step
+			editor.currentStep = 4;
 		} catch (err) {
 			isExporting = false;
 			if ((err as Error).message === 'Export cancelled') {
@@ -315,10 +319,17 @@
 		setTimeout(() => URL.revokeObjectURL(url), 10000);
 	}
 
-	function handleMusicMerged(blob: Blob, url: string) {
-		if (videoUrl) URL.revokeObjectURL(videoUrl);
-		videoBlob = blob;
-		videoUrl = url;
+	function handleAudioApply(mergedBlob: Blob | null, mergedUrl: string | null) {
+		if (mergedBlob && mergedUrl) {
+			if (videoUrl) URL.revokeObjectURL(videoUrl);
+			videoBlob = mergedBlob;
+			videoUrl = mergedUrl;
+		}
+		editor.currentStep = 5;
+	}
+
+	function handleAudioSkip() {
+		editor.currentStep = 5;
 	}
 
 	function handleDashboard() {
@@ -338,7 +349,7 @@
 		<!-- Skeleton while trip loads -->
 		<div class="space-y-4 animate-pulse">
 			<div class="flex gap-2">
-				{#each Array(4) as _}
+				{#each Array(6) as _}
 					<div class="flex-1 h-8 bg-border/50 rounded-lg"></div>
 				{/each}
 			</div>
@@ -380,8 +391,8 @@
 		{:else if editor.currentStep === 1}
 			{#if editor.locations.length > 0 && editor.locations.every(l => l.clips.length === 0)}
 				<div class="bg-warning/10 border-2 border-warning/30 rounded-xl p-4 mb-4">
-					<p class="text-sm font-medium text-warning">Re-attach your media</p>
-					<p class="text-xs text-text-muted mt-1">Your trip settings are preserved. Add your photos and videos back to each stop to re-export.</p>
+					<p class="text-sm font-medium text-warning">Your photos & videos need to be re-added</p>
+					<p class="text-xs text-text-muted mt-1">Media files are stored on your device, not in the cloud, so they can't be loaded from a previous session. Your trip title, locations, and settings are all still here — just tap each stop below and add your photos/videos back.</p>
 				</div>
 			{/if}
 			<LocationsStep
@@ -431,28 +442,15 @@
 				onmove={(from, to) => editor.moveLocation(from, to)}
 				ontransport={(id, mode) => editor.updateLocationTransport(id, mode)}
 				onlabel={(id, label) => editor.updateLocationLabel(id, label)}
-				onnext={() => { editor.nextStep(); handleExport(); }}
+				onnext={() => editor.nextStep()}
 				onback={() => editor.prevStep()}
 			/>
-		{:else}
+		{:else if editor.currentStep === 3}
 			<ExportStep
-				bind:musicSelection={editor.musicSelection}
-				bind:musicVolume={editor.musicVolume}
-				bind:keepOriginalAudio={editor.keepOriginalAudio}
-				bind:voiceOverVolume={editor.voiceOverVolume}
 				canExport={editor.canExport && support.canExport}
-				locations={editor.locations}
-				{videoSegments}
 				{isExporting}
-				{exportDone}
 				{progress}
-				{videoUrl}
-				{videoBlob}
 				{error}
-				tripTitle={editor.title}
-				tripDescription={editor.titleDescription}
-				tripTags={editor.tags}
-				tripDate={editor.tripDate}
 				browserSupported={support.canExport}
 				browserWarnings={support.warnings}
 				exportSteps={exportSteps}
@@ -463,10 +461,36 @@
 				onback={() => editor.prevStep()}
 				oncancel={handleCancel}
 				onretry={handleRetry}
+			/>
+		{:else if editor.currentStep === 4 && videoUrl && videoBlob}
+			<AudioEditor
+				{videoUrl}
+				videoBlob={videoBlob}
+				{videoSegments}
+				locations={editor.locations}
+				bind:musicSelection={editor.musicSelection}
+				bind:musicVolume={editor.musicVolume}
+				bind:keepOriginalAudio={editor.keepOriginalAudio}
+				bind:voiceOverVolume={editor.voiceOverVolume}
+				title="Add Audio"
+				applyLabel="Apply & Continue"
+				skipLabel="Skip"
+				showBackArrow={false}
+				onback={handleAudioSkip}
+				onapply={handleAudioApply}
+			/>
+		{:else if editor.currentStep === 5 && videoUrl && videoBlob}
+			<ExportResult
+				{videoUrl}
+				videoBlob={videoBlob}
+				tripTitle={editor.title}
+				tripDescription={editor.titleDescription}
+				tripTags={editor.tags}
+				tripDate={editor.tripDate}
+				locations={editor.locations}
+				{shareUrl}
 				ondownload={handleDownload}
 				ondashboard={handleDashboard}
-				onmusicmerged={handleMusicMerged}
-				{shareUrl}
 				oncopylink={handleCopyLink}
 			/>
 		{/if}

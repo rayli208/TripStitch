@@ -13,6 +13,19 @@
 	import TravelMap from '$lib/components/TravelMap.svelte';
 	import { Copy } from 'phosphor-svelte';
 
+	let mapContainer: HTMLDivElement | undefined = $state();
+	let mapVisible = $state(false);
+
+	$effect(() => {
+		if (!mapContainer) return;
+		const observer = new IntersectionObserver(
+			([entry]) => { if (entry.isIntersecting) { mapVisible = true; observer.disconnect(); } },
+			{ rootMargin: '200px' }
+		);
+		observer.observe(mapContainer);
+		return () => observer.disconnect();
+	});
+
 	$effect(() => {
 		if (authState.loading) return;
 		if (!authState.isSignedIn) {
@@ -24,6 +37,8 @@
 		return () => tripsState.unsubscribe();
 	});
 </script>
+
+<svelte:head><title>My Trips | TripStitch</title></svelte:head>
 
 <AppShell title="My Trips" showBottomNav logoUrl={profileState.profile?.logoUrl}>
 	<div class="space-y-4">
@@ -81,27 +96,31 @@
 					locations: t.locations.map(l => ({ lat: l.lat, lng: l.lng, name: l.name, label: l.label }))
 				}))}
 			{#if globeTrips.length > 0}
-				{#if (profileState.profile?.mapDisplay ?? 'globe') === 'map'}
-					<TravelMap
-						trips={globeTrips}
-						getTripHref={(id) => `/trip/${id}`}
-						mapStyle={profileState.profile?.globeStyle === 'custom' ? 'dark' : (profileState.profile?.globeStyle ?? 'dark')}
-					/>
-				{:else}
-					<TravelGlobe
-						trips={globeTrips}
-						getTripHref={(id) => `/trip/${id}`}
-						globeStyle={profileState.profile?.globeStyle ?? 'dark'}
-						brandColors={profileState.profile?.brandColors ?? []}
-					/>
-				{/if}
+				<div bind:this={mapContainer}>
+					{#if mapVisible}
+						{#if (profileState.profile?.mapDisplay ?? 'globe') === 'map'}
+							<TravelMap
+								trips={globeTrips}
+								getTripHref={(id) => `/trip/${id}`}
+								mapStyle={profileState.profile?.globeStyle === 'custom' ? 'dark' : (profileState.profile?.globeStyle ?? 'dark')}
+							/>
+						{:else}
+							<TravelGlobe
+								trips={globeTrips}
+								getTripHref={(id) => `/trip/${id}`}
+								globeStyle={profileState.profile?.globeStyle ?? 'dark'}
+								brandColors={profileState.profile?.brandColors ?? []}
+							/>
+						{/if}
+					{/if}
+				</div>
 			{/if}
 			<div class="space-y-3">
 				{#each tripsState.trips as trip (trip.id)}
 					<TripCard
 						{trip}
 						onedit={() => goto(`/trip/${trip.id}/edit`)}
-						onlinks={() => goto(`/trip/${trip.id}/links`)}
+						onlinks={() => goto(`/trip/${trip.id}/edit`)}
 						onshare={() => {
 							navigator.clipboard.writeText(getShareUrl(trip.id));
 							toast.success('Link copied!');

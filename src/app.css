@@ -62,6 +62,15 @@
   --shadow-brutal-lg: 6px 6px 0 #E8E8E8;
 }
 
+/* Hide scrollbar but keep scrolling */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Prevent iOS Safari from zooming into inputs */
 @supports (-webkit-touch-callout: none) {
   input, select, textarea {

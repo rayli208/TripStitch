@@ -46,6 +46,7 @@
 			style="background-color: {primaryColor}"
 			onclick={() => (selected = primaryColor)}
 			aria-label="Select your brand color"
+			aria-pressed={selected === primaryColor}
 			title="Your color"
 		></button>
 		<div class="w-px h-6 bg-border"></div>
@@ -56,6 +57,7 @@
 			style="background-color: {color}"
 			onclick={() => (selected = color)}
 			aria-label="Select color {color}"
+			aria-pressed={selected === color}
 		></button>
 	{/each}
 

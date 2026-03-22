@@ -31,6 +31,7 @@
 </script>
 
 <button
+	type="button"
 	class="{baseClasses} {variantClasses[variant]} {sizeClasses[size]}"
 	{disabled}
 	{onclick}

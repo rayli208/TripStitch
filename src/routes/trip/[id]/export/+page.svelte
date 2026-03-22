@@ -8,6 +8,7 @@
 	import { checkBrowserSupport, getSupportedMimeType, getFileExtension } from '$lib/utils/browserCompat';
 	import AppShell from '$lib/components/layout/AppShell.svelte';
 	import ExportStep from '$lib/components/editor/ExportStep.svelte';
+	import ExportResult from '$lib/components/editor/ExportResult.svelte';
 
 	const tripId = page.params.id!;
 
@@ -54,14 +55,6 @@
 		abortController = new AbortController();
 
 		try {
-			// Warn about large files
-			const totalMediaSize = trip.locations.reduce((sum, loc) => {
-				return sum + (loc.mediaFile?.size ?? 0);
-			}, 0);
-			if (totalMediaSize > 50 * 1024 * 1024) {
-				console.warn('Total media size exceeds 50MB. Export may be slow or fail.');
-			}
-
 			// Dynamic import to avoid loading heavy deps upfront
 			const { assembleVideo } = await import('$lib/services/videoAssembler');
 
@@ -140,21 +133,26 @@
 </script>
 
 <AppShell title="Export" showBack onback={() => goto(`/trip/${tripId}/edit`)}>
-	<ExportStep
-		canExport={support.canExport}
-		{isExporting}
-		{exportDone}
-		{progress}
-		{videoUrl}
-		{error}
-		tripTitle={trip?.title ?? ''}
-		browserSupported={support.canExport}
-		browserWarnings={support.warnings}
-		onexport={handleExport}
-		onback={() => goto(`/trip/${tripId}/edit`)}
-		oncancel={handleCancel}
-		onretry={handleRetry}
-		ondownload={handleDownload}
-		ondashboard={handleDashboard}
-	/>
+	{#if exportDone && videoUrl && videoBlob}
+		<ExportResult
+			{videoUrl}
+			videoBlob={videoBlob}
+			tripTitle={trip?.title ?? ''}
+			ondownload={handleDownload}
+			ondashboard={handleDashboard}
+		/>
+	{:else}
+		<ExportStep
+			canExport={support.canExport}
+			{isExporting}
+			{progress}
+			{error}
+			browserSupported={support.canExport}
+			browserWarnings={support.warnings}
+			onexport={handleExport}
+			onback={() => goto(`/trip/${tripId}/edit`)}
+			oncancel={handleCancel}
+			onretry={handleRetry}
+		/>
+	{/if}
 </AppShell>

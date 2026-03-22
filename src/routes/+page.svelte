@@ -502,7 +502,8 @@
 			<p class="mt-4 text-text-secondary text-lg max-w-xl mx-auto">From weekend getaways to cross-continental adventures — TripStitch handles it all.</p>
 		</div>
 
-		<div class="flex md:grid md:grid-cols-3 gap-6 overflow-x-auto md:overflow-visible pb-4 md:pb-0 snap-x snap-mandatory reveal">
+		<div class="relative">
+		<div class="flex md:grid md:grid-cols-3 gap-6 overflow-x-auto md:overflow-visible pb-4 md:pb-0 snap-x snap-mandatory reveal scrollbar-hide">
 			<!-- Card 1 -->
 			<div class="showcase-card flex-shrink-0 w-72 md:w-auto snap-start bg-card border-2 border-border rounded-2xl overflow-hidden shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] transition-all duration-300">
 				<div class="h-3 bg-accent"></div>
@@ -570,6 +571,10 @@
 				</div>
 			</div>
 		</div>
+		<!-- Scroll indicators (mobile only) -->
+		<div class="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-page to-transparent md:hidden"></div>
+		<div class="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-page to-transparent md:hidden"></div>
+	</div>
 	</section>
 
 	<!-- Pricing -->

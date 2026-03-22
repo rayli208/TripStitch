@@ -11,13 +11,14 @@
 	import { uuid } from '$lib/utils/uuid';
 	import { estimateVideoDuration } from '$lib/utils/durationEstimate';
 	import toast from '$lib/state/toast.svelte';
-	import { DEFAULT_BRAND_COLORS } from '$lib/constants/fonts';
 	import AppShell from '$lib/components/layout/AppShell.svelte';
 	import StepIndicator from '$lib/components/editor/StepIndicator.svelte';
 	import TitleStep from '$lib/components/editor/TitleStep.svelte';
 	import LocationsStep from '$lib/components/editor/LocationsStep.svelte';
 	import ReviewStep from '$lib/components/editor/ReviewStep.svelte';
 	import ExportStep from '$lib/components/editor/ExportStep.svelte';
+	import AudioEditor from '$lib/components/editor/AudioEditor.svelte';
+	import ExportResult from '$lib/components/editor/ExportResult.svelte';
 	import { MapTrifold, MapPin } from 'phosphor-svelte';
 
 	let showEditor = $state(false);
@@ -266,6 +267,8 @@
 			shareUrl = docId ? getShareUrl(docId) : null;
 			// Persist trip ID so if iOS kills the tab during share, we can redirect back
 			if (docId) sessionStorage.setItem(SAVED_TRIP_KEY, docId);
+			// Auto-advance to Audio step
+			editor.currentStep = 4;
 		} catch (err) {
 			isExporting = false;
 			if ((err as Error).message === 'Export cancelled') {
@@ -320,10 +323,17 @@
 		setTimeout(() => URL.revokeObjectURL(url), 10000);
 	}
 
-	function handleMusicMerged(blob: Blob, url: string) {
-		if (videoUrl) URL.revokeObjectURL(videoUrl);
-		videoBlob = blob;
-		videoUrl = url;
+	function handleAudioApply(mergedBlob: Blob | null, mergedUrl: string | null) {
+		if (mergedBlob && mergedUrl) {
+			if (videoUrl) URL.revokeObjectURL(videoUrl);
+			videoBlob = mergedBlob;
+			videoUrl = mergedUrl;
+		}
+		editor.currentStep = 5;
+	}
+
+	function handleAudioSkip() {
+		editor.currentStep = 5;
 	}
 
 	function handleDashboard() {
@@ -339,6 +349,8 @@
 	}
 
 </script>
+
+<svelte:head><title>Create | TripStitch</title></svelte:head>
 
 <AppShell title="Create" showBottomNav logoUrl={profileState.profile?.logoUrl}>
 	{#if !showEditor}
@@ -448,28 +460,15 @@
 			onmove={(from, to) => editor.moveLocation(from, to)}
 			ontransport={(id, mode) => editor.updateLocationTransport(id, mode)}
 			onlabel={(id, label) => editor.updateLocationLabel(id, label)}
-			onnext={() => { editor.nextStep(); handleExport(); }}
+			onnext={() => editor.nextStep()}
 			onback={() => editor.prevStep()}
 		/>
-	{:else}
+	{:else if editor.currentStep === 3}
 		<ExportStep
-			bind:musicSelection={editor.musicSelection}
-			bind:musicVolume={editor.musicVolume}
-			bind:keepOriginalAudio={editor.keepOriginalAudio}
-			bind:voiceOverVolume={editor.voiceOverVolume}
 			canExport={editor.canExport && support.canExport}
-			locations={editor.locations}
-			{videoSegments}
 			{isExporting}
-			{exportDone}
 			{progress}
-			{videoUrl}
-			{videoBlob}
 			{error}
-			tripTitle={editor.title}
-			tripDescription={editor.titleDescription}
-			tripTags={editor.tags}
-			tripDate={editor.tripDate}
 			browserSupported={support.canExport}
 			browserWarnings={support.warnings}
 			exportSteps={exportSteps}
@@ -480,10 +479,36 @@
 			onback={() => editor.prevStep()}
 			oncancel={handleCancel}
 			onretry={handleRetry}
+		/>
+	{:else if editor.currentStep === 4 && videoUrl && videoBlob}
+		<AudioEditor
+			{videoUrl}
+			videoBlob={videoBlob}
+			{videoSegments}
+			locations={editor.locations}
+			bind:musicSelection={editor.musicSelection}
+			bind:musicVolume={editor.musicVolume}
+			bind:keepOriginalAudio={editor.keepOriginalAudio}
+			bind:voiceOverVolume={editor.voiceOverVolume}
+			title="Add Audio"
+			applyLabel="Apply & Continue"
+			skipLabel="Skip"
+			showBackArrow={false}
+			onback={handleAudioSkip}
+			onapply={handleAudioApply}
+		/>
+	{:else if editor.currentStep === 5 && videoUrl && videoBlob}
+		<ExportResult
+			{videoUrl}
+			videoBlob={videoBlob}
+			tripTitle={editor.title}
+			tripDescription={editor.titleDescription}
+			tripTags={editor.tags}
+			tripDate={editor.tripDate}
+			locations={editor.locations}
+			{shareUrl}
 			ondownload={handleDownload}
 			ondashboard={handleDashboard}
-			onmusicmerged={handleMusicMerged}
-			{shareUrl}
 			oncopylink={handleCopyLink}
 		/>
 	{/if}

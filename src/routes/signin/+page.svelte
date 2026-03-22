@@ -304,7 +304,7 @@
 				</div>
 				<div class="flex items-center gap-1.5">
 					<CurrencyDollar size={14} weight="bold" />
-					<span>100% free</span>
+					<span>Free to start</span>
 				</div>
 			</div>
 		</div>

@@ -394,7 +394,7 @@
 					<div class="min-w-0 flex-1">
 						<input
 							type="text"
-							class="bg-transparent text-base font-semibold text-text-primary w-full outline-none border-b border-transparent focus:border-border transition-colors"
+							class="w-full rounded-lg bg-page border-2 border-border text-base font-semibold text-text-primary px-3 py-1.5 placeholder-text-muted shadow-[2px_2px_0_var(--color-border)] focus:outline-none focus:shadow-[4px_4px_0_var(--color-accent)] focus:border-border transition-shadow"
 							placeholder={activeLoc.name.split(',')[0]}
 							value={activeLoc.label ?? ''}
 							oninput={(e) => onlabel(activeLoc!.id, (e.target as HTMLInputElement).value)}
@@ -652,7 +652,7 @@
 				<!-- Description -->
 				<div class="mb-3">
 					<textarea
-						class="w-full bg-transparent text-sm text-text-secondary border border-border rounded-lg px-3 py-2 outline-none focus:border-accent transition-colors resize-none"
+						class="w-full rounded-lg bg-card border-2 border-border text-sm text-text-primary px-3 py-2 placeholder-text-muted shadow-[2px_2px_0_var(--color-border)] focus:outline-none focus:shadow-[4px_4px_0_var(--color-accent)] focus:border-border transition-shadow resize-none"
 						placeholder="Add a note about this stop... *"
 						rows="2"
 						value={activeLoc.description ?? ''}

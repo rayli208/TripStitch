@@ -30,7 +30,7 @@
 		ondownload?: () => void;
 		ondashboard?: () => void;
 		oncopylink?: () => void;
-		oneditaudio: () => void;
+		oneditaudio?: () => void;
 	} = $props();
 
 	let canShareFiles = $derived.by(() => {
@@ -108,12 +108,14 @@
 			</Button>
 		{/if}
 
-		<Button variant="ghost" onclick={oneditaudio}>
-			<span class="flex items-center gap-2">
-				<MusicNote size={16} weight="bold" />
-				Edit Audio
-			</span>
-		</Button>
+		{#if oneditaudio}
+			<Button variant="ghost" onclick={oneditaudio}>
+				<span class="flex items-center gap-2">
+					<MusicNote size={16} weight="bold" />
+					Edit Audio
+				</span>
+			</Button>
+		{/if}
 
 		<!-- Caption generation -->
 		<div class="bg-card border-2 border-border rounded-lg p-4 w-full space-y-3">
