@@ -110,7 +110,7 @@
 		bind:value={query}
 		oninput={handleInput}
 		onfocus={() => (isOpen = true)}
-		class="w-full rounded-lg bg-card border border-border text-text-primary px-3 py-2 text-sm placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+		class="w-full rounded-lg bg-card border-2 border-border text-text-primary px-3 py-2 text-sm placeholder-text-muted shadow-[2px_2px_0_var(--color-border)] focus:outline-none focus:shadow-[4px_4px_0_var(--color-accent)] focus:border-border transition-shadow"
 	/>
 
 	{#if loading}
@@ -120,7 +120,7 @@
 	{/if}
 
 	{#if isOpen && suggestions.length > 0}
-		<div class="absolute z-20 mt-1 w-full bg-card border border-border rounded-lg shadow-xl overflow-hidden">
+		<div class="absolute z-20 mt-1 w-full bg-card border-2 border-border rounded-lg shadow-[4px_4px_0_var(--color-border)] overflow-hidden">
 			{#each suggestions as suggestion}
 				<button
 					class="w-full text-left px-3 py-2 text-sm text-text-secondary hover:bg-border transition-colors cursor-pointer"
@@ -133,7 +133,7 @@
 	{/if}
 
 	{#if isOpen && !loading && query.length >= 2 && suggestions.length === 0}
-		<div class="absolute z-20 mt-1 w-full bg-card border border-border rounded-lg shadow-xl p-3">
+		<div class="absolute z-20 mt-1 w-full bg-card border-2 border-border rounded-lg shadow-[4px_4px_0_var(--color-border)] p-3">
 			<p class="text-sm text-text-muted">No results found</p>
 		</div>
 	{/if}

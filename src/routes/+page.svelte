@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import authState from '$lib/state/auth.svelte';
-	import { ArrowRight, CaretDown, MapTrifold, Palette, Camera, Sparkle, FrameCorners, ShareNetwork, ShieldCheck, DeviceMobile, Timer, Download, Check, X, Crown, CloudArrowUp, PaintBrush } from 'phosphor-svelte';
+	import { ArrowRight, CaretDown, MapTrifold, Palette, Camera, Sparkle, FrameCorners, ShareNetwork, ShieldCheck, DeviceMobile, Timer, Download, Check, X, Crown, CloudArrowUp, PaintBrush, MapPin } from 'phosphor-svelte';
 
 	// Redirect authenticated users straight to dashboard
 	$effect(() => {
@@ -64,7 +64,8 @@
 			"Custom branding and fonts",
 			"9:16, 1:1, and 16:9 export",
 			"Client-side video processing",
-			"AI-powered captions and hashtags"
+			"AI-powered captions and hashtags",
+			"Location Spotlight animations"
 		]
 	})}</script>`}
 </svelte:head>
@@ -288,10 +289,10 @@
 	<div class="border-y-3 border-border bg-accent text-white overflow-hidden">
 		<div class="flex animate-marquee whitespace-nowrap py-3">
 			<span class="mx-4 text-sm font-bold tracking-widest uppercase">
-				ANIMATED MAPS &bull; VOICE-OVER &bull; AI CAPTIONS &bull; CUSTOM BRANDING &bull; 100% IN-BROWSER &bull; NO UPLOADS &bull; KEN BURNS EFFECTS &bull; MULTIPLE ASPECT RATIOS &bull; MUSIC TRACKS &bull; PUBLIC PROFILES &bull;&nbsp;
+				ANIMATED MAPS &bull; VOICE-OVER &bull; AI CAPTIONS &bull; CUSTOM BRANDING &bull; LOCATION SPOTLIGHT &bull; 100% IN-BROWSER &bull; NO UPLOADS &bull; KEN BURNS EFFECTS &bull; MULTIPLE ASPECT RATIOS &bull; MUSIC TRACKS &bull; PUBLIC PROFILES &bull;&nbsp;
 			</span>
 			<span class="mx-4 text-sm font-bold tracking-widest uppercase" aria-hidden="true">
-				ANIMATED MAPS &bull; VOICE-OVER &bull; AI CAPTIONS &bull; CUSTOM BRANDING &bull; 100% IN-BROWSER &bull; NO UPLOADS &bull; KEN BURNS EFFECTS &bull; MULTIPLE ASPECT RATIOS &bull; MUSIC TRACKS &bull; PUBLIC PROFILES &bull;&nbsp;
+				ANIMATED MAPS &bull; VOICE-OVER &bull; AI CAPTIONS &bull; CUSTOM BRANDING &bull; LOCATION SPOTLIGHT &bull; 100% IN-BROWSER &bull; NO UPLOADS &bull; KEN BURNS EFFECTS &bull; MULTIPLE ASPECT RATIOS &bull; MUSIC TRACKS &bull; PUBLIC PROFILES &bull;&nbsp;
 			</span>
 		</div>
 	</div>
@@ -362,6 +363,53 @@
 				<p class="text-sm text-text-secondary leading-relaxed">
 					Share individual trips via link with an interactive map, or build a public profile showcasing all your adventures.
 				</p>
+			</div>
+		</div>
+	</section>
+
+	<!-- Location Spotlight callout -->
+	<section class="border-y-3 border-border bg-card">
+		<div class="max-w-5xl mx-auto px-6 py-16 sm:py-20 reveal">
+			<div class="flex flex-col md:flex-row items-center gap-10">
+				<div class="flex-1">
+					<div class="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-warning text-black text-xs font-bold border-2 border-border shadow-[2px_2px_0_var(--color-border)] mb-5">
+						<MapPin size={14} weight="bold" />
+						New
+					</div>
+					<h2 class="text-2xl sm:text-3xl font-bold text-text-primary mb-4">Location Spotlight</h2>
+					<p class="text-text-secondary leading-relaxed mb-6">
+						Need a quick map animation for your video content? Spotlight generates a short clip that zooms from a town overview — complete with the city boundary outlined — into a specific location with a pin. Drop it into your video editor as an overlay while you talk about a place.
+					</p>
+					<a
+						href="/signin"
+						class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-accent text-white font-bold border-2 border-border shadow-[3px_3px_0_var(--color-border)] hover:shadow-[1px_1px_0_var(--color-border)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+					>
+						Try It Free
+						<ArrowRight size={18} weight="bold" />
+					</a>
+				</div>
+				<div class="flex-shrink-0 w-64 sm:w-72">
+					<!-- Spotlight mini-illustration -->
+					<div class="bg-page border-3 border-border rounded-2xl shadow-brutal-lg overflow-hidden p-4">
+						<div class="relative bg-accent-light rounded-xl h-36 flex items-center justify-center overflow-hidden">
+							<svg class="w-full h-full" viewBox="0 0 240 144" aria-hidden="true">
+								<!-- Town boundary shape -->
+								<path d="M40,80 C50,30 90,20 130,35 S190,25 210,60 C220,90 200,120 160,115 S80,130 50,110 C35,100 30,90 40,80Z" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-dasharray="6 3" opacity="0.5" />
+								<path d="M40,80 C50,30 90,20 130,35 S190,25 210,60 C220,90 200,120 160,115 S80,130 50,110 C35,100 30,90 40,80Z" fill="var(--color-accent)" fill-opacity="0.08" />
+								<!-- Pin -->
+								<circle cx="140" cy="72" r="8" fill="var(--color-accent)" />
+								<circle cx="140" cy="72" r="4" fill="white" />
+								<!-- Zoom indicator lines -->
+								<line x1="148" y1="64" x2="170" y2="42" stroke="var(--color-accent)" stroke-width="1.5" opacity="0.3" />
+								<line x1="132" y1="64" x2="110" y2="42" stroke="var(--color-accent)" stroke-width="1.5" opacity="0.3" />
+							</svg>
+						</div>
+						<div class="mt-3 text-center">
+							<p class="text-xs font-bold text-text-primary">The Sink</p>
+							<p class="text-[10px] text-text-muted">1165 13th St, Boulder, CO</p>
+						</div>
+					</div>
+				</div>
 			</div>
 		</div>
 	</section>

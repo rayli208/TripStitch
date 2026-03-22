@@ -131,13 +131,8 @@
 		return null;
 	});
 
-	const canSave = $derived(
-		!usernameError &&
-		!displayNameError &&
-		!websiteError &&
-		usernameStatus !== 'checking' &&
-		!saving
-	);
+	const hasValidationErrors = $derived(!!usernameError || !!displayNameError || !!websiteError);
+	const canSave = $derived(isDirty && !saving && usernameStatus !== 'checking');
 
 	// ── Avatar helpers ──
 	const avatarUrl = $derived(profileState.profile?.avatarUrl || authState.user?.avatarUrl || '');
@@ -201,6 +196,12 @@
 	});
 
 	async function handleSave() {
+		if (hasValidationErrors) {
+			errorMsg = usernameError || displayNameError || websiteError;
+			// Scroll to top so the user can see the error banner + field errors
+			window.scrollTo({ top: 0, behavior: 'smooth' });
+			return;
+		}
 		saving = true;
 		errorMsg = null;
 		const result = await profileState.save({
@@ -376,7 +377,7 @@
 							<span class="text-xs text-error flex-shrink-0">Taken</span>
 						{/if}
 					</div>
-					{#if usernameError && usernameClean && !isUsernameUnchanged}
+					{#if usernameError && (usernameClean ? !isUsernameUnchanged : true)}
 						<p class="text-xs text-error mt-1">{usernameError}</p>
 					{/if}
 				</div>

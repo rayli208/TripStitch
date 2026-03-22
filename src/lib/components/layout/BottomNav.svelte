@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import { Plus, Path, User } from 'phosphor-svelte';
 
 	const tabs = [
@@ -8,7 +9,23 @@
 		{ href: '/profile', label: 'Profile', icon: 'profile' }
 	] as const;
 
-	const isActive = (href: string) => page.url.pathname === href;
+	const isActive = (href: string) =>
+		href === '/create'
+			? page.url.pathname.startsWith('/create')
+			: page.url.pathname === href;
+
+	function handleTabClick(e: MouseEvent, href: string) {
+		// If tapping "Create" while on any /create page, always go to /create chooser
+		if (href === '/create' && page.url.pathname.startsWith('/create')) {
+			e.preventDefault();
+			if (page.url.pathname === '/create') {
+				// Same page — dispatch a custom event the create page listens for
+				window.dispatchEvent(new CustomEvent('tripstitch:create-reset'));
+			} else {
+				goto('/create');
+			}
+		}
+	}
 </script>
 
 <nav class="fixed bottom-0 inset-x-0 z-40 bg-page border-t-3 border-border" style="padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);">
@@ -16,6 +33,7 @@
 		{#each tabs as tab}
 			<a
 				href={tab.href}
+				onclick={(e) => handleTabClick(e, tab.href)}
 				class="flex flex-col items-center justify-center gap-0.5 px-6 py-2 rounded-xl transition-colors {isActive(tab.href) ? 'text-accent font-bold' : 'text-text-muted hover:text-text-secondary'}"
 			>
 				{#if tab.icon === 'create'}

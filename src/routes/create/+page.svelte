@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto, beforeNavigate } from '$app/navigation';
+	import { goto, beforeNavigate, afterNavigate } from '$app/navigation';
 	import { createEditorState } from '$lib/state/editor.svelte';
 	import authState from '$lib/state/auth.svelte';
 	import tripsState from '$lib/state/trips.svelte';
@@ -18,6 +18,27 @@
 	import LocationsStep from '$lib/components/editor/LocationsStep.svelte';
 	import ReviewStep from '$lib/components/editor/ReviewStep.svelte';
 	import ExportStep from '$lib/components/editor/ExportStep.svelte';
+	import { MapTrifold, MapPin } from 'phosphor-svelte';
+
+	let showEditor = $state(false);
+
+	// When navigating back to /create (e.g. from spotlight), reset to chooser
+	afterNavigate(({ from }) => {
+		if (from?.url.pathname && from.url.pathname !== '/create' && !isExporting && !exportDone) {
+			showEditor = false;
+		}
+	});
+
+	// When "Create" tab is tapped while already on /create, reset to chooser
+	$effect(() => {
+		const handler = () => {
+			if (!isExporting && !exportDone) {
+				showEditor = false;
+			}
+		};
+		window.addEventListener('tripstitch:create-reset', handler);
+		return () => window.removeEventListener('tripstitch:create-reset', handler);
+	});
 
 	// If the page reloads after iOS backgrounding during share/download,
 	// redirect to the saved trip's edit page instead of showing a blank create form.
@@ -319,7 +340,44 @@
 
 </script>
 
-<AppShell title="Create Trip" showBottomNav logoUrl={profileState.profile?.logoUrl}>
+<AppShell title="Create" showBottomNav logoUrl={profileState.profile?.logoUrl}>
+	{#if !showEditor}
+		<!-- Tool chooser -->
+		<div class="space-y-4">
+			<p class="text-sm text-text-muted">What would you like to create?</p>
+			<div class="grid grid-cols-1 gap-3">
+				<button
+					class="group flex items-start gap-4 rounded-xl border-2 border-border bg-card p-5 text-left shadow-[3px_3px_0_var(--color-border)] hover:shadow-[5px_5px_0_var(--color-accent)] hover:-translate-y-0.5 transition-all cursor-pointer"
+					onclick={() => (showEditor = true)}
+				>
+					<div class="w-11 h-11 rounded-xl bg-accent text-white flex items-center justify-center flex-shrink-0 border-2 border-border group-hover:scale-110 transition-transform">
+						<MapTrifold size={22} weight="bold" />
+					</div>
+					<div>
+						<h3 class="font-bold text-text-primary text-base">Trip Video</h3>
+						<p class="text-sm text-text-muted mt-0.5">
+							Stitch your photos and clips into a cinematic video with animated map transitions between stops.
+						</p>
+					</div>
+				</button>
+
+				<a
+					href="/create/spotlight"
+					class="group flex items-start gap-4 rounded-xl border-2 border-border bg-card p-5 text-left shadow-[3px_3px_0_var(--color-border)] hover:shadow-[5px_5px_0_var(--color-accent)] hover:-translate-y-0.5 transition-all"
+				>
+					<div class="w-11 h-11 rounded-xl bg-warning text-black flex items-center justify-center flex-shrink-0 border-2 border-border group-hover:scale-110 transition-transform">
+						<MapPin size={22} weight="bold" />
+					</div>
+					<div>
+						<h3 class="font-bold text-text-primary text-base">Location Spotlight</h3>
+						<p class="text-sm text-text-muted mt-0.5">
+							Generate a short zoom-in animation from a town overview to a specific place — perfect as a video overlay.
+						</p>
+					</div>
+				</a>
+			</div>
+		</div>
+	{:else}
 	<StepIndicator steps={editor.stepLabels} current={editor.currentStep} />
 
 	{#if editor.currentStep === 0}
@@ -428,5 +486,6 @@
 			{shareUrl}
 			oncopylink={handleCopyLink}
 		/>
+	{/if}
 	{/if}
 </AppShell>
