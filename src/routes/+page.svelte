@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import authState from '$lib/state/auth.svelte';
-	import { ArrowRight, CaretDown, MapTrifold, Palette, Camera, Sparkle, FrameCorners, ShareNetwork, ShieldCheck, DeviceMobile, Timer, Download, Check, X, Crown, CloudArrowUp, PaintBrush, MapPin } from 'phosphor-svelte';
+	import { ArrowRight, CaretDown, MapTrifold, Palette, Camera, Sparkle, FrameCorners, ShareNetwork, ShieldCheck, DeviceMobile, Timer, Download, Check, X, Crown, CloudArrowUp, PaintBrush, MapPin, Article, PencilLine } from 'phosphor-svelte';
 
 	// Redirect authenticated users straight to dashboard
 	$effect(() => {
@@ -39,18 +39,18 @@
 </script>
 
 <svelte:head>
-	<title>TripStitch - Turn Your Trips into Cinematic Videos</title>
-	<meta property="og:title" content="TripStitch - Turn Your Trips into Cinematic Videos" />
-	<meta property="og:description" content="Drop your photos, pick your stops on a map, and TripStitch stitches together a polished travel video with animated map transitions — all in your browser." />
+	<title>TripStitch - Turn Your Trips into Videos & Travel Blogs</title>
+	<meta property="og:title" content="TripStitch - Turn Your Trips into Videos & Travel Blogs" />
+	<meta property="og:description" content="Create cinematic travel videos with animated map transitions and write rich travel blogs with embedded locations, ratings, and routes — all in your browser." />
 	<meta property="og:url" content="https://tripstitch.blog" />
-	<meta name="twitter:title" content="TripStitch - Turn Your Trips into Cinematic Videos" />
-	<meta name="twitter:description" content="Drop your photos, pick your stops on a map, and TripStitch stitches together a polished travel video with animated map transitions — all in your browser." />
+	<meta name="twitter:title" content="TripStitch - Turn Your Trips into Videos & Travel Blogs" />
+	<meta name="twitter:description" content="Create cinematic travel videos with animated map transitions and write rich travel blogs with embedded locations, ratings, and routes — all in your browser." />
 	{@html `<script type="application/ld+json">${JSON.stringify({
 		"@context": "https://schema.org",
 		"@type": "WebApplication",
 		"name": "TripStitch",
 		"url": "https://tripstitch.blog",
-		"description": "Turn your travel photos into cinematic videos with animated map transitions, custom branding, and voice-over — all in your browser.",
+		"description": "Turn your travel photos into cinematic videos with animated map transitions, and write rich travel blogs with embedded locations and routes — all in your browser.",
 		"applicationCategory": "MultimediaApplication",
 		"operatingSystem": "Any",
 		"offers": [
@@ -65,7 +65,9 @@
 			"9:16, 1:1, and 16:9 export",
 			"Client-side video processing",
 			"AI-powered captions and hashtags",
-			"Location Spotlight animations"
+			"Location Spotlight animations",
+			"Travel blog editor with rich text",
+			"Embedded location cards and routes"
 		]
 	})}</script>`}
 </svelte:head>
@@ -145,6 +147,7 @@
 	.showcase-card:nth-child(1) { transform: rotate(-1deg); }
 	.showcase-card:nth-child(2) { transform: rotate(0.5deg); }
 	.showcase-card:nth-child(3) { transform: rotate(-0.8deg); }
+	.showcase-card:nth-child(4) { transform: rotate(1deg); }
 	.showcase-card:hover { transform: rotate(0) translateY(-4px); }
 
 	/* Phone mockup */
@@ -161,7 +164,8 @@
 		.feature-card:nth-child(n) { transform: none; }
 		.feature-card:hover { transform: translateY(-4px); }
 		.showcase-card,
-		.showcase-card:nth-child(n) { transform: none; }
+		.showcase-card:nth-child(n),
+		.showcase-card:nth-child(4) { transform: none; }
 		.showcase-card:hover { transform: translateY(-4px); }
 		.phone-mockup { transform: none; }
 	}
@@ -217,13 +221,13 @@
 			<h1 class="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-text-primary leading-[1.1] {ready ? 'animate-fade-up fill-both delay-200' : 'opacity-0'}">
 				Turn your trips into
 				<span class="text-accent">
-					cinematic videos
+					videos & blogs
 				</span>
 			</h1>
 
 			<p class="mt-6 text-lg sm:text-xl text-text-secondary max-w-2xl mx-auto leading-relaxed {ready ? 'animate-fade-up fill-both delay-300' : 'opacity-0'}">
-				Drop your photos, pick your stops on a map, and TripStitch stitches together
-				a polished travel video with animated map transitions — all in your browser.
+				Create cinematic travel videos with animated map transitions, or write rich travel blogs
+				with embedded locations and routes — all in your browser.
 			</p>
 
 			<div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 {ready ? 'animate-fade-up fill-both delay-400' : 'opacity-0'}">
@@ -289,10 +293,10 @@
 	<div class="border-y-3 border-border bg-accent text-white overflow-hidden">
 		<div class="flex animate-marquee whitespace-nowrap py-3">
 			<span class="mx-4 text-sm font-bold tracking-widest uppercase">
-				ANIMATED MAPS &bull; VOICE-OVER &bull; AI CAPTIONS &bull; CUSTOM BRANDING &bull; LOCATION SPOTLIGHT &bull; 100% IN-BROWSER &bull; NO UPLOADS &bull; KEN BURNS EFFECTS &bull; MULTIPLE ASPECT RATIOS &bull; MUSIC TRACKS &bull; PUBLIC PROFILES &bull;&nbsp;
+				ANIMATED MAPS &bull; TRAVEL BLOGS &bull; VOICE-OVER &bull; AI CAPTIONS &bull; CUSTOM BRANDING &bull; LOCATION CARDS &bull; 100% IN-BROWSER &bull; KEN BURNS EFFECTS &bull; MULTIPLE ASPECT RATIOS &bull; MUSIC TRACKS &bull; PUBLIC PROFILES &bull;&nbsp;
 			</span>
 			<span class="mx-4 text-sm font-bold tracking-widest uppercase" aria-hidden="true">
-				ANIMATED MAPS &bull; VOICE-OVER &bull; AI CAPTIONS &bull; CUSTOM BRANDING &bull; LOCATION SPOTLIGHT &bull; 100% IN-BROWSER &bull; NO UPLOADS &bull; KEN BURNS EFFECTS &bull; MULTIPLE ASPECT RATIOS &bull; MUSIC TRACKS &bull; PUBLIC PROFILES &bull;&nbsp;
+				ANIMATED MAPS &bull; TRAVEL BLOGS &bull; VOICE-OVER &bull; AI CAPTIONS &bull; CUSTOM BRANDING &bull; LOCATION CARDS &bull; 100% IN-BROWSER &bull; KEN BURNS EFFECTS &bull; MULTIPLE ASPECT RATIOS &bull; MUSIC TRACKS &bull; PUBLIC PROFILES &bull;&nbsp;
 			</span>
 		</div>
 	</div>
@@ -361,7 +365,7 @@
 				</div>
 				<h3 class="text-lg font-bold text-text-primary mb-2">Share & Public Profile</h3>
 				<p class="text-sm text-text-secondary leading-relaxed">
-					Share individual trips via link with an interactive map, or build a public profile showcasing all your adventures.
+					Share trips and blogs via link, or build a public profile showcasing all your adventures — videos and articles side by side.
 				</p>
 			</div>
 		</div>
@@ -407,6 +411,71 @@
 						<div class="mt-3 text-center">
 							<p class="text-xs font-bold text-text-primary">The Sink</p>
 							<p class="text-[10px] text-text-muted">1165 13th St, Boulder, CO</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<!-- Travel Blog callout -->
+	<section class="border-y-3 border-border bg-page">
+		<div class="max-w-5xl mx-auto px-6 py-16 sm:py-20 reveal">
+			<div class="flex flex-col md:flex-row items-center gap-10">
+				<div class="flex-1 md:order-2">
+					<div class="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-success text-white text-xs font-bold border-2 border-border shadow-[2px_2px_0_var(--color-border)] mb-5">
+						<Article size={14} weight="bold" />
+						New
+					</div>
+					<h2 class="text-2xl sm:text-3xl font-bold text-text-primary mb-4">Travel Blogs</h2>
+					<p class="text-text-secondary leading-relaxed mb-6">
+						Write rich travel guides, listicles, and reviews with a full-featured editor. Embed location cards with ratings, prices, and tips — plus route timelines to map out your itineraries. Publish to your profile and share with anyone.
+					</p>
+					<a
+						href="/signin"
+						class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-accent text-white font-bold border-2 border-border shadow-[3px_3px_0_var(--color-border)] hover:shadow-[1px_1px_0_var(--color-border)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+					>
+						Start Writing
+						<PencilLine size={18} weight="bold" />
+					</a>
+				</div>
+				<div class="flex-shrink-0 w-64 sm:w-72 md:order-1">
+					<!-- Blog mini-illustration -->
+					<div class="bg-card border-3 border-border rounded-2xl shadow-brutal-lg overflow-hidden p-4">
+						<!-- Title area -->
+						<div class="mb-3">
+							<div class="h-3 w-3/4 bg-text-primary/20 rounded mb-2"></div>
+							<div class="h-2 w-1/2 bg-text-muted/20 rounded"></div>
+						</div>
+						<!-- Text lines -->
+						<div class="space-y-1.5 mb-4">
+							<div class="h-1.5 w-full bg-text-muted/10 rounded"></div>
+							<div class="h-1.5 w-full bg-text-muted/10 rounded"></div>
+							<div class="h-1.5 w-4/5 bg-text-muted/10 rounded"></div>
+						</div>
+						<!-- Location card mock -->
+						<div class="bg-page border-2 border-border rounded-xl p-3 mb-3">
+							<div class="flex items-center gap-2 mb-2">
+								<div class="w-6 h-6 rounded-lg bg-accent/20 flex items-center justify-center">
+									<MapPin size={12} weight="bold" class="text-accent" />
+								</div>
+								<div>
+									<div class="h-2 w-20 bg-text-primary/20 rounded"></div>
+									<div class="flex gap-0.5 mt-1">
+										<div class="w-2 h-2 rounded-full bg-warning"></div>
+										<div class="w-2 h-2 rounded-full bg-warning"></div>
+										<div class="w-2 h-2 rounded-full bg-warning"></div>
+										<div class="w-2 h-2 rounded-full bg-warning"></div>
+										<div class="w-2 h-2 rounded-full bg-text-muted/20"></div>
+									</div>
+								</div>
+							</div>
+							<div class="h-1.5 w-full bg-text-muted/10 rounded"></div>
+						</div>
+						<!-- More text -->
+						<div class="space-y-1.5">
+							<div class="h-1.5 w-full bg-text-muted/10 rounded"></div>
+							<div class="h-1.5 w-3/5 bg-text-muted/10 rounded"></div>
 						</div>
 					</div>
 				</div>
@@ -499,11 +568,11 @@
 	<section class="max-w-5xl mx-auto px-6 py-20 sm:py-28">
 		<div class="text-center mb-16 reveal">
 			<h2 class="text-3xl sm:text-4xl font-bold text-text-primary">What you can create</h2>
-			<p class="mt-4 text-text-secondary text-lg max-w-xl mx-auto">From weekend getaways to cross-continental adventures — TripStitch handles it all.</p>
+			<p class="mt-4 text-text-secondary text-lg max-w-xl mx-auto">From trip videos to travel blogs — TripStitch handles it all.</p>
 		</div>
 
 		<div class="relative">
-		<div class="flex md:grid md:grid-cols-3 gap-6 overflow-x-auto md:overflow-visible pb-4 md:pb-0 snap-x snap-mandatory reveal scrollbar-hide">
+		<div class="flex md:grid md:grid-cols-4 gap-6 overflow-x-auto md:overflow-visible pb-4 md:pb-0 snap-x snap-mandatory reveal scrollbar-hide">
 			<!-- Card 1 -->
 			<div class="showcase-card flex-shrink-0 w-72 md:w-auto snap-start bg-card border-2 border-border rounded-2xl overflow-hidden shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] transition-all duration-300">
 				<div class="h-3 bg-accent"></div>
@@ -567,6 +636,36 @@
 						<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-warning-light border border-border">8 stops</span>
 						<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent-light border border-border">Outdoor map</span>
 						<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-success-light border border-border">AI captions</span>
+					</div>
+				</div>
+			</div>
+
+			<!-- Card 4 — Blog -->
+			<div class="showcase-card flex-shrink-0 w-72 md:w-auto snap-start bg-card border-2 border-border rounded-2xl overflow-hidden shadow-[4px_4px_0_var(--color-border)] hover:shadow-[6px_6px_0_var(--color-accent)] transition-all duration-300">
+				<div class="h-3 bg-sky-400"></div>
+				<div class="p-5">
+					<h3 class="font-bold text-text-primary mb-3">Top 10 Bars in Lisbon</h3>
+					<!-- Blog visualization -->
+					<div class="space-y-2 mb-4">
+						<div class="h-1.5 w-full bg-text-muted/15 rounded"></div>
+						<div class="h-1.5 w-full bg-text-muted/15 rounded"></div>
+						<div class="flex items-center gap-2 py-1.5 px-2 bg-page rounded-lg border border-border">
+							<MapPin size={10} weight="bold" class="text-accent flex-shrink-0" />
+							<div class="h-1.5 w-16 bg-text-primary/20 rounded"></div>
+							<div class="flex gap-0.5 ml-auto">
+								<div class="w-1.5 h-1.5 rounded-full bg-warning"></div>
+								<div class="w-1.5 h-1.5 rounded-full bg-warning"></div>
+								<div class="w-1.5 h-1.5 rounded-full bg-warning"></div>
+								<div class="w-1.5 h-1.5 rounded-full bg-warning"></div>
+								<div class="w-1.5 h-1.5 rounded-full bg-text-muted/20"></div>
+							</div>
+						</div>
+						<div class="h-1.5 w-4/5 bg-text-muted/15 rounded"></div>
+					</div>
+					<div class="flex flex-wrap gap-1.5">
+						<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-warning-light border border-border">Listicle</span>
+						<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent-light border border-border">10 locations</span>
+						<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-success-light border border-border">5 min read</span>
 					</div>
 				</div>
 			</div>
@@ -698,7 +797,7 @@
 			Ready to stitch your next trip?
 		</h2>
 		<p class="text-lg text-text-secondary mb-10 max-w-lg mx-auto">
-			Start for free — no credit card, no commitment. Create your first travel video in minutes.
+			Start for free — no credit card, no commitment. Create your first travel video or blog in minutes.
 		</p>
 		<a
 			href="/signin"
@@ -720,7 +819,7 @@
 						<span class="text-base font-extrabold tracking-tight"><span class="text-text-primary">Trip</span><span class="text-accent">Stitch</span></span>
 					</a>
 					<p class="text-sm text-text-muted leading-relaxed">
-						Turn your travel photos into cinematic videos with animated map transitions — all in your browser.
+						Turn your travel photos into cinematic videos and write rich travel blogs — all in your browser.
 					</p>
 				</div>
 
@@ -732,6 +831,7 @@
 						<li><a href="#features" class="hover:text-accent transition-colors">Features</a></li>
 						<li><a href="#pricing" class="hover:text-accent transition-colors">Pricing</a></li>
 						<li><a href="/explore" class="hover:text-accent transition-colors">Explore Trips</a></li>
+						<li><a href="/signin" class="hover:text-accent transition-colors">Write a Blog</a></li>
 					</ul>
 				</div>
 

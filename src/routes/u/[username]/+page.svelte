@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import type { UserProfile, SharedTrip } from '$lib/types';
+	import type { UserProfile, SharedTrip, SharedBlog } from '$lib/types';
 	import profileState from '$lib/state/profile.svelte';
 	import { fetchUserTrips, getShareUrl } from '$lib/services/shareService';
+	import { fetchUserBlogs } from '$lib/services/blogService';
+	import BlogCard from '$lib/components/blog/BlogCard.svelte';
 	import TravelGlobe from '$lib/components/TravelGlobe.svelte';
 	import TravelMap from '$lib/components/TravelMap.svelte';
 	import { parseAllVideoLinks } from '$lib/utils/videoEmbed';
@@ -26,6 +28,8 @@
 
 	let profile = $state<UserProfile | null>(null);
 	let trips = $state<SharedTrip[]>([]);
+	let blogs = $state<SharedBlog[]>([]);
+	let activeTab = $state<'trips' | 'blogs'>('trips');
 	const mapTripData = $derived(trips.map(t => ({
 		id: t.id,
 		title: t.title,
@@ -61,6 +65,7 @@
 				return;
 			}
 			trips = await fetchUserTrips(uid);
+			blogs = await fetchUserBlogs(uid);
 		} catch (err) {
 			console.error('[Profile] Failed to load public profile:', err);
 			notFound = true;
@@ -126,8 +131,8 @@
 		transition: transform 0.3s ease, box-shadow 0.3s ease;
 	}
 	.trip-card:hover {
-		transform: translateY(-4px);
-		box-shadow: 6px 6px 0 var(--color-accent);
+		transform: translateY(-2px);
+		box-shadow: 4px 4px 0 var(--color-accent);
 	}
 
 	@media (prefers-reduced-motion: reduce) {
@@ -317,9 +322,42 @@
 			</div>
 		{/if}
 
-		<!-- Trip grid -->
+		<!-- Content tabs + grid -->
 		<div class="max-w-3xl mx-auto px-6 sm:px-8 py-8">
-			{#if trips.length === 0}
+			<!-- Tab toggle -->
+			{#if blogs.length > 0 || trips.length > 0}
+				<div class="flex gap-2 mb-5 {ready ? 'animate-fade-up fill-both delay-200' : 'opacity-0'}">
+					<button
+						class="px-4 py-2 rounded-lg text-sm font-bold border-2 border-border transition-all cursor-pointer {activeTab === 'trips' ? 'bg-accent text-white shadow-[2px_2px_0_var(--color-border)]' : 'bg-card text-text-primary hover:bg-accent-light'}"
+						onclick={() => activeTab = 'trips'}
+					>
+						Trips ({trips.length})
+					</button>
+					<button
+						class="px-4 py-2 rounded-lg text-sm font-bold border-2 border-border transition-all cursor-pointer {activeTab === 'blogs' ? 'bg-accent text-white shadow-[2px_2px_0_var(--color-border)]' : 'bg-card text-text-primary hover:bg-accent-light'}"
+						onclick={() => activeTab = 'blogs'}
+					>
+						Blogs ({blogs.length})
+					</button>
+				</div>
+			{/if}
+
+			{#if activeTab === 'blogs'}
+				{#if blogs.length === 0}
+					<div class="text-center py-16 {ready ? 'animate-fade-up fill-both delay-200' : 'opacity-0'}">
+						<div class="w-16 h-16 rounded-2xl bg-accent-light border-2 border-border flex items-center justify-center mx-auto mb-4 shadow-brutal-sm">
+							<MapPin size={28} weight="bold" class="text-accent" />
+						</div>
+						<p class="text-text-muted font-medium">No blogs yet</p>
+					</div>
+				{:else}
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-5 {ready ? 'animate-fade-up fill-both delay-300' : 'opacity-0'}">
+						{#each blogs as blog}
+							<BlogCard {blog} />
+						{/each}
+					</div>
+				{/if}
+			{:else if trips.length === 0}
 				<div class="text-center py-16 {ready ? 'animate-fade-up fill-both delay-200' : 'opacity-0'}">
 					<div class="w-16 h-16 rounded-2xl bg-accent-light border-2 border-border flex items-center justify-center mx-auto mb-4 shadow-brutal-sm">
 						<MapPin size={28} weight="bold" class="text-accent" />
@@ -327,7 +365,6 @@
 					<p class="text-text-muted font-medium">No trips yet</p>
 				</div>
 			{:else}
-				<h2 class="text-lg font-bold text-text-primary mb-5 {ready ? 'animate-fade-up fill-both delay-200' : 'opacity-0'}">Trips</h2>
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-5 {ready ? 'animate-fade-up fill-both delay-300' : 'opacity-0'}">
 					{#each trips as trip}
 						{@const videos = trip.videoLinks ? parseAllVideoLinks(trip.videoLinks) : []}

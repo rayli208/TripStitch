@@ -174,3 +174,98 @@ export interface SharedLocation {
 	rating: number | null;
 	priceTier: PriceTier | null;
 }
+
+// ── Blog Types ──
+
+export type BlogCategory = 'guide' | 'listicle' | 'review' | 'story' | 'tips' | 'itinerary';
+
+export type BlogVisibility = 'draft' | 'public' | 'unlisted' | 'private';
+
+export interface BlogLocation {
+	id: string;
+	order: number;
+	name: string;
+	label: string | null;
+	description: string | null;
+	lat: number;
+	lng: number;
+	city: string | null;
+	state: string | null;
+	country: string | null;
+	rating: number | null;
+	priceTier: PriceTier | null;
+	imageUrls: string[];
+	websiteUrl: string | null;
+	instagramHandle: string | null;
+	hours: string | null;
+	rank: number | null;
+	category: string | null;
+	tips: string | null;
+}
+
+export interface RouteStop {
+	id: string;
+	order: number;
+	name: string;
+	description: string | null;
+}
+
+export interface BlogRoute {
+	id: string;
+	title: string;
+	stops: RouteStop[];
+}
+
+export interface BlogPost {
+	id: string;
+	userId: string;
+	title: string;
+	subtitle: string | null;
+	coverImageUrl: string | null;
+	coverImageFile: File | null;
+	content: Record<string, unknown>;
+	tags: string[];
+	category: BlogCategory;
+	visibility: BlogVisibility;
+	slug: string;
+	excerpt: string;
+	readingTime: number;
+	linkedTripIds: string[];
+	youtubeUrl: string | null;
+	locations: BlogLocation[];
+	routes: BlogRoute[];
+	cities: string[];
+	states: string[];
+	countries: string[];
+	createdAt: string;
+	updatedAt: string;
+	publishedAt: string | null;
+}
+
+export interface SharedBlog {
+	id: string;
+	userId: string;
+	username: string;
+	userDisplayName: string;
+	userAvatarUrl: string;
+	title: string;
+	subtitle: string | null;
+	coverImageUrl: string | null;
+	content: Record<string, unknown>;
+	tags: string[];
+	category: BlogCategory;
+	visibility: BlogVisibility;
+	slug: string;
+	excerpt: string;
+	readingTime: number;
+	linkedTripIds: string[];
+	youtubeUrl: string | null;
+	locations: BlogLocation[];
+	routes: BlogRoute[];
+	cities: string[];
+	states: string[];
+	countries: string[];
+	createdAt: string;
+	updatedAt: string;
+	publishedAt: string | null;
+}

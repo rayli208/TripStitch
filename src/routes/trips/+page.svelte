@@ -2,16 +2,20 @@
 	import { goto } from '$app/navigation';
 	import authState from '$lib/state/auth.svelte';
 	import tripsState from '$lib/state/trips.svelte';
+	import blogsState from '$lib/state/blogs.svelte';
 	import profileState from '$lib/state/profile.svelte';
 	import toast from '$lib/state/toast.svelte';
 	import { getShareUrl, getProfileUrl } from '$lib/services/shareService';
 	import AppShell from '$lib/components/layout/AppShell.svelte';
 	import TripCard from '$lib/components/dashboard/TripCard.svelte';
+	import BlogDashboardCard from '$lib/components/dashboard/BlogDashboardCard.svelte';
 	import EmptyState from '$lib/components/dashboard/EmptyState.svelte';
 	import SkeletonCard from '$lib/components/ui/SkeletonCard.svelte';
 	import TravelGlobe from '$lib/components/TravelGlobe.svelte';
 	import TravelMap from '$lib/components/TravelMap.svelte';
 	import { Copy } from 'phosphor-svelte';
+
+	let activeTab = $state<'trips' | 'blogs'>('trips');
 
 	let mapContainer: HTMLDivElement | undefined = $state();
 	let mapVisible = $state(false);
@@ -33,14 +37,18 @@
 			return;
 		}
 		tripsState.subscribe();
+		blogsState.subscribe();
 		profileState.load();
-		return () => tripsState.unsubscribe();
+		return () => {
+			tripsState.unsubscribe();
+			blogsState.unsubscribe();
+		};
 	});
 </script>
 
-<svelte:head><title>My Trips | TripStitch</title></svelte:head>
+<svelte:head><title>Dashboard | TripStitch</title></svelte:head>
 
-<AppShell title="My Trips" showBottomNav logoUrl={profileState.profile?.logoUrl}>
+<AppShell title="Dashboard" showBottomNav logoUrl={profileState.profile?.logoUrl}>
 	<div class="space-y-4">
 		{#if !profileState.loading && !profileState.hasProfile}
 			<div class="bg-accent-light border-2 border-accent text-accent-hover text-sm rounded-lg px-4 py-3 flex items-center justify-between shadow-brutal-sm">
@@ -82,7 +90,40 @@
 			</div>
 		{/if}
 
-		{#if tripsState.loading}
+		<!-- Tab toggle -->
+		<div class="flex gap-2">
+			<button
+				class="px-4 py-2 rounded-lg text-sm font-bold border-2 border-border transition-all cursor-pointer {activeTab === 'trips' ? 'bg-accent text-white shadow-[2px_2px_0_var(--color-border)]' : 'bg-card text-text-primary hover:bg-accent-light'}"
+				onclick={() => activeTab = 'trips'}
+			>
+				Trips ({tripsState.count})
+			</button>
+			<button
+				class="px-4 py-2 rounded-lg text-sm font-bold border-2 border-border transition-all cursor-pointer {activeTab === 'blogs' ? 'bg-accent text-white shadow-[2px_2px_0_var(--color-border)]' : 'bg-card text-text-primary hover:bg-accent-light'}"
+				onclick={() => activeTab = 'blogs'}
+			>
+				Blogs ({blogsState.count})
+			</button>
+		</div>
+
+		{#if activeTab === 'blogs'}
+			{#if blogsState.loading}
+				<SkeletonCard count={2} />
+			{:else if blogsState.count === 0}
+				<div class="text-center py-12">
+					<p class="text-text-muted font-medium mb-3">No blog posts yet</p>
+					<a href="/create/blog" class="inline-block px-4 py-2 text-sm font-bold border-2 border-border rounded-lg bg-accent text-white shadow-[2px_2px_0_var(--color-border)] hover:shadow-[3px_3px_0_var(--color-border)] transition-all">
+						Write your first blog
+					</a>
+				</div>
+			{:else}
+				<div class="space-y-3">
+					{#each blogsState.blogs as blog (blog.id)}
+						<BlogDashboardCard {blog} />
+					{/each}
+				</div>
+			{/if}
+		{:else if tripsState.loading}
 			<SkeletonCard count={3} />
 		{:else if tripsState.count === 0}
 			<EmptyState onaction={() => goto('/create')} />

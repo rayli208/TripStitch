@@ -19,7 +19,7 @@
 	import ExportStep from '$lib/components/editor/ExportStep.svelte';
 	import AudioEditor from '$lib/components/editor/AudioEditor.svelte';
 	import ExportResult from '$lib/components/editor/ExportResult.svelte';
-	import { MapTrifold, MapPin } from 'phosphor-svelte';
+	import { MapTrifold, MapPin, Article } from 'phosphor-svelte';
 
 	let showEditor = $state(false);
 
@@ -384,6 +384,21 @@
 						<h3 class="font-bold text-text-primary text-base">Location Spotlight</h3>
 						<p class="text-sm text-text-muted mt-0.5">
 							Generate a short zoom-in animation from a town overview to a specific place — perfect as a video overlay.
+						</p>
+					</div>
+				</a>
+
+				<a
+					href="/create/blog"
+					class="group flex items-start gap-4 rounded-xl border-2 border-border bg-card p-5 text-left shadow-[3px_3px_0_var(--color-border)] hover:shadow-[5px_5px_0_var(--color-accent)] hover:-translate-y-0.5 transition-all"
+				>
+					<div class="w-11 h-11 rounded-xl bg-success text-white flex items-center justify-center flex-shrink-0 border-2 border-border group-hover:scale-110 transition-transform">
+						<Article size={22} weight="bold" />
+					</div>
+					<div>
+						<h3 class="font-bold text-text-primary text-base">Blog Post</h3>
+						<p class="text-sm text-text-muted mt-0.5">
+							Write a guide, listicle, or review with embedded locations, routes, and photos.
 						</p>
 					</div>
 				</a>

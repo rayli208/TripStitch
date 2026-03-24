@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { Plus, Path, User } from 'phosphor-svelte';
+	import { Plus, SquaresFour, User } from 'phosphor-svelte';
 
 	const tabs = [
 		{ href: '/create', label: 'Create', icon: 'create' },
-		{ href: '/trips', label: 'My Trips', icon: 'trips' },
+		{ href: '/trips', label: 'Dashboard', icon: 'trips' },
 		{ href: '/profile', label: 'Profile', icon: 'profile' }
 	] as const;
 
@@ -39,7 +39,7 @@
 				{#if tab.icon === 'create'}
 					<Plus size={22} weight="bold" />
 				{:else if tab.icon === 'trips'}
-					<Path size={22} weight="bold" />
+					<SquaresFour size={22} weight="bold" />
 				{:else}
 					<User size={22} weight="bold" />
 				{/if}

@@ -277,14 +277,43 @@ function createProfileState() {
 					await deleteDoc(doc(db, 'trips', tripDoc.id));
 				}
 
-				// 2. Delete user storage files (avatar, logo)
+				// 2. Find and delete all user's blogs (storage + Firestore + slug index)
+				const blogsQuery = query(collection(db, 'blogs'), where('userId', '==', uid));
+				const blogsSnap = await getDocs(blogsQuery);
+
+				for (const blogDoc of blogsSnap.docs) {
+					const blogData = blogDoc.data();
+
+					// Delete blog storage files (images, cover)
+					try {
+						const folderRef = ref(storage, `blogs/${blogDoc.id}`);
+						const list = await listAll(folderRef);
+						for (const prefix of list.prefixes) {
+							const subList = await listAll(prefix);
+							await Promise.all(subList.items.map((item) => deleteObject(item)));
+						}
+						await Promise.all(list.items.map((item) => deleteObject(item)));
+					} catch { /* folder may not exist */ }
+
+					// Delete slug index entry
+					if (blogData.slug) {
+						try {
+							await deleteDoc(doc(db, 'blogSlugs', blogData.slug));
+						} catch { /* may not exist */ }
+					}
+
+					// Delete blog document
+					await deleteDoc(doc(db, 'blogs', blogDoc.id));
+				}
+
+				// 3. Delete user storage files (avatar, logo)
 				try {
 					const userFolder = ref(storage, `users/${uid}`);
 					const userFiles = await listAll(userFolder);
 					await Promise.all(userFiles.items.map((item) => deleteObject(item)));
 				} catch { /* folder may not exist */ }
 
-				// 3. Delete username entry
+				// 4. Delete username entry
 				const username = profile?.username;
 				if (username) {
 					try {
@@ -292,12 +321,12 @@ function createProfileState() {
 					} catch { /* may not exist */ }
 				}
 
-				// 4. Delete profile document
+				// 5. Delete profile document
 				try {
 					await deleteDoc(doc(db, 'users', uid, 'profile', 'main'));
 				} catch { /* may not exist */ }
 
-				// 5. Delete Firebase Auth user (must be last — can't access data after this)
+				// 6. Delete Firebase Auth user (must be last — can't access data after this)
 				await deleteUser(currentUser);
 
 				profile = null;
