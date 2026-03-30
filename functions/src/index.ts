@@ -165,6 +165,7 @@ export const createCheckoutSession = onCall(
       customer: customerId,
       payment_method_types: ["card"],
       mode: "subscription",
+      allow_promotion_codes: true,
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: cancelUrl,
