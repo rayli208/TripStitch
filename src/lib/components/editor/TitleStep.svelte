@@ -5,7 +5,7 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import { FONTS, DEFAULT_BRAND_COLORS, getFontById, googleFontsUrl, fontFamily } from '$lib/constants/fonts';
 	import { preloadFont } from '$lib/utils/fontLoader';
-	import { Upload, X, CaretDown, Check, MapTrifold, Broadcast, Mountains, Compass, Moon, Sun } from 'phosphor-svelte';
+	import { Upload, X, CaretDown, Check, MapTrifold, Broadcast, Mountains, Compass, Moon, Sun, Lock, Crown } from 'phosphor-svelte';
 
 	let {
 		title = $bindable(''),
@@ -22,6 +22,7 @@
 		logoUrl = null,
 		aspectRatio = $bindable<AspectRatio>('9:16'),
 		mapStyle = $bindable<MapStyle>('streets'),
+		isPro = false,
 		onmedia,
 		onremovemedia,
 		onnext
@@ -40,6 +41,7 @@
 		logoUrl?: string | null;
 		aspectRatio?: AspectRatio;
 		mapStyle?: MapStyle;
+		isPro?: boolean;
 		onmedia?: (file: File) => void;
 		onremovemedia?: () => void;
 		onnext: () => void;
@@ -214,61 +216,96 @@
 			</div>
 
 			<!-- Colors -->
-			<div class="pl-3 grid grid-cols-2 gap-4">
-				<div>
-					<span class="block text-sm font-medium text-text-secondary mb-1.5">Title Color</span>
-					<ColorPicker bind:selected={titleColor} colors={pickerColors} primaryColor={primaryBrandColor} />
-				</div>
-				<div>
-					<span class="block text-sm font-medium text-text-secondary mb-1.5">Background</span>
-					<ColorPicker bind:selected={secondaryColor} colors={secondaryPickerColors} primaryColor={primarySecondaryColor} />
-				</div>
-			</div>
-
-			<!-- Font — compact dropdown -->
-			<div class="pl-3 relative font-dropdown">
-				<span class="block text-sm font-medium text-text-secondary mb-1.5">Font</span>
-				<button
-					class="w-full flex items-center justify-between px-3 py-2 rounded-lg border-2 border-border bg-card text-sm text-text-primary hover:bg-card-hover transition-colors cursor-pointer"
-					style="font-family: {selectedFont.family}, system-ui, sans-serif"
-					onclick={() => (fontDropdownOpen = !fontDropdownOpen)}
-				>
-					<span>{selectedFont.name}</span>
-					<CaretDown size={16} weight="bold" class="text-text-muted transition-transform {fontDropdownOpen ? 'rotate-180' : ''}" />
-				</button>
-				{#if fontDropdownOpen}
-					<div class="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border-2 border-border bg-card shadow-brutal">
-						{#if preferredFont}
-							<button
-								class="w-full flex items-center justify-between px-3 py-2 text-left transition-colors cursor-pointer border-b border-border {fontId === preferredFont.id ? 'bg-accent-light' : 'hover:bg-card-hover'}"
-								style="font-family: {preferredFont.family}, system-ui, sans-serif"
-								onclick={() => { fontId = preferredFont.id; fontDropdownOpen = false; }}
-							>
-								<div class="flex items-center gap-2">
-									<span class="text-sm text-text-primary">{preferredFont.name}</span>
-									<span class="text-[10px] text-text-muted px-1.5 py-0.5 rounded bg-border/60">Your font</span>
-								</div>
-								{#if fontId === preferredFont.id}
-									<Check size={16} weight="bold" class="text-accent flex-shrink-0" />
-								{/if}
-							</button>
-						{/if}
-						{#each otherFonts as font (font.id)}
-							<button
-								class="w-full flex items-center justify-between px-3 py-2 text-left transition-colors cursor-pointer border-b border-border last:border-b-0 {fontId === font.id ? 'bg-accent-light' : 'hover:bg-card-hover'}"
-								style="font-family: {font.family}, system-ui, sans-serif"
-								onclick={() => { fontId = font.id; fontDropdownOpen = false; }}
-								onmouseenter={() => preloadFont(font.id)}
-							>
-								<span class="text-sm text-text-primary">{font.name}</span>
-								{#if fontId === font.id}
-									<Check size={16} weight="bold" class="text-accent flex-shrink-0" />
-								{/if}
-							</button>
-						{/each}
+			{#if isPro}
+				<div class="pl-3 grid grid-cols-2 gap-4">
+					<div>
+						<span class="block text-sm font-medium text-text-secondary mb-1.5">Title Color</span>
+						<ColorPicker bind:selected={titleColor} colors={pickerColors} primaryColor={primaryBrandColor} />
 					</div>
-				{/if}
-			</div>
+					<div>
+						<span class="block text-sm font-medium text-text-secondary mb-1.5">Background</span>
+						<ColorPicker bind:selected={secondaryColor} colors={secondaryPickerColors} primaryColor={primarySecondaryColor} />
+					</div>
+				</div>
+			{:else}
+				<div class="pl-3 relative">
+					<div class="flex items-center gap-2 mb-1.5">
+						<span class="block text-sm font-medium text-text-secondary">Colors</span>
+						<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/15 text-accent text-[9px] font-bold uppercase tracking-wider">
+							<Crown size={8} weight="fill" /> Pro
+						</span>
+					</div>
+					<div class="grid grid-cols-2 gap-4 opacity-40 pointer-events-none select-none">
+						<div>
+							<span class="block text-sm font-medium text-text-secondary mb-1.5">Title Color</span>
+							<div class="h-8 rounded-lg border-2 border-border bg-card"></div>
+						</div>
+						<div>
+							<span class="block text-sm font-medium text-text-secondary mb-1.5">Background</span>
+							<div class="h-8 rounded-lg border-2 border-border bg-card"></div>
+						</div>
+					</div>
+				</div>
+			{/if}
+
+			<!-- Font -->
+			{#if isPro}
+				<div class="pl-3 relative font-dropdown">
+					<span class="block text-sm font-medium text-text-secondary mb-1.5">Font</span>
+					<button
+						class="w-full flex items-center justify-between px-3 py-2 rounded-lg border-2 border-border bg-card text-sm text-text-primary hover:bg-card-hover transition-colors cursor-pointer"
+						style="font-family: {selectedFont.family}, system-ui, sans-serif"
+						onclick={() => (fontDropdownOpen = !fontDropdownOpen)}
+					>
+						<span>{selectedFont.name}</span>
+						<CaretDown size={16} weight="bold" class="text-text-muted transition-transform {fontDropdownOpen ? 'rotate-180' : ''}" />
+					</button>
+					{#if fontDropdownOpen}
+						<div class="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border-2 border-border bg-card shadow-brutal">
+							{#if preferredFont}
+								<button
+									class="w-full flex items-center justify-between px-3 py-2 text-left transition-colors cursor-pointer border-b border-border {fontId === preferredFont.id ? 'bg-accent-light' : 'hover:bg-card-hover'}"
+									style="font-family: {preferredFont.family}, system-ui, sans-serif"
+									onclick={() => { fontId = preferredFont.id; fontDropdownOpen = false; }}
+								>
+									<div class="flex items-center gap-2">
+										<span class="text-sm text-text-primary">{preferredFont.name}</span>
+										<span class="text-[10px] text-text-muted px-1.5 py-0.5 rounded bg-border/60">Your font</span>
+									</div>
+									{#if fontId === preferredFont.id}
+										<Check size={16} weight="bold" class="text-accent flex-shrink-0" />
+									{/if}
+								</button>
+							{/if}
+							{#each otherFonts as font (font.id)}
+								<button
+									class="w-full flex items-center justify-between px-3 py-2 text-left transition-colors cursor-pointer border-b border-border last:border-b-0 {fontId === font.id ? 'bg-accent-light' : 'hover:bg-card-hover'}"
+									style="font-family: {font.family}, system-ui, sans-serif"
+									onclick={() => { fontId = font.id; fontDropdownOpen = false; }}
+									onmouseenter={() => preloadFont(font.id)}
+								>
+									<span class="text-sm text-text-primary">{font.name}</span>
+									{#if fontId === font.id}
+										<Check size={16} weight="bold" class="text-accent flex-shrink-0" />
+									{/if}
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			{:else}
+				<div class="pl-3">
+					<div class="flex items-center gap-2 mb-1.5">
+						<span class="block text-sm font-medium text-text-secondary">Font</span>
+						<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/15 text-accent text-[9px] font-bold uppercase tracking-wider">
+							<Crown size={8} weight="fill" /> Pro
+						</span>
+					</div>
+					<div class="w-full px-3 py-2 rounded-lg border-2 border-border bg-card text-sm text-text-muted opacity-40">
+						Inter (default)
+					</div>
+				</div>
+			{/if}
 
 			<!-- Aspect Ratio — inline row -->
 			<div class="pl-3">
@@ -327,7 +364,7 @@
 			</div>
 
 			<!-- Logo toggle -->
-			{#if logoUrl}
+			{#if isPro && logoUrl}
 				<div class="pl-3">
 					<label class="flex items-center gap-3 cursor-pointer">
 						<input
@@ -340,6 +377,19 @@
 							<span class="text-sm text-text-secondary">Show logo watermark</span>
 						</div>
 					</label>
+				</div>
+			{:else if logoUrl}
+				<div class="pl-3 opacity-40">
+					<div class="flex items-center gap-3">
+						<Lock size={14} weight="bold" class="text-text-muted" />
+						<div class="flex items-center gap-2">
+							<img src={logoUrl} alt="Your logo" class="w-6 h-6 rounded object-contain" />
+							<span class="text-sm text-text-secondary">Logo watermark</span>
+							<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/15 text-accent text-[9px] font-bold uppercase tracking-wider">
+								<Crown size={8} weight="fill" /> Pro
+							</span>
+						</div>
+					</div>
 				</div>
 			{/if}
 		</div>

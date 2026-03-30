@@ -14,6 +14,9 @@ function createProfileState() {
 	let profile = $state<UserProfile | null>(null);
 	let loading = $state(true);
 	let hasProfile = $derived(profile !== null);
+	let isPro = $derived(
+		profile?.subscriptionStatus === 'active' || profile?.subscriptionStatus === 'trialing'
+	);
 
 	return {
 		get profile() {
@@ -24,6 +27,9 @@ function createProfileState() {
 		},
 		get hasProfile() {
 			return hasProfile;
+		},
+		get isPro() {
+			return isPro;
 		},
 
 		/** Load the current user's profile from Firestore */

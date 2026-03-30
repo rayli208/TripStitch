@@ -76,7 +76,7 @@ export const LocationCardExtension = Node.create({
 	},
 
 	renderHTML({ HTMLAttributes }) {
-		return ['div', mergeAttributes(HTMLAttributes, { 'data-location-card': '' }), 0];
+		return ['div', mergeAttributes(HTMLAttributes, { 'data-location-card': '' })];
 	},
 
 	addNodeView() {

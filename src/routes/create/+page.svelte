@@ -19,7 +19,7 @@
 	import ExportStep from '$lib/components/editor/ExportStep.svelte';
 	import AudioEditor from '$lib/components/editor/AudioEditor.svelte';
 	import ExportResult from '$lib/components/editor/ExportResult.svelte';
-	import { MapTrifold, MapPin, Article } from 'phosphor-svelte';
+	import { MapTrifold, MapPin, Article, Lock, Crown } from 'phosphor-svelte';
 
 	let showEditor = $state(false);
 
@@ -249,12 +249,12 @@
 				(p) => { progress = p; },
 				abortController.signal,
 				editor.mapStyle,
-				profileState.profile?.logoUrl,
-				editor.secondaryColor,
+				profileState.isPro ? profileState.profile?.logoUrl : undefined,
+				profileState.isPro ? editor.secondaryColor : undefined,
 				{
 					username: profileState.profile?.username,
 					displayName: profileState.profile?.displayName,
-					socialLinks: profileState.profile?.socialLinks
+					socialLinks: profileState.isPro ? profileState.profile?.socialLinks : undefined
 				}
 			);
 
@@ -373,35 +373,81 @@
 					</div>
 				</button>
 
-				<a
-					href="/create/spotlight"
-					class="group flex items-start gap-4 rounded-xl border-2 border-border bg-card p-5 text-left shadow-[3px_3px_0_var(--color-border)] hover:shadow-[5px_5px_0_var(--color-accent)] hover:-translate-y-0.5 transition-all"
-				>
-					<div class="w-11 h-11 rounded-xl bg-warning text-black flex items-center justify-center flex-shrink-0 border-2 border-border group-hover:scale-110 transition-transform">
-						<MapPin size={22} weight="bold" />
-					</div>
-					<div>
-						<h3 class="font-bold text-text-primary text-base">Location Spotlight</h3>
-						<p class="text-sm text-text-muted mt-0.5">
-							Generate a short zoom-in animation from a town overview to a specific place — perfect as a video overlay.
-						</p>
-					</div>
-				</a>
+				{#if profileState.isPro}
+					<a
+						href="/create/spotlight"
+						class="group flex items-start gap-4 rounded-xl border-2 border-border bg-card p-5 text-left shadow-[3px_3px_0_var(--color-border)] hover:shadow-[5px_5px_0_var(--color-accent)] hover:-translate-y-0.5 transition-all"
+					>
+						<div class="w-11 h-11 rounded-xl bg-warning text-black flex items-center justify-center flex-shrink-0 border-2 border-border group-hover:scale-110 transition-transform">
+							<MapPin size={22} weight="bold" />
+						</div>
+						<div>
+							<h3 class="font-bold text-text-primary text-base">Location Spotlight</h3>
+							<p class="text-sm text-text-muted mt-0.5">
+								Generate a short zoom-in animation from a town overview to a specific place — perfect as a video overlay.
+							</p>
+						</div>
+					</a>
+				{:else}
+					<button
+						onclick={() => goto('/pricing')}
+						class="group flex items-start gap-4 rounded-xl border-2 border-border bg-card p-5 text-left shadow-[3px_3px_0_var(--color-border)] opacity-60 cursor-pointer transition-all hover:opacity-80"
+					>
+						<div class="w-11 h-11 rounded-xl bg-warning/50 text-black/50 flex items-center justify-center flex-shrink-0 border-2 border-border">
+							<MapPin size={22} weight="bold" />
+						</div>
+						<div class="flex-1">
+							<div class="flex items-center gap-2">
+								<h3 class="font-bold text-text-primary text-base">Location Spotlight</h3>
+								<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 text-accent text-[10px] font-bold uppercase tracking-wider">
+									<Crown size={10} weight="fill" /> Pro
+								</span>
+							</div>
+							<p class="text-sm text-text-muted mt-0.5">
+								Generate a short zoom-in animation from a town overview to a specific place — perfect as a video overlay.
+							</p>
+						</div>
+						<Lock size={18} weight="bold" class="text-text-muted flex-shrink-0 mt-1" />
+					</button>
+				{/if}
 
-				<a
-					href="/create/blog"
-					class="group flex items-start gap-4 rounded-xl border-2 border-border bg-card p-5 text-left shadow-[3px_3px_0_var(--color-border)] hover:shadow-[5px_5px_0_var(--color-accent)] hover:-translate-y-0.5 transition-all"
-				>
-					<div class="w-11 h-11 rounded-xl bg-success text-white flex items-center justify-center flex-shrink-0 border-2 border-border group-hover:scale-110 transition-transform">
-						<Article size={22} weight="bold" />
-					</div>
-					<div>
-						<h3 class="font-bold text-text-primary text-base">Blog Post</h3>
-						<p class="text-sm text-text-muted mt-0.5">
-							Write a guide, listicle, or review with embedded locations, routes, and photos.
-						</p>
-					</div>
-				</a>
+				{#if profileState.isPro}
+					<a
+						href="/create/blog"
+						class="group flex items-start gap-4 rounded-xl border-2 border-border bg-card p-5 text-left shadow-[3px_3px_0_var(--color-border)] hover:shadow-[5px_5px_0_var(--color-accent)] hover:-translate-y-0.5 transition-all"
+					>
+						<div class="w-11 h-11 rounded-xl bg-success text-white flex items-center justify-center flex-shrink-0 border-2 border-border group-hover:scale-110 transition-transform">
+							<Article size={22} weight="bold" />
+						</div>
+						<div>
+							<h3 class="font-bold text-text-primary text-base">Blog Post</h3>
+							<p class="text-sm text-text-muted mt-0.5">
+								Write a guide, listicle, or review with embedded locations, routes, and photos.
+							</p>
+						</div>
+					</a>
+				{:else}
+					<button
+						onclick={() => goto('/pricing')}
+						class="group flex items-start gap-4 rounded-xl border-2 border-border bg-card p-5 text-left shadow-[3px_3px_0_var(--color-border)] opacity-60 cursor-pointer transition-all hover:opacity-80"
+					>
+						<div class="w-11 h-11 rounded-xl bg-success/50 text-white/50 flex items-center justify-center flex-shrink-0 border-2 border-border">
+							<Article size={22} weight="bold" />
+						</div>
+						<div class="flex-1">
+							<div class="flex items-center gap-2">
+								<h3 class="font-bold text-text-primary text-base">Blog Post</h3>
+								<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 text-accent text-[10px] font-bold uppercase tracking-wider">
+									<Crown size={10} weight="fill" /> Pro
+								</span>
+							</div>
+							<p class="text-sm text-text-muted mt-0.5">
+								Write a guide, listicle, or review with embedded locations, routes, and photos.
+							</p>
+						</div>
+						<Lock size={18} weight="bold" class="text-text-muted flex-shrink-0 mt-1" />
+					</button>
+				{/if}
 			</div>
 		</div>
 	{:else}
@@ -421,6 +467,7 @@
 			preferredFontId={profileState.profile?.preferredFontId}
 			titleMediaPreviewUrl={editor.titleMediaPreviewUrl}
 			logoUrl={profileState.profile?.logoUrl ?? null}
+		isPro={profileState.isPro}
 			bind:aspectRatio={editor.aspectRatio}
 			bind:mapStyle={editor.mapStyle}
 			onmedia={(file) => editor.updateTitleMedia(file)}
@@ -466,7 +513,7 @@
 			aspectRatio={editor.aspectRatio}
 			username={profileState.profile?.username ?? ''}
 			displayName={profileState.profile?.displayName ?? ''}
-			socialLinks={profileState.profile?.socialLinks ?? {}}
+			socialLinks={profileState.isPro ? (profileState.profile?.socialLinks ?? {}) : {}}
 			estimatedDuration={durationEstimate.formatted}
 			{hasOutro}
 			{canShowOutro}

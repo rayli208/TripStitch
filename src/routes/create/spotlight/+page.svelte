@@ -8,12 +8,16 @@
 	let isExporting = $state(false);
 
 	$effect(() => {
-		if (authState.loading) return;
+		if (authState.loading || profileState.loading) return;
 		if (!authState.isSignedIn) {
 			goto('/signin');
-		} else {
-			profileState.load();
+			return;
 		}
+		if (!profileState.isPro) {
+			goto('/pricing');
+			return;
+		}
+		profileState.load();
 	});
 
 	// Navigation guard during export

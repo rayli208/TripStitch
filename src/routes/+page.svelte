@@ -740,12 +740,12 @@
 				<div class="relative bg-card border-3 border-accent rounded-2xl p-7 shadow-[4px_4px_0_var(--color-accent)] flex flex-col">
 					<div class="absolute -top-3 right-6 bg-accent text-white text-xs font-bold px-3 py-1 rounded-lg border-2 border-border shadow-[2px_2px_0_var(--color-border)] flex items-center gap-1">
 						<Crown size={14} weight="fill" />
-						Coming Soon
+						Popular
 					</div>
 
 					<div class="mb-6">
 						<h3 class="text-xl font-bold text-text-primary mb-1">Pro</h3>
-						<p class="text-3xl font-extrabold text-accent">TBD<span class="text-base font-normal text-text-muted">/month</span></p>
+						<p class="text-3xl font-extrabold text-accent">$5.99<span class="text-base font-normal text-text-muted">/month</span></p>
 						<p class="text-sm text-text-secondary mt-2">For creators who want the full experience.</p>
 					</div>
 
@@ -780,12 +780,12 @@
 						</li>
 					</ul>
 
-					<button
-						class="block w-full text-center px-6 py-3 rounded-xl bg-accent/20 text-accent font-bold border-2 border-accent/30 cursor-default"
-						disabled
+					<a
+						href="/pricing"
+						class="block w-full text-center px-6 py-3 rounded-xl bg-accent text-white font-bold border-2 border-border shadow-[3px_3px_0_var(--color-border)] hover:shadow-[1px_1px_0_var(--color-border)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
 					>
-						Coming Soon
-					</button>
+						Upgrade to Pro
+					</a>
 				</div>
 			</div>
 		</div>

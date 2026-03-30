@@ -1,14 +1,17 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateCaption = void 0;
+exports.createPortalSession = exports.cancelSubscription = exports.stripeWebhook = exports.createCheckoutSession = exports.generateCaption = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const params_1 = require("firebase-functions/params");
 const generative_ai_1 = require("@google/generative-ai");
 const app_1 = require("firebase-admin/app");
 const firestore_1 = require("firebase-admin/firestore");
+const stripe_1 = require("stripe");
 (0, app_1.initializeApp)();
 const firestore = (0, firestore_1.getFirestore)();
 const geminiApiKey = (0, params_1.defineSecret)("GEMINI_API_KEY");
+const stripeSecretKey = (0, params_1.defineSecret)("STRIPE_SECRET_KEY");
+const stripeWebhookSecret = (0, params_1.defineSecret)("STRIPE_WEBHOOK_SECRET");
 const DAILY_CAPTION_LIMIT = 5;
 exports.generateCaption = (0, https_1.onCall)({ secrets: [geminiApiKey], maxInstances: 10 }, async (request) => {
     if (!request.auth) {
@@ -82,5 +85,137 @@ Return ONLY the JSON object, no markdown fencing.`;
         console.error("[generateCaption] Gemini error:", err);
         throw new https_1.HttpsError("internal", "Caption generation failed. Try again.");
     }
+});
+// ── Stripe: Create Checkout Session ──
+exports.createCheckoutSession = (0, https_1.onCall)({ secrets: [stripeSecretKey], maxInstances: 10 }, async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError("unauthenticated", "Must be signed in.");
+    }
+    const { priceId, successUrl, cancelUrl } = request.data;
+    if (!priceId || !successUrl || !cancelUrl) {
+        throw new https_1.HttpsError("invalid-argument", "priceId, successUrl, and cancelUrl are required.");
+    }
+    const uid = request.auth.uid;
+    const stripe = new stripe_1.default(stripeSecretKey.value());
+    // Get or create Stripe customer
+    const profileRef = firestore.doc(`users/${uid}/profile/main`);
+    const profileSnap = await profileRef.get();
+    let customerId = profileSnap.data()?.stripeCustomerId;
+    if (!customerId) {
+        const customer = await stripe.customers.create({
+            email: request.auth.token.email ?? undefined,
+            metadata: { firebaseUid: uid },
+        });
+        customerId = customer.id;
+        // Store customer ID on profile and in lookup collection
+        await profileRef.set({ stripeCustomerId: customerId }, { merge: true });
+        await firestore.doc(`stripeCustomers/${customerId}`).set({ uid });
+    }
+    const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        payment_method_types: ["card"],
+        mode: "subscription",
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: cancelUrl,
+    });
+    return { url: session.url };
+});
+// ── Stripe: Webhook ──
+exports.stripeWebhook = (0, https_1.onRequest)({ secrets: [stripeSecretKey, stripeWebhookSecret] }, async (req, res) => {
+    if (req.method !== "POST") {
+        res.status(405).send("Method not allowed");
+        return;
+    }
+    const stripe = new stripe_1.default(stripeSecretKey.value());
+    const sig = req.headers["stripe-signature"];
+    let event;
+    try {
+        event = stripe.webhooks.constructEvent(req.rawBody, sig, stripeWebhookSecret.value());
+    }
+    catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        console.error("[stripeWebhook] Signature verification failed:", message);
+        res.status(400).send(`Webhook signature verification failed.`);
+        return;
+    }
+    try {
+        switch (event.type) {
+            case "customer.subscription.created":
+            case "customer.subscription.updated": {
+                const subscription = event.data.object;
+                const customerId = subscription.customer;
+                const mappingSnap = await firestore.doc(`stripeCustomers/${customerId}`).get();
+                const uid = mappingSnap.data()?.uid;
+                if (uid) {
+                    await firestore.doc(`users/${uid}/profile/main`).set({
+                        subscriptionStatus: subscription.status,
+                        subscriptionId: subscription.id,
+                        subscriptionPriceId: subscription.items.data[0]?.price.id ?? null,
+                        subscriptionCurrentPeriodEnd: subscription.items.data[0]?.current_period_end ?? null,
+                    }, { merge: true });
+                }
+                break;
+            }
+            case "customer.subscription.deleted": {
+                const subscription = event.data.object;
+                const customerId = subscription.customer;
+                const mappingSnap = await firestore.doc(`stripeCustomers/${customerId}`).get();
+                const uid = mappingSnap.data()?.uid;
+                if (uid) {
+                    await firestore.doc(`users/${uid}/profile/main`).set({
+                        subscriptionStatus: "canceled",
+                        subscriptionId: null,
+                        subscriptionPriceId: null,
+                        subscriptionCurrentPeriodEnd: null,
+                    }, { merge: true });
+                }
+                break;
+            }
+        }
+        res.json({ received: true });
+    }
+    catch (err) {
+        console.error("[stripeWebhook] Error processing event:", err);
+        res.status(500).send("Webhook handler failed.");
+    }
+});
+// ── Stripe: Cancel Subscription ──
+exports.cancelSubscription = (0, https_1.onCall)({ secrets: [stripeSecretKey], maxInstances: 10 }, async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError("unauthenticated", "Must be signed in.");
+    }
+    const uid = request.auth.uid;
+    const profileSnap = await firestore.doc(`users/${uid}/profile/main`).get();
+    const subscriptionId = profileSnap.data()?.subscriptionId;
+    if (!subscriptionId) {
+        throw new https_1.HttpsError("failed-precondition", "No active subscription found.");
+    }
+    const stripe = new stripe_1.default(stripeSecretKey.value());
+    await stripe.subscriptions.cancel(subscriptionId);
+    await firestore.doc(`users/${uid}/profile/main`).set({
+        subscriptionStatus: "canceled",
+        subscriptionId: null,
+        subscriptionPriceId: null,
+    }, { merge: true });
+    return { success: true };
+});
+// ── Stripe: Customer Portal Session ──
+exports.createPortalSession = (0, https_1.onCall)({ secrets: [stripeSecretKey], maxInstances: 10 }, async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError("unauthenticated", "Must be signed in.");
+    }
+    const uid = request.auth.uid;
+    const profileSnap = await firestore.doc(`users/${uid}/profile/main`).get();
+    const customerId = profileSnap.data()?.stripeCustomerId;
+    if (!customerId) {
+        throw new https_1.HttpsError("failed-precondition", "No billing account found.");
+    }
+    const stripe = new stripe_1.default(stripeSecretKey.value());
+    const session = await stripe.billingPortal.sessions.create({
+        customer: customerId,
+        return_url: request.data.returnUrl,
+    });
+    return { url: session.url };
 });
 //# sourceMappingURL=index.js.map

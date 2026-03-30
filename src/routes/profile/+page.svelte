@@ -11,8 +11,10 @@
 	import { preloadFont } from '$lib/utils/fontLoader';
 	import SkeletonProfile from '$lib/components/ui/SkeletonProfile.svelte';
 	import themeState from '$lib/state/theme.svelte';
-	import { CaretDown, Check, Upload, Sun, Moon, Desktop, Globe, MapTrifold, Camera, Trash, Warning } from 'phosphor-svelte';
+	import { CaretDown, Check, Upload, Sun, Moon, Desktop, Globe, MapTrifold, Camera, Trash, Warning, Crown, Lock, CreditCard, CalendarBlank } from 'phosphor-svelte';
 	import tripsState from '$lib/state/trips.svelte';
+	import { cancelMembership, openBillingPortal } from '$lib/services/subscriptionService';
+	import { PUBLIC_STRIPE_MONTHLY_PRICE_ID, PUBLIC_STRIPE_YEARLY_PRICE_ID } from '$env/static/public';
 	import type { ThemeMode } from '$lib/state/theme.svelte';
 	import type { GlobeStyle, MapDisplay } from '$lib/types';
 
@@ -230,12 +232,59 @@
 		}
 	}
 
+	// ── Subscription info ──
+	const subPlan = $derived(
+		profileState.profile?.subscriptionPriceId === PUBLIC_STRIPE_YEARLY_PRICE_ID ? 'yearly' :
+		profileState.profile?.subscriptionPriceId === PUBLIC_STRIPE_MONTHLY_PRICE_ID ? 'monthly' : null
+	);
+	const subPlanLabel = $derived(subPlan === 'yearly' ? 'Pro Yearly' : subPlan === 'monthly' ? 'Pro Monthly' : 'Pro');
+	const subPrice = $derived(subPlan === 'yearly' ? '$59.99/year' : '$5.99/month');
+	const subRenewalDate = $derived.by(() => {
+		const ts = profileState.profile?.subscriptionCurrentPeriodEnd;
+		if (!ts) return null;
+		return new Date(ts * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+	});
+
+	let billingLoading = $state(false);
+	async function handleManageBilling() {
+		billingLoading = true;
+		try {
+			await openBillingPortal();
+		} catch (err) {
+			console.error('[Profile] Billing portal failed:', err);
+			toast.error('Failed to open billing portal.');
+			billingLoading = false;
+		}
+	}
+
+	// ── Cancel membership ──
+	let cancelStep = $state<'idle' | 'confirm' | 'canceling'>('idle');
+
+	async function handleCancelMembership() {
+		cancelStep = 'canceling';
+		try {
+			await cancelMembership();
+			toast.success('Membership canceled');
+			cancelStep = 'idle';
+		} catch (err) {
+			console.error('[Profile] Cancel membership failed:', err);
+			toast.error('Failed to cancel membership. Please try again.');
+			cancelStep = 'idle';
+		}
+	}
+
 	// ── Delete account ──
 	let deleteStep = $state<'idle' | 'confirm' | 'deleting'>('idle');
 
 	async function handleDeleteAccount() {
 		deleteStep = 'deleting';
 		tripsState.unsubscribe();
+		// Cancel subscription before deleting account
+		if (profileState.isPro && profileState.profile?.subscriptionId) {
+			try {
+				await cancelMembership();
+			} catch { /* proceed with deletion even if cancel fails */ }
+		}
 		const result = await profileState.deleteAccount();
 		if (result.ok) {
 			toast.success('Account deleted');
@@ -401,7 +450,7 @@
 				</div>
 			</section>
 
-			<!-- ═══════════ SECTION: Appearance ═══════════ -->
+		<!-- ═══════════ SECTION: Appearance ═══════════ -->
 			<section class="bg-card border-2 border-border rounded-xl p-5 space-y-4 {ready ? 'animate-fade-up fill-both delay-100' : 'opacity-0'}">
 				<h2 class="text-base font-semibold text-text-primary">Appearance</h2>
 				<div class="grid grid-cols-3 gap-2">
@@ -433,11 +482,19 @@
 					class="w-full flex items-center justify-between p-5 cursor-pointer text-left"
 					onclick={() => brandingOpen = !brandingOpen}
 				>
+					<div class="flex items-center gap-2">
 					<h2 class="text-base font-semibold text-text-primary">Branding</h2>
+					{#if !profileState.isPro}
+						<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/15 text-accent text-[9px] font-bold uppercase tracking-wider">
+							<Crown size={8} weight="fill" /> Pro
+						</span>
+					{/if}
+				</div>
 					<CaretDown size={20} weight="bold" class="transition-transform {brandingOpen ? 'rotate-180' : ''}" />
 				</button>
 
 				{#if brandingOpen}
+					{#if profileState.isPro}
 					<div class="px-5 pb-5 space-y-5 border-t border-border pt-4">
 						<!-- Logo -->
 						<div>
@@ -544,6 +601,17 @@
 							</div>
 						</div>
 					</div>
+					{:else}
+					<div class="px-5 pb-5 border-t border-border pt-4">
+						<div class="text-center py-4">
+							<Lock size={24} weight="bold" class="text-text-muted mx-auto mb-2" />
+							<p class="text-sm text-text-muted mb-3">Custom logo, colors, and fonts are available with Pro.</p>
+							<a href="/pricing" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-white text-sm font-bold hover:bg-accent-hover transition-colors">
+								<Crown size={14} weight="fill" /> Upgrade to Pro
+							</a>
+						</div>
+					</div>
+					{/if}
 				{/if}
 			</section>
 
@@ -616,11 +684,19 @@
 					class="w-full flex items-center justify-between p-5 cursor-pointer text-left"
 					onclick={() => socialsOpen = !socialsOpen}
 				>
+					<div class="flex items-center gap-2">
 					<h2 class="text-base font-semibold text-text-primary">Social Links</h2>
+					{#if !profileState.isPro}
+						<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/15 text-accent text-[9px] font-bold uppercase tracking-wider">
+							<Crown size={8} weight="fill" /> Pro
+						</span>
+					{/if}
+				</div>
 					<CaretDown size={20} weight="bold" class="transition-transform {socialsOpen ? 'rotate-180' : ''}" />
 				</button>
 
 				{#if socialsOpen}
+					{#if profileState.isPro}
 					<div class="px-5 pb-5 space-y-3 border-t border-border pt-4">
 						<Input label="Instagram" placeholder="@username or full URL" bind:value={instagram} />
 						<Input label="TikTok" placeholder="@username or full URL" bind:value={tiktok} />
@@ -632,10 +708,119 @@
 							{/if}
 						</div>
 					</div>
+					{:else}
+					<div class="px-5 pb-5 border-t border-border pt-4">
+						<div class="text-center py-4">
+							<Lock size={24} weight="bold" class="text-text-muted mx-auto mb-2" />
+							<p class="text-sm text-text-muted mb-3">Social links in your video outro are available with Pro.</p>
+							<a href="/pricing" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-white text-sm font-bold hover:bg-accent-hover transition-colors">
+								<Crown size={14} weight="fill" /> Upgrade to Pro
+							</a>
+						</div>
+					</div>
+					{/if}
 				{/if}
 			</section>
 
-			<!-- ═══════════ SECTION: Delete Account ═══════════ -->
+			<!-- ═══════════ SECTION: Subscription ═══════════ -->
+		{#if profileState.isPro}
+			<section class="bg-card border-2 border-accent/30 rounded-xl p-5 space-y-4 {ready ? 'animate-fade-up fill-both delay-300' : 'opacity-0'}">
+				<div class="flex items-center justify-between">
+					<h2 class="text-base font-semibold text-text-primary">Subscription</h2>
+					<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-accent/15 text-accent text-xs font-bold">
+						<Crown size={12} weight="fill" /> Active
+					</span>
+				</div>
+
+				<div class="space-y-3">
+					<div class="flex items-center gap-3">
+						<div class="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center">
+							<CreditCard size={18} weight="bold" class="text-accent" />
+						</div>
+						<div>
+							<p class="text-sm font-semibold text-text-primary">{subPlanLabel}</p>
+							<p class="text-xs text-text-muted">{subPrice}</p>
+						</div>
+					</div>
+
+					{#if subRenewalDate}
+						<div class="flex items-center gap-3">
+							<div class="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center">
+								<CalendarBlank size={18} weight="bold" class="text-accent" />
+							</div>
+							<div>
+								<p class="text-sm font-semibold text-text-primary">Next renewal</p>
+								<p class="text-xs text-text-muted">{subRenewalDate}</p>
+							</div>
+						</div>
+					{/if}
+				</div>
+
+				<div class="flex gap-2 pt-1">
+					<button
+						class="flex-1 text-sm py-2.5 rounded-lg border-2 border-border bg-card hover:bg-primary-light text-text-secondary font-medium transition-colors cursor-pointer"
+						onclick={handleManageBilling}
+						disabled={billingLoading}
+					>
+						{billingLoading ? 'Loading...' : 'Manage Billing'}
+					</button>
+					<button
+						class="text-sm py-2.5 px-4 rounded-lg text-text-muted hover:text-error transition-colors cursor-pointer"
+						onclick={() => cancelStep = 'confirm'}
+					>
+						Cancel
+					</button>
+				</div>
+
+				{#if cancelStep === 'confirm'}
+					<div class="border-t-2 border-border pt-4 space-y-3">
+						<div class="flex items-start gap-3">
+							<Warning size={20} weight="fill" class="text-warning flex-shrink-0 mt-0.5" />
+							<div>
+								<p class="text-sm font-semibold text-warning">Cancel your Pro membership?</p>
+								<p class="text-xs text-text-muted mt-1">You'll lose access to blogs, spotlights, custom branding, and other Pro features.</p>
+							</div>
+						</div>
+						<div class="flex gap-2">
+							<button
+								class="flex-1 text-sm py-2 rounded-lg bg-error hover:bg-error/80 text-white font-bold transition-colors cursor-pointer"
+								onclick={handleCancelMembership}
+							>
+								Yes, cancel membership
+							</button>
+							<button
+								class="flex-1 text-sm py-2 rounded-lg bg-border hover:bg-primary-light text-text-secondary transition-colors cursor-pointer"
+								onclick={() => cancelStep = 'idle'}
+							>
+								Keep Pro
+							</button>
+						</div>
+					</div>
+				{:else if cancelStep === 'canceling'}
+					<div class="border-t-2 border-border pt-4 flex items-center justify-center gap-3 py-2">
+						<div class="w-4 h-4 border-2 border-warning/30 border-t-warning rounded-full animate-spin"></div>
+						<span class="text-sm text-text-muted">Canceling membership...</span>
+					</div>
+				{/if}
+			</section>
+		{:else}
+			<section class="bg-card border-2 border-border rounded-xl p-5 space-y-3 {ready ? 'animate-fade-up fill-both delay-300' : 'opacity-0'}">
+				<div class="flex items-center gap-3">
+					<div class="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center">
+						<Crown size={18} weight="bold" class="text-accent" />
+					</div>
+					<div class="flex-1">
+						<p class="text-sm font-semibold text-text-primary">Upgrade to Pro</p>
+						<p class="text-xs text-text-muted">Unlock blogs, spotlights, custom branding & more</p>
+					</div>
+					<a href="/pricing" class="px-4 py-2 rounded-lg bg-accent text-white text-sm font-bold hover:bg-accent-hover transition-colors">
+						View Plans
+					</a>
+				</div>
+			</section>
+		{/if}
+
+		<!-- ═══════════ SECTION: Delete Account ═══════════ -->
 			<section class="bg-card border-2 border-error/30 rounded-xl p-5 {ready ? 'animate-fade-up fill-both delay-350' : 'opacity-0'}">
 				{#if deleteStep === 'idle'}
 					<button

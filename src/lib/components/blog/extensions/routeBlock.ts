@@ -46,7 +46,7 @@ export const RouteBlockExtension = Node.create({
 	},
 
 	renderHTML({ HTMLAttributes }) {
-		return ['div', mergeAttributes(HTMLAttributes, { 'data-route-block': '' }), 0];
+		return ['div', mergeAttributes(HTMLAttributes, { 'data-route-block': '' })];
 	},
 
 	addNodeView() {

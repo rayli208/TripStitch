@@ -40,6 +40,8 @@ export interface SocialLinks {
 	website?: string;
 }
 
+export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'paused' | 'unpaid' | null;
+
 export interface UserProfile {
 	username: string;
 	displayName: string;
@@ -53,6 +55,11 @@ export interface UserProfile {
 	globeStyle: GlobeStyle;
 	mapDisplay: MapDisplay;
 	createdAt: string;
+	stripeCustomerId?: string | null;
+	subscriptionStatus?: SubscriptionStatus;
+	subscriptionId?: string | null;
+	subscriptionPriceId?: string | null;
+	subscriptionCurrentPeriodEnd?: number | null;
 }
 
 export interface Clip {

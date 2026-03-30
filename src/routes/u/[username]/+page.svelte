@@ -9,7 +9,7 @@
 	import TravelMap from '$lib/components/TravelMap.svelte';
 	import { parseAllVideoLinks } from '$lib/utils/videoEmbed';
 	import authState from '$lib/state/auth.svelte';
-	import { CaretLeft, YoutubeLogo, InstagramLogo, TiktokLogo, Car, PersonSimpleHike, Buildings, SunHorizon, Backpack, ForkKnife, Mountains, Leaf, Bank, Camera, Globe, MapPin, ArrowRight, Path } from 'phosphor-svelte';
+	import { CaretLeft, YoutubeLogo, InstagramLogo, TiktokLogo, Car, PersonSimpleHike, Buildings, SunHorizon, Backpack, ForkKnife, Mountains, Leaf, Bank, Camera, Globe, MapPin, ArrowRight, Path, Crown } from 'phosphor-svelte';
 	import type { Component } from 'svelte';
 
 	const TAG_ICONS: Record<string, Component> = {
@@ -236,6 +236,11 @@
 						<div class="flex-1 min-w-0">
 							<div class="flex items-center gap-2">
 								<h1 class="text-xl sm:text-2xl font-extrabold text-text-primary tracking-tight">{profile.displayName}</h1>
+								{#if profile.subscriptionStatus === 'active' || profile.subscriptionStatus === 'trialing'}
+									<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 text-accent text-[10px] font-bold uppercase tracking-wider shrink-0">
+										<Crown size={10} weight="fill" /> Pro
+									</span>
+								{/if}
 								{#if profile.logoUrl}
 									<img src={profile.logoUrl} alt="Logo" class="w-7 h-7 rounded-md object-contain border border-border bg-page p-0.5 shrink-0" />
 								{/if}

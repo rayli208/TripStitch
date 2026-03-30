@@ -247,12 +247,12 @@
 				(p) => { progress = p; },
 				abortController.signal,
 				editor.mapStyle,
-				profileState.profile?.logoUrl,
+				profileState.isPro ? profileState.profile?.logoUrl : undefined,
 				editor.secondaryColor,
 				{
 					username: profileState.profile?.username,
 					displayName: profileState.profile?.displayName,
-					socialLinks: profileState.profile?.socialLinks
+					socialLinks: profileState.isPro ? profileState.profile?.socialLinks : undefined
 				}
 			);
 
@@ -382,6 +382,7 @@
 				preferredFontId={profileState.profile?.preferredFontId}
 				titleMediaPreviewUrl={editor.titleMediaPreviewUrl}
 				logoUrl={profileState.profile?.logoUrl ?? null}
+			isPro={profileState.isPro}
 				bind:aspectRatio={editor.aspectRatio}
 				bind:mapStyle={editor.mapStyle}
 				onmedia={(file) => editor.updateTitleMedia(file)}
@@ -433,7 +434,7 @@
 				aspectRatio={editor.aspectRatio}
 				username={profileState.profile?.username ?? ''}
 				displayName={profileState.profile?.displayName ?? ''}
-				socialLinks={profileState.profile?.socialLinks ?? {}}
+				socialLinks={profileState.isPro ? (profileState.profile?.socialLinks ?? {}) : {}}
 				estimatedDuration={durationEstimate.formatted}
 				{hasOutro}
 				{canShowOutro}
