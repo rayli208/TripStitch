@@ -38,9 +38,9 @@
 	});
 </script>
 
-<svelte:head><title>Location Spotlight | TripStitch</title></svelte:head>
+<svelte:head><title>YouTube Map Overlay Studio | TripStitch</title></svelte:head>
 
-<AppShell title="Location Spotlight" showBottomNav logoUrl={profileState.profile?.logoUrl}>
+<AppShell title="Map Overlay Studio" showBottomNav logoUrl={profileState.profile?.logoUrl}>
 	<SpotlightCreator
 		accentColor={profileState.profile?.brandColors?.[0] ?? '#FFFFFF'}
 		secondaryColor={profileState.profile?.secondaryColor ?? '#0a0f1e'}

@@ -65,7 +65,7 @@
 			"9:16, 1:1, and 16:9 export",
 			"Client-side video processing",
 			"AI-powered captions and hashtags",
-			"Location Spotlight animations",
+			"Map Overlay Studio for YouTube edits",
 			"Travel blog editor with rich text",
 			"Embedded location cards and routes"
 		]
@@ -371,18 +371,18 @@
 		</div>
 	</section>
 
-	<!-- Location Spotlight callout -->
+	<!-- Map Overlay Studio callout -->
 	<section class="border-y-3 border-border bg-card">
 		<div class="max-w-5xl mx-auto px-6 py-16 sm:py-20 reveal">
 			<div class="flex flex-col md:flex-row items-center gap-10">
 				<div class="flex-1">
 					<div class="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-warning text-black text-xs font-bold border-2 border-border shadow-[2px_2px_0_var(--color-border)] mb-5">
 						<MapPin size={14} weight="bold" />
-						New
+						For YouTube Creators
 					</div>
-					<h2 class="text-2xl sm:text-3xl font-bold text-text-primary mb-4">Location Spotlight</h2>
+					<h2 class="text-2xl sm:text-3xl font-bold text-text-primary mb-4">Map Overlay Studio</h2>
 					<p class="text-text-secondary leading-relaxed mb-6">
-						Need a quick map animation for your video content? Spotlight generates a short clip that zooms from a town overview — complete with the city boundary outlined — into a specific location with a pin. Drop it into your video editor as an overlay while you talk about a place.
+						Export a short map clip — with your brand colors — to drop straight into your travel edits as a corner overlay. Transparent WebM for instant compositing, seamless loops for long voiceovers, and a radius mode for neighborhoods and landmarks that don't have official boundaries. Works in DaVinci, Premiere, and CapCut.
 					</p>
 					<a
 						href="/signin"

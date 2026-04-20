@@ -81,3 +81,27 @@ export async function canUseWebCodecs(w: number, h: number): Promise<boolean> {
 		return false;
 	}
 }
+
+/**
+ * Pick a MediaRecorder mime type that preserves alpha when fed a
+ * canvas.captureStream(). Chrome/Edge/Firefox encode the alpha as a separate
+ * track in the resulting WebM; Safari's MediaRecorder only supports H.264/MP4
+ * which has no alpha.
+ */
+export function getAlphaMimeType(): string | null {
+	if (typeof MediaRecorder === 'undefined') return null;
+	const candidates = [
+		'video/webm;codecs=vp8', // VP8 alpha is the most reliable in Chrome
+		'video/webm;codecs=vp9',
+		'video/webm'
+	];
+	for (const c of candidates) {
+		if (MediaRecorder.isTypeSupported(c)) return c;
+	}
+	return null;
+}
+
+/** True when this browser can export a WebM with a transparent background. */
+export function canUseAlphaExport(): boolean {
+	return getAlphaMimeType() !== null;
+}

@@ -382,9 +382,9 @@
 							<MapPin size={22} weight="bold" />
 						</div>
 						<div>
-							<h3 class="font-bold text-text-primary text-base">Location Spotlight</h3>
+							<h3 class="font-bold text-text-primary text-base">Map Overlay Studio</h3>
 							<p class="text-sm text-text-muted mt-0.5">
-								Generate a short zoom-in animation from a town overview to a specific place — perfect as a video overlay.
+								Export a short map clip — transparent, looping, or standard — to drop into your YouTube travel edits as a corner overlay.
 							</p>
 						</div>
 					</a>
@@ -398,13 +398,13 @@
 						</div>
 						<div class="flex-1">
 							<div class="flex items-center gap-2">
-								<h3 class="font-bold text-text-primary text-base">Location Spotlight</h3>
+								<h3 class="font-bold text-text-primary text-base">Map Overlay Studio</h3>
 								<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 text-accent text-[10px] font-bold uppercase tracking-wider">
 									<Crown size={10} weight="fill" /> Pro
 								</span>
 							</div>
 							<p class="text-sm text-text-muted mt-0.5">
-								Generate a short zoom-in animation from a town overview to a specific place — perfect as a video overlay.
+								Export a short map clip — transparent, looping, or standard — to drop into your YouTube travel edits as a corner overlay.
 							</p>
 						</div>
 						<Lock size={18} weight="bold" class="text-text-muted flex-shrink-0 mt-1" />
