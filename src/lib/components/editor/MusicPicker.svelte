@@ -341,7 +341,7 @@
 					{@const isLoading = loadingTrackId === track.id}
 					<div
 						class="flex items-center gap-2 p-2 rounded-lg transition-colors
-							{isSelected ? 'bg-accent/10 border border-accent/30' : 'hover:bg-border/50'}"
+							{isSelected ? 'bg-accent/10 border border-accent/30' : 'hover:bg-accent-light hover:text-text-primary'}"
 					>
 						<!-- Preview button -->
 						<button

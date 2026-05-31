@@ -21,7 +21,7 @@
 	{#each options as opt}
 		<button
 			class="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer
-				{mode === opt.value ? 'bg-accent text-white' : 'bg-card text-text-muted hover:bg-border'}"
+				{mode === opt.value ? 'bg-accent text-white' : 'bg-card text-text-muted hover:bg-accent-light hover:text-text-primary'}"
 			onclick={() => onchange(opt.value)}
 		>
 			<span>

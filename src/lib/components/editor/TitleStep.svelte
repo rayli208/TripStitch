@@ -142,45 +142,47 @@
 		/>
 	</div>
 
-	<!-- Preview -->
+	<!-- Preview (mobile only — desktop shows in right pane) — 1:1 with titleRenderer -->
 	{#if title}
-		<div class="rounded-lg border-2 border-border overflow-hidden">
+		<div class="md:hidden rounded-lg border-2 border-border overflow-hidden">
 			<p class="text-xs text-text-muted px-4 pt-3 pb-1">Preview</p>
-			{#if titleMediaPreviewUrl}
-				<div class="relative h-40 flex items-center justify-center">
+			<div class="relative h-40 flex items-center justify-center">
+				{#if titleMediaPreviewUrl}
 					<img src={titleMediaPreviewUrl} alt="Cover" class="absolute inset-0 w-full h-full object-cover" />
-					<div class="absolute inset-0 bg-overlay/40"></div>
-					<div class="relative text-center px-6 py-4 rounded-xl" style="background: {secondaryColor}bf">
-						<p class="text-2xl font-bold" style="color: {titleColor}; font-family: {fontFamily(fontId)}">{title}</p>
-						{#if titleDescription}
-							<p class="text-sm mt-1 opacity-70" style="color: {titleColor}; font-family: {fontFamily(fontId)}">{titleDescription}</p>
-						{/if}
-					</div>
-					{#if showLogoOnTitle && logoUrl}
-						<img
-							src={logoUrl}
-							alt="Logo"
-							class="absolute bottom-2 right-3 w-8 h-8 object-contain opacity-80"
-						/>
+					<div class="absolute inset-0" style="background: rgba(0,0,0,0.4);"></div>
+				{:else}
+					<div class="absolute inset-0" style="background: linear-gradient(to bottom, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%);"></div>
+				{/if}
+
+				<div
+					class="relative text-center px-6 py-4 rounded-2xl overflow-hidden max-w-[80%]"
+					style="background: {secondaryColor}bf;"
+				>
+					<!-- Left accent bar in titleColor @ 85% alpha (matches renderer) -->
+					<span
+						class="absolute left-0 top-0 bottom-0 w-1"
+						style="background: {titleColor}; opacity: 0.85;"
+					></span>
+					<!-- Title: always white in the export -->
+					<p class="text-2xl font-bold text-white" style="font-family: {fontFamily(fontId)}">{title}</p>
+					{#if titleDescription}
+						<p class="text-sm mt-1 text-white" style="font-family: {fontFamily(fontId)}; opacity: 0.7;">{titleDescription}</p>
+					{:else}
+						<span
+							class="block mx-auto mt-2 w-[30%] h-[2px]"
+							style="background: {titleColor}; opacity: 0.6;"
+						></span>
 					{/if}
 				</div>
-			{:else}
-				<div class="relative h-40 flex items-center justify-center" style="background: linear-gradient(to bottom, #0a0a0a, #1a1a2e, #0a0a0a)">
-					<div class="relative text-center px-6 py-4 rounded-xl" style="background: {secondaryColor}bf">
-						<p class="text-2xl font-bold" style="color: {titleColor}; font-family: {fontFamily(fontId)}">{title}</p>
-						{#if titleDescription}
-							<p class="text-sm mt-1 opacity-70" style="color: {titleColor}; font-family: {fontFamily(fontId)}">{titleDescription}</p>
-						{/if}
-					</div>
-					{#if showLogoOnTitle && logoUrl}
-						<img
-							src={logoUrl}
-							alt="Logo"
-							class="absolute bottom-2 right-3 w-8 h-8 object-contain opacity-80"
-						/>
-					{/if}
-				</div>
-			{/if}
+				{#if showLogoOnTitle && logoUrl}
+					<img
+						src={logoUrl}
+						alt=""
+						class="absolute object-contain"
+						style="width: 12%; height: auto; right: 4%; bottom: 4%; opacity: 0.8;"
+					/>
+				{/if}
+			</div>
 		</div>
 	{/if}
 
@@ -395,8 +397,13 @@
 		</div>
 	{/if}
 
-	<div class="flex justify-end pt-4">
-		<Button variant="primary" disabled={!title.trim()} onclick={onnext}>
+	<div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4">
+		<Button
+			variant="primary"
+			disabled={!title.trim()}
+			onclick={onnext}
+			class="w-full sm:w-auto"
+		>
 			{#if !title.trim()}
 				Enter a title to continue
 			{:else}

@@ -19,6 +19,7 @@
 	import ExportStep from '$lib/components/editor/ExportStep.svelte';
 	import AudioEditor from '$lib/components/editor/AudioEditor.svelte';
 	import ExportResult from '$lib/components/editor/ExportResult.svelte';
+	import { ImageSquare } from 'phosphor-svelte';
 
 	const tripId = page.params.id!;
 
@@ -391,9 +392,16 @@
 			/>
 		{:else if editor.currentStep === 1}
 			{#if editor.locations.length > 0 && editor.locations.every(l => l.clips.length === 0)}
-				<div class="bg-warning/10 border-2 border-warning/30 rounded-xl p-4 mb-4">
-					<p class="text-sm font-medium text-warning">Your photos & videos need to be re-added</p>
-					<p class="text-xs text-text-muted mt-1">Media files are stored on your device, not in the cloud, so they can't be loaded from a previous session. Your trip title, locations, and settings are all still here — just tap each stop below and add your photos/videos back.</p>
+				<div class="flex items-start gap-3 rounded-xl border-2 border-warning bg-warning-light p-4 mb-5 shadow-[2px_2px_0_var(--color-border)]">
+					<div class="shrink-0 w-9 h-9 rounded-lg border-2 border-border bg-warning text-text-primary flex items-center justify-center">
+						<ImageSquare size={18} weight="bold" />
+					</div>
+					<div class="min-w-0 flex-1">
+						<p class="text-sm font-bold text-text-primary leading-tight">Re-add your photos & videos</p>
+						<p class="text-xs text-text-secondary mt-1 leading-relaxed">
+							Media stays on your device — it isn't uploaded to the cloud, so we can't restore it across sessions. Your title, stops, and settings are intact; just tap a stop below and drop the clips back in.
+						</p>
+					</div>
 				</div>
 			{/if}
 			<LocationsStep

@@ -15,7 +15,7 @@ import {
 	orderBy,
 	type Unsubscribe
 } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL, listAll, deleteObject } from 'firebase/storage';
+import { ref as storageRef, uploadBytes, uploadBytesResumable, getDownloadURL, listAll, deleteObject } from 'firebase/storage';
 import { compressImage, imageExtension } from '$lib/utils/imageUtils';
 
 const blogsRef = collection(db, 'blogs');
@@ -225,7 +225,11 @@ function createBlogsState() {
 			await deleteDoc(doc(db, 'blogs', id));
 		},
 
-		async uploadBlogImage(blogId: string, file: File): Promise<string | null> {
+		async uploadBlogImage(
+			blogId: string,
+			file: File,
+			onProgress?: (percent: number) => void
+		): Promise<string | null> {
 			const uid = authState.user?.id;
 			if (!uid) return null;
 			try {
@@ -233,14 +237,51 @@ function createBlogsState() {
 				const ext = imageExtension(compressed);
 				const id = Math.random().toString(36).slice(2, 10);
 				const imgRef = storageRef(storage, `blogs/${blogId}/images/${id}.${ext}`);
-				await uploadBytes(imgRef, compressed, {
+				const task = uploadBytesResumable(imgRef, compressed, {
 					contentType: compressed.type,
 					cacheControl: 'public, max-age=31536000'
 				});
-				return await getDownloadURL(imgRef);
+				return await new Promise<string | null>((resolve) => {
+					task.on(
+						'state_changed',
+						(snapshot) => {
+							if (onProgress && snapshot.totalBytes > 0) {
+								onProgress(Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100));
+							}
+						},
+						(err) => {
+							console.warn('[Blogs] Image upload failed:', err);
+							resolve(null);
+						},
+						async () => {
+							resolve(await getDownloadURL(imgRef));
+						}
+					);
+				});
 			} catch (err) {
 				console.warn('[Blogs] Image upload failed:', err);
 				return null;
+			}
+		},
+
+		/**
+		 * Delete a blog image from Storage by its download URL.
+		 * Only deletes URLs that belong to this app's Firebase Storage bucket
+		 * under `blogs/{blogId}/`, to avoid trying to delete arbitrary external
+		 * URLs that may have been pasted into the editor.
+		 */
+		async deleteBlogImageByUrl(url: string): Promise<void> {
+			if (!url || typeof url !== 'string') return;
+			// Firebase download URLs encode the path after `/o/` and url-encode it.
+			const match = url.match(/\/o\/([^?]+)/);
+			if (!match) return;
+			const path = decodeURIComponent(match[1]);
+			if (!path.startsWith('blogs/')) return;
+			try {
+				await deleteObject(storageRef(storage, path));
+			} catch (err) {
+				// Ignore not-found and not-allowed errors; we just don't want to throw.
+				console.warn('[Blogs] Image cleanup:', err);
 			}
 		}
 	};

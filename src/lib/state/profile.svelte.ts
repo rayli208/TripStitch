@@ -97,7 +97,14 @@ function createProfileState() {
 				preferredFontId: updates.preferredFontId ?? profile?.preferredFontId ?? DEFAULT_FONT_ID,
 				globeStyle: updates.globeStyle ?? profile?.globeStyle ?? 'dark',
 				mapDisplay: updates.mapDisplay ?? profile?.mapDisplay ?? 'globe',
-				createdAt: profile?.createdAt ?? new Date().toISOString()
+				createdAt: profile?.createdAt ?? new Date().toISOString(),
+				// Preserve subscription fields — they're managed by Stripe webhooks, not the
+				// profile form. tx.set() replaces the whole document, so anything we don't
+				// carry over here gets wiped (which is what dropped users out of Pro).
+				...(profile?.subscriptionStatus !== undefined && { subscriptionStatus: profile.subscriptionStatus }),
+				...(profile?.subscriptionId !== undefined && { subscriptionId: profile.subscriptionId }),
+				...(profile?.subscriptionPriceId !== undefined && { subscriptionPriceId: profile.subscriptionPriceId }),
+				...(profile?.subscriptionCurrentPeriodEnd !== undefined && { subscriptionCurrentPeriodEnd: profile.subscriptionCurrentPeriodEnd })
 			};
 
 			try {

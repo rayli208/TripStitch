@@ -26,10 +26,17 @@
 			map = null;
 		}
 
-		const maplibregl = (await import('maplibre-gl')).default;
+		const mod = await import('maplibre-gl');
+		// Re-check after the awaited import — the component may have unmounted
+		// in the meantime (e.g. user moved to another step), in which case
+		// `container` will have been cleared by Svelte and `new Map({ container })`
+		// would throw "Invalid type: 'container' must be a String or HTMLElement".
+		if (!container) return;
+		const maplibregl: any = (mod as any).default ?? mod;
 
-		// Fetch real road geometries
+		// Fetch real road geometries (may take seconds when routing is unreachable)
 		const routeGeometries = await fetchAllRouteGeometries(locations);
+		if (!container) return; // unmounted during the fetch
 
 		const bounds = new maplibregl.LngLatBounds();
 		for (const loc of locations) {

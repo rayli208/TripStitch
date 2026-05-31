@@ -354,10 +354,10 @@
 					<span class="text-text-muted flex-shrink-0"><CaretRight size={12} weight="bold" /></span>
 				{/if}
 				<button
-					class="px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer
+					class="px-2.5 py-1 rounded-full text-xs font-medium border-2 transition-all cursor-pointer
 						{i === activeIndex && wizardPhase === 'card'
-						? 'bg-accent text-white'
-						: 'bg-border text-text-muted hover:bg-primary-light hover:text-white'}"
+						? 'bg-accent text-white border-accent shadow-[1px_1px_0_var(--color-border)]'
+						: 'bg-card text-text-secondary border-border hover:bg-accent-light hover:text-text-primary'}"
 					onclick={() => { activeIndex = i; wizardPhase = 'card'; }}
 				>
 					{loc.label || loc.name.split(',')[0]}
@@ -640,7 +640,7 @@
 						{#each PRICE_TIERS as tier}
 							<button
 								class="text-xs px-2.5 py-1 rounded-lg transition-colors cursor-pointer
-									{activeLoc.priceTier === tier.value ? 'bg-accent text-white' : 'bg-card border border-border text-text-muted hover:bg-border'}"
+									{activeLoc.priceTier === tier.value ? 'bg-accent text-white' : 'bg-card border border-border text-text-muted hover:bg-accent-light hover:text-text-primary'}"
 								onclick={() => onpricetier(activeLoc!.id, activeLoc!.priceTier === tier.value ? null : tier.value)}
 							>
 								{tier.label}
@@ -725,9 +725,14 @@
 	{/if}
 
 	<!-- Bottom nav -->
-	<div class="flex justify-between pt-2">
-		<Button variant="ghost" onclick={onback}>Details</Button>
-		<Button variant="primary" disabled={!canProceed} onclick={onnext}>
+	<div class="flex flex-col-reverse sm:flex-row sm:justify-between gap-2 pt-2">
+		<Button variant="ghost" onclick={onback} class="w-full sm:w-auto">Back</Button>
+		<Button
+			variant="primary"
+			disabled={!canProceed}
+			onclick={onnext}
+			class="w-full sm:w-auto"
+		>
 			{#if locations.length < 2}
 				Add at least 2 stops
 			{:else if !allLocsHaveClips}

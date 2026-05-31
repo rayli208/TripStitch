@@ -140,34 +140,31 @@
 
 <div class="space-y-5">
 	<div>
-		<h2 class="text-xl font-semibold mb-1">Review Your Trip</h2>
+		<h2 class="text-2xl font-bold mb-1">Review your trip</h2>
 		<p class="text-sm text-text-muted">
-			Drag to reorder stops, pick how you traveled between them, and review your media.
+			Reorder, tag, set visibility. Preview before you stitch.
 		</p>
 	</div>
 
-	<!-- Stats bar -->
-	<div class="flex items-center justify-center gap-4 py-3 px-4 bg-card rounded-xl border border-border">
-		<div class="text-center">
-			<p class="text-lg font-bold text-text-primary">{locations.length}</p>
-			<p class="text-xs text-text-muted">stops</p>
+	<!-- Stats grid (4 cards) -->
+	<div class="grid grid-cols-4 gap-2 md:gap-3">
+		<div class="rounded-xl border-2 border-border bg-card px-2 py-3 md:py-4 text-center shadow-[2px_2px_0_var(--color-border)]">
+			<p class="text-xl md:text-2xl font-bold text-text-primary leading-none">{locations.length}</p>
+			<p class="text-[10px] md:text-[11px] font-semibold text-text-muted uppercase tracking-wider mt-1.5">Stops</p>
 		</div>
-		<div class="w-px h-8 bg-border"></div>
-		<div class="text-center">
-			<p class="text-lg font-bold text-text-primary">
+		<div class="rounded-xl border-2 border-border bg-card px-2 py-3 md:py-4 text-center shadow-[2px_2px_0_var(--color-border)]">
+			<p class="text-xl md:text-2xl font-bold text-text-primary leading-none">
 				{totalMiles() < 10 ? totalMiles().toFixed(1) : Math.round(totalMiles())}
 			</p>
-			<p class="text-xs text-text-muted">miles</p>
+			<p class="text-[10px] md:text-[11px] font-semibold text-text-muted uppercase tracking-wider mt-1.5">Miles</p>
 		</div>
-		<div class="w-px h-8 bg-border"></div>
-		<div class="text-center">
-			<p class="text-lg font-bold text-text-primary">~{Math.round(totalMinutes())}</p>
-			<p class="text-xs text-text-muted">min</p>
+		<div class="rounded-xl border-2 border-border bg-card px-2 py-3 md:py-4 text-center shadow-[2px_2px_0_var(--color-border)]">
+			<p class="text-xl md:text-2xl font-bold text-text-primary leading-none">~{Math.round(totalMinutes())}</p>
+			<p class="text-[10px] md:text-[11px] font-semibold text-text-muted uppercase tracking-wider mt-1.5">Min</p>
 		</div>
-		<div class="w-px h-8 bg-border"></div>
-		<div class="text-center">
-			<p class="text-lg font-bold text-text-primary">{mediaCount}</p>
-			<p class="text-xs text-text-muted">clips</p>
+		<div class="rounded-xl border-2 border-border bg-card px-2 py-3 md:py-4 text-center shadow-[2px_2px_0_var(--color-border)]">
+			<p class="text-xl md:text-2xl font-bold text-text-primary leading-none">{mediaCount}</p>
+			<p class="text-[10px] md:text-[11px] font-semibold text-text-muted uppercase tracking-wider mt-1.5">Clips</p>
 		</div>
 	</div>
 
@@ -179,7 +176,7 @@
 				{@const TagIcon = TAG_ICONS[tag.value]}
 				<button
 					class="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer
-						{tags.includes(tag.value) ? 'bg-accent text-white' : 'bg-card border border-border text-text-muted hover:bg-border'}"
+						{tags.includes(tag.value) ? 'bg-accent text-white' : 'bg-card border border-border text-text-muted hover:bg-accent-light hover:text-text-primary'}"
 					onclick={() => toggleTag(tag.value)}
 				>
 					{#if TagIcon}<TagIcon size={14} weight="bold" />{/if}
@@ -228,29 +225,33 @@
 		</div>
 	{/if}
 
-	<!-- Map preview -->
-	{#if locations.length >= 2}
-		<RoutePreviewMap {locations} {mapStyle} {titleColor} />
-	{/if}
+	<!-- Map preview (mobile only — desktop shows in right pane) -->
+	<div class="md:hidden">
+		{#if locations.length >= 2}
+			<RoutePreviewMap {locations} {mapStyle} {titleColor} />
+		{/if}
+	</div>
 
-	<!-- Video preview -->
-	<VideoPreview
-		{title}
-		{titleColor}
-		{titleDescription}
-		{fontId}
-		{secondaryColor}
-		{titleMediaFile}
-		{logoUrl}
-		{showLogoOnTitle}
-		{locations}
-		{aspectRatio}
-		{username}
-		{displayName}
-		{socialLinks}
-		{estimatedDuration}
-		{hasOutro}
-	/>
+	<!-- Video preview (mobile only — desktop shows in right pane) -->
+	<div class="md:hidden">
+		<VideoPreview
+			{title}
+			{titleColor}
+			{titleDescription}
+			{fontId}
+			{secondaryColor}
+			{titleMediaFile}
+			{logoUrl}
+			{showLogoOnTitle}
+			{locations}
+			{aspectRatio}
+			{username}
+			{displayName}
+			{socialLinks}
+			{estimatedDuration}
+			{hasOutro}
+		/>
+	</div>
 
 	<!-- Location list -->
 	<div class="space-y-0">
@@ -350,21 +351,10 @@
 		{/each}
 	</div>
 
-	<!-- Audio reminder -->
-	<div class="flex items-start gap-3 p-3.5 rounded-xl bg-accent/5 border border-accent/20">
-		<div class="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-			<Microphone size={16} weight="bold" class="text-accent" />
-		</div>
-		<div>
-			<p class="text-sm font-medium text-text-primary">Add voice-over & music</p>
-			<p class="text-xs text-text-muted">Record narration and pick a soundtrack after stitching.</p>
-		</div>
-	</div>
-
 	<!-- Bottom nav -->
-	<div class="flex justify-between pt-2">
-		<Button variant="ghost" onclick={onback}>Locations</Button>
-		<Button variant="primary" onclick={onnext}>
+	<div class="flex flex-col-reverse sm:flex-row sm:justify-between gap-2 pt-2">
+		<Button variant="ghost" onclick={onback} class="w-full sm:w-auto">Back</Button>
+		<Button variant="primary" onclick={onnext} class="w-full sm:w-auto">
 			Stitch Video
 		</Button>
 	</div>

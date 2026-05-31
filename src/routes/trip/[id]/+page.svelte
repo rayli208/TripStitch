@@ -184,6 +184,51 @@
 		highlightMarker(loc.id);
 	}
 
+	// Click-to-pin: opens the popup for the selected stop, closes any other open popup.
+	// Clicking the same stop again toggles its popup closed and resets the view.
+	let openPopupId = $state<string | null>(null);
+
+	function selectLocation(loc: { lng: number; lat: number; id: string }) {
+		if (!mapInstance) return;
+
+		// Toggle off if clicking the already-open one
+		if (openPopupId === loc.id) {
+			closeOpenPopup();
+			resetMapView();
+			return;
+		}
+
+		// Close any currently-open popup first
+		closeOpenPopup();
+
+		// Fly to the new stop and highlight its marker
+		flyToLocation(loc);
+
+		// Open the new popup
+		const marker = mapMarkers.get(loc.id);
+		if (marker) {
+			const popup = marker.getPopup();
+			if (popup && !popup.isOpen()) {
+				marker.togglePopup();
+			}
+			openPopupId = loc.id;
+		}
+
+		// Highlight the corresponding sidebar row briefly
+		highlightedLocationId = loc.id;
+	}
+
+	function closeOpenPopup() {
+		if (!openPopupId) return;
+		const marker = mapMarkers.get(openPopupId);
+		if (marker) {
+			const popup = marker.getPopup();
+			if (popup?.isOpen()) marker.togglePopup();
+		}
+		openPopupId = null;
+		highlightedLocationId = null;
+	}
+
 	function resetMapView() {
 		if (!mapInstance || !initialBounds) return;
 		unhighlightMarker();
@@ -192,9 +237,10 @@
 
 	async function initMap() {
 		if (!trip) return;
-		let maplibregl: typeof import('maplibre-gl').default;
+		let maplibregl: any;
 		try {
-			maplibregl = (await import('maplibre-gl')).default;
+			const mod = await import('maplibre-gl');
+			maplibregl = (mod as any).default ?? mod;
 		} catch {
 			mapError = true;
 			return;
@@ -313,14 +359,14 @@
 					requestAnimationFrame(animateRoute);
 				}
 
-				// Markers with staggered pop-in
+				// Markers with staggered pop-in (numbered to match the stops sidebar)
 				for (let i = 0; i < sorted.length; i++) {
 					const loc = sorted[i];
 					const label = loc.label || loc.name.split(',')[0];
 					// Outer wrapper — MapLibre controls its transform for positioning, so leave it alone
 					const el = document.createElement('div');
 					el.className = 'trip-marker';
-					el.style.cssText = 'width: 28px; height: 28px; cursor: pointer;';
+					el.style.cssText = 'width: 30px; height: 30px; cursor: pointer;';
 					// Inner dot — all visual styling and animation goes here
 					const dot = document.createElement('div');
 					dot.className = 'marker-dot';
@@ -330,7 +376,11 @@
 						box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 						opacity: 0; transform: scale(0);
 						transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease, box-shadow 0.3s ease;
+						display: flex; align-items: center; justify-content: center;
+						color: white; font-size: 12px; font-weight: 800; line-height: 1;
+						text-shadow: 0 1px 2px rgba(0,0,0,0.4);
 					`;
+					dot.textContent = String(i + 1);
 					el.appendChild(dot);
 
 					// Pop in with stagger
@@ -372,9 +422,11 @@
 						`<div style="font-weight:600;font-size:13px;color:#f1f5f9">${escapeHtml(label)}</div>${ratingLine}${desc}`
 					);
 
-					// Click marker -> scroll to location in list
+					// Click marker -> open its popup, close any other, and scroll the sidebar to it
 					el.addEventListener('click', () => {
-						scrollToLocation(loc.id);
+						selectLocation({ id: loc.id, lat: loc.lat, lng: loc.lng });
+						const sidebarEl = document.getElementById(`loc-${loc.id}`);
+						sidebarEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 					});
 
 					const marker = new maplibregl.Marker({ element: el })
@@ -485,7 +537,7 @@
 	<div class="min-h-screen bg-page animate-pulse">
 		<div class="border-b-3 border-border py-4 px-6"><div class="h-5 w-16 bg-border/50 rounded"></div></div>
 		<div class="h-72 sm:h-96 bg-border/50"></div>
-		<div class="max-w-3xl mx-auto px-6 sm:px-8 py-6">
+		<div class="max-w-6xl mx-auto px-6 sm:px-8 py-6">
 			<div class="bg-card border-2 border-border rounded-2xl p-6 shadow-brutal space-y-4">
 				<div class="flex items-center gap-3">
 					<div class="w-10 h-10 rounded-full bg-border/50"></div>
@@ -524,19 +576,36 @@
 		</svg>
 
 		<!-- Top bar -->
-		<div class="border-b-3 border-border bg-page">
-			<div class="max-w-3xl mx-auto px-6 sm:px-8 py-4 flex items-center justify-between">
+		<div class="sticky top-0 z-30 border-b-3 border-border bg-page/95 backdrop-blur-sm">
+			<div class="max-w-6xl mx-auto px-6 sm:px-8 py-3 flex items-center justify-between gap-3">
+				<a href="/" class="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity">
+					{#if trip.userLogoUrl}
+						<img src={trip.userLogoUrl} alt="Logo" class="h-7 w-7 rounded-md object-contain border-2 border-border bg-page p-0.5" />
+					{:else}
+						<img src="/favicon-192.png" alt="" class="h-6" />
+					{/if}
+					<span class="hidden sm:inline text-sm font-extrabold tracking-tight"><span class="text-text-primary">Trip</span><span class="text-accent">Stitch</span></span>
+				</a>
 				<button
-					class="text-sm text-text-muted hover:text-text-primary transition-colors cursor-pointer flex items-center gap-1 font-medium"
+					class="hidden sm:flex text-sm text-text-muted hover:text-text-primary transition-colors cursor-pointer items-center gap-1 font-medium"
 					onclick={() => { if (window.history.length > 1) history.back(); else window.location.href = '/'; }}
 				>
 					<CaretLeft size={16} weight="bold" />
 					Back
 				</button>
-				<div class="flex items-center gap-2 sm:gap-3">
+				<div class="flex items-center gap-2 sm:gap-2 ml-auto">
+					<!-- Save button (sign-in CTA for guests, bookmark for users) -->
+					{#if !authState.isSignedIn}
+						<a
+							href="/signin"
+							class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-border text-xs sm:text-sm font-bold bg-page hover:bg-accent-light hover:border-accent transition-all shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer"
+						>
+							Save
+						</a>
+					{/if}
 					<!-- PDF download -->
 					<button
-						class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-border text-xs font-bold bg-page hover:bg-accent-light hover:border-accent transition-all shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+						class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-border text-xs sm:text-sm font-bold bg-page hover:bg-accent-light hover:border-accent transition-all shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
 						onclick={downloadPdf}
 						disabled={pdfGenerating}
 					>
@@ -550,24 +619,25 @@
 					</button>
 					<!-- Share button -->
 					<button
-						class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-border text-xs font-bold bg-page hover:bg-accent-light hover:border-accent transition-all shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer"
+						class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-border text-xs sm:text-sm font-bold bg-accent text-white hover:bg-accent-hover transition-all shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer"
 						onclick={shareTrip}
 					>
 						{#if linkCopied}
-							<Check size={14} weight="bold" class="text-success" />
-							Copied!
+							<Check size={14} weight="bold" />
+							<span class="hidden sm:inline">Copied!</span>
 						{:else}
-							<ShareNetwork size={14} weight="bold" class="text-accent" />
-							Share
+							<ShareNetwork size={14} weight="bold" />
+							<span class="hidden sm:inline">Share</span>
 						{/if}
 					</button>
-					{#if trip.userLogoUrl}
-						<img src={trip.userLogoUrl} alt="Logo" class="h-7 w-7 rounded-md object-contain border-2 border-border bg-page p-0.5" />
+					{#if !authState.isSignedIn}
+						<a
+							href="/signin"
+							class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold text-text-primary hover:text-accent transition-colors cursor-pointer"
+						>
+							Sign in
+						</a>
 					{/if}
-					<a href="/" class="flex items-center gap-1.5 opacity-70 hover:opacity-100 transition-opacity">
-						<img src="/favicon-192.png" alt="" class="h-5" />
-						<span class="text-sm font-extrabold tracking-tight"><span class="text-text-primary">Trip</span><span class="text-accent">Stitch</span></span>
-					</a>
 				</div>
 			</div>
 		</div>
@@ -581,7 +651,7 @@
 					class="absolute inset-0 w-full h-full object-cover"
 				/>
 				<div class="absolute inset-0 bg-gradient-to-t from-page via-page/40 to-transparent"></div>
-				<div class="absolute bottom-0 left-0 right-0 p-6 sm:p-8 max-w-3xl mx-auto">
+				<div class="absolute bottom-0 left-0 right-0 p-6 sm:p-8 max-w-6xl mx-auto">
 					<div class="inline-block px-4 py-3 -mx-4 rounded-xl bg-black/35 backdrop-blur-sm border-2 border-white/10">
 						{#if formattedDate}
 							<p class="text-sm text-white/70 font-medium mb-2">{formattedDate}</p>
@@ -596,7 +666,7 @@
 				</div>
 			</div>
 		{:else}
-			<div class="max-w-3xl mx-auto px-6 sm:px-8 pt-10 pb-4 {ready ? 'animate-fade-up fill-both' : 'opacity-0'}">
+			<div class="max-w-6xl mx-auto px-6 sm:px-8 pt-10 pb-4 {ready ? 'animate-fade-up fill-both' : 'opacity-0'}">
 				<div class="inline-block px-4 py-3 -mx-4 rounded-xl" style="background: {trip.titleColor}10; border-left: 4px solid {trip.titleColor}">
 					{#if formattedDate}
 						<p class="text-sm text-text-muted font-medium mb-2">{formattedDate}</p>
@@ -612,7 +682,7 @@
 		{/if}
 
 		<!-- Info card: author + stats + tags + video -->
-		<div class="max-w-3xl mx-auto px-6 sm:px-8 py-6 {ready ? 'animate-fade-up fill-both delay-100' : 'opacity-0'}">
+		<div class="max-w-6xl mx-auto px-6 sm:px-8 py-6 {ready ? 'animate-fade-up fill-both delay-100' : 'opacity-0'}">
 			<div class="bg-card border-2 border-border rounded-2xl shadow-brutal-lg p-5 sm:p-6">
 				<div class="{parsedVideos.length > 0 ? 'lg:flex lg:gap-6' : ''}">
 					<!-- Left: trip info -->
@@ -735,7 +805,7 @@
 
 		<!-- Video Embed (mobile only, outside card) -->
 		{#if parsedVideos.length > 0}
-			<div class="lg:hidden max-w-3xl mx-auto px-6 sm:px-8 pb-6 {ready ? 'animate-fade-up fill-both delay-200' : 'opacity-0'}">
+			<div class="lg:hidden max-w-6xl mx-auto px-6 sm:px-8 pb-6 {ready ? 'animate-fade-up fill-both delay-200' : 'opacity-0'}">
 				<div class="bg-card border-2 border-border rounded-2xl shadow-brutal overflow-hidden">
 					<div class="px-4 py-3 border-b-2 border-border flex items-center gap-2">
 						<span class="text-xs font-bold text-text-primary">Trip Video</span>
@@ -767,65 +837,52 @@
 			</div>
 		{/if}
 
-		<!-- Map + Route -->
-		<div class="max-w-3xl mx-auto px-6 sm:px-8 pb-8 {ready ? 'animate-fade-up fill-both delay-200' : 'opacity-0'}">
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div
-				class="bg-card border-2 border-border rounded-2xl shadow-brutal overflow-hidden"
-				onmouseleave={resetMapView}
-			>
-				<!-- Map -->
-				{#if mapError}
-					<div class="w-full h-64 sm:h-80 flex items-center justify-center bg-page">
-						<p class="text-sm text-text-muted">Map could not be loaded</p>
-					</div>
-				{:else}
-					<div
-						bind:this={mapContainer}
-						class="w-full h-64 sm:h-80"
-					></div>
-				{/if}
+		<!-- Map + Route (cinematic 2-column on desktop) -->
+		<div class="max-w-6xl mx-auto px-6 sm:px-8 pb-8 {ready ? 'animate-fade-up fill-both delay-200' : 'opacity-0'}">
+			<div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)] gap-4 lg:gap-5">
+				<!-- Big map (cinematic, dominates the view on desktop) -->
+				<div
+					class="bg-card border-2 border-border rounded-2xl shadow-brutal overflow-hidden"
+				>
+					{#if mapError}
+						<div class="w-full h-64 sm:h-80 lg:h-[560px] flex items-center justify-center bg-page">
+							<p class="text-sm text-text-muted">Map could not be loaded</p>
+						</div>
+					{:else}
+						<div
+							bind:this={mapContainer}
+							class="w-full h-64 sm:h-80 lg:h-[560px]"
+						></div>
+					{/if}
+				</div>
 
-				<!-- Locations list -->
-				<div class="p-4 sm:p-5">
-					<div class="flex items-center justify-between mb-3">
+				<!-- Stops sidebar -->
+				<aside class="bg-card border-2 border-border rounded-2xl shadow-brutal overflow-hidden lg:sticky lg:top-20 lg:self-start lg:max-h-[560px] flex flex-col">
+					<div class="px-4 sm:px-5 pt-4 pb-3 border-b-2 border-border flex items-center justify-between">
 						<h2 class="text-sm font-bold text-text-primary">{sortedLocations.length} Stops</h2>
-						<p class="text-xs text-text-muted">{trip.stats.miles < 10 ? trip.stats.miles.toFixed(1) : Math.round(trip.stats.miles)} mi</p>
+						<p class="text-xs font-mono text-text-muted">
+							{trip.stats.miles < 10 ? trip.stats.miles.toFixed(1) : Math.round(trip.stats.miles)} mi · ~{trip.stats.minutes} min
+						</p>
 					</div>
-					<div class="space-y-0">
+					<div class="flex-1 overflow-y-auto p-2 sm:p-3 space-y-1">
 						{#each sortedLocations as loc, i}
 							<!-- svelte-ignore a11y_no_static_element_interactions -->
+							<!-- svelte-ignore a11y_click_events_have_key_events -->
 							<div
 								id="loc-{loc.id}"
-								class="flex items-start gap-3 rounded-xl py-1.5 px-2 -mx-2 transition-colors duration-500 cursor-pointer {highlightedLocationId === loc.id ? 'bg-accent/10 ring-1 ring-accent/30' : 'hover:bg-page/50'}"
-								onmouseenter={() => flyToLocation(loc)}
-							onmouseleave={() => unhighlightMarker()}
+								class="flex items-center gap-3 rounded-xl p-2 transition-all cursor-pointer border-2 {openPopupId === loc.id ? 'bg-accent/10 border-accent/60 shadow-[2px_2px_0_var(--color-border)]' : highlightedLocationId === loc.id ? 'bg-accent/10 border-accent/40' : 'border-transparent hover:bg-page/50 hover:border-border/60'}"
+								onclick={() => selectLocation({ id: loc.id, lat: loc.lat, lng: loc.lng })}
 							>
-								<div class="flex flex-col items-center">
-									<div
-										class="w-6 h-6 rounded-full border-2 flex items-center justify-center text-[10px] font-bold text-white shrink-0"
-										style="border-color: {trip.titleColor}; background: {trip.titleColor}"
-									>
-										{i + 1}
-									</div>
-									{#if i < sortedLocations.length - 1}
-										{@const nextLoc = sortedLocations[i + 1]}
-										<div class="flex flex-col items-center">
-											<div class="w-0.5 h-2.5" style="background: {trip.titleColor}40"></div>
-											{#if nextLoc.transportMode}
-												{@const transport = TRANSPORT_ICONS[nextLoc.transportMode]}
-												{#if transport}
-													{@const TransportIcon = transport.icon}
-													<div class="w-4 h-4 rounded-full flex items-center justify-center my-0.5" style="background: {trip.titleColor}15">
-														<TransportIcon size={8} weight="bold" style="color: {trip.titleColor}" />
-													</div>
-												{/if}
-											{/if}
-											<div class="w-0.5 h-2.5" style="background: {trip.titleColor}40"></div>
-										</div>
-									{/if}
+								<!-- Numbered badge (matches map pin) -->
+								<div
+									class="w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold text-white shrink-0 shadow-[1px_1px_0_var(--color-border)]"
+									style="border-color: {trip.titleColor}; background: {trip.titleColor}"
+								>
+									{i + 1}
 								</div>
-								<div class="pt-0.5 flex-1 min-w-0 pb-1">
+
+								<!-- Name + meta -->
+								<div class="flex-1 min-w-0">
 									<div class="flex items-center gap-1.5">
 										<p class="text-sm font-bold text-text-primary truncate">{loc.label || loc.name.split(',')[0]}</p>
 										{#if loc.rating && loc.rating >= 5}
@@ -835,38 +892,46 @@
 											</span>
 										{/if}
 									</div>
-									{#if loc.rating || loc.priceTier}
-										<div class="flex items-center gap-1.5 mt-0.5">
-											{#if loc.rating}
-												<div class="flex items-center">
-													{#each Array(5) as _, s}
-														{#if loc.rating >= s + 1}
-															<span class="text-amber-400"><Star size={10} weight="fill" /></span>
-														{:else if loc.rating >= s + 0.5}
-															<span class="relative inline-block" style="width:10px;height:10px">
-																<span class="absolute inset-0 text-border"><Star size={10} weight="fill" /></span>
-																<span class="absolute inset-0 text-amber-400"><StarHalf size={10} weight="fill" /></span>
-															</span>
-														{:else}
-															<span class="text-border"><Star size={10} weight="fill" /></span>
-														{/if}
-													{/each}
-												</div>
+									<div class="flex items-center gap-1.5 mt-0.5">
+										{#if loc.rating}
+											<div class="flex items-center">
+												{#each Array(5) as _, s}
+													{#if loc.rating >= s + 1}
+														<span class="text-amber-400"><Star size={9} weight="fill" /></span>
+													{:else if loc.rating >= s + 0.5}
+														<span class="relative inline-block" style="width:9px;height:9px">
+															<span class="absolute inset-0 text-border"><Star size={9} weight="fill" /></span>
+															<span class="absolute inset-0 text-amber-400"><StarHalf size={9} weight="fill" /></span>
+														</span>
+													{:else}
+														<span class="text-border"><Star size={9} weight="fill" /></span>
+													{/if}
+												{/each}
+											</div>
+										{/if}
+										{#if loc.priceTier}
+											<span class="text-[10px] text-success font-bold">{loc.priceTier}</span>
+										{/if}
+										{#if i < sortedLocations.length - 1 && sortedLocations[i + 1].transportMode}
+											{@const transport = TRANSPORT_ICONS[sortedLocations[i + 1].transportMode!]}
+											{#if transport}
+												{@const TransportIcon = transport.icon}
+												<span class="inline-flex items-center text-[10px] text-text-muted gap-0.5">
+													<TransportIcon size={9} weight="bold" />
+												</span>
 											{/if}
-											{#if loc.priceTier}
-												<span class="text-[11px] text-green-400 font-bold">{loc.priceTier}</span>
-											{/if}
-										</div>
-									{/if}
+										{/if}
+									</div>
 									{#if loc.description}
-										<p class="text-xs text-text-muted mt-0.5 line-clamp-2">{loc.description}</p>
+										<p class="text-[11px] text-text-muted mt-0.5 line-clamp-1">{loc.description}</p>
 									{/if}
 								</div>
+
 								<a
 									href="https://www.google.com/maps/dir/?api=1&destination={loc.lat},{loc.lng}"
 									target="_blank"
 									rel="noopener noreferrer"
-									class="shrink-0 mt-0.5 w-7 h-7 flex items-center justify-center rounded-lg border border-border text-text-muted hover:text-accent hover:border-accent transition-colors"
+									class="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg border border-border text-text-muted hover:text-accent hover:border-accent transition-colors"
 									title="Navigate to {loc.label || loc.name.split(',')[0]}"
 									onclick={(e: MouseEvent) => e.stopPropagation()}
 								>
@@ -875,13 +940,13 @@
 							</div>
 						{/each}
 					</div>
-				</div>
+				</aside>
 			</div>
 		</div>
 
 		<!-- CTA for non-users -->
 		{#if !authState.isSignedIn}
-			<div class="max-w-3xl mx-auto px-6 sm:px-8 pb-8 {ready ? 'animate-fade-up fill-both delay-400' : 'opacity-0'}">
+			<div class="max-w-6xl mx-auto px-6 sm:px-8 pb-8 {ready ? 'animate-fade-up fill-both delay-400' : 'opacity-0'}">
 				<div class="bg-accent-light border-2 border-border rounded-2xl shadow-brutal p-6 sm:p-8 text-center">
 					<h3 class="text-lg font-extrabold text-text-primary mb-2">Create your own trip video</h3>
 					<p class="text-sm text-text-secondary mb-5 max-w-md mx-auto">Drop your photos, pick your stops, and TripStitch stitches together a cinematic travel video — free, in your browser.</p>
@@ -898,7 +963,7 @@
 
 		<!-- Footer -->
 		<footer class="border-t-3 border-border">
-			<div class="max-w-3xl mx-auto px-6 sm:px-8 py-6 flex items-center justify-between">
+			<div class="max-w-6xl mx-auto px-6 sm:px-8 py-6 flex items-center justify-between">
 				<a href="/" class="flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
 					<img src="/favicon-192.png" alt="" class="h-4" />
 					<span class="text-xs font-extrabold tracking-tight"><span class="text-text-primary">Trip</span><span class="text-accent">Stitch</span></span>

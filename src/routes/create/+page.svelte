@@ -19,7 +19,9 @@
 	import ExportStep from '$lib/components/editor/ExportStep.svelte';
 	import AudioEditor from '$lib/components/editor/AudioEditor.svelte';
 	import ExportResult from '$lib/components/editor/ExportResult.svelte';
-	import { MapTrifold, MapPin, Article, Lock, Crown } from 'phosphor-svelte';
+	import LivePreviewPane from '$lib/components/editor/LivePreviewPane.svelte';
+	import Button from '$lib/components/ui/Button.svelte';
+	import { MapTrifold, MapPin, Article, Lock, Crown, SignOut } from 'phosphor-svelte';
 
 	let showEditor = $state(false);
 
@@ -348,11 +350,42 @@
 		toast.success('Link copied!');
 	}
 
+	function handleExitEditor() {
+		if (editor.hasContent && !exportDone && !confirm('Exit editor? Unsaved work will be lost.')) return;
+		showEditor = false;
+	}
+
+	const desktopSubtitle = $derived(showEditor ? `${editor.title || 'Untitled trip'} · draft` : undefined);
+	// Step 3 (Stitch) renders as full-width centered card; other editor steps use two-pane on desktop
+	// Two-pane layout disabled on:
+	//  - Stitch (3): full-width centered card
+	//  - Audio (4): AudioEditor already shows the video inline for voice-over
+	//    recording; mirroring it in the right pane is redundant + can desync
+	const useTwoPane = $derived(showEditor && editor.currentStep !== 3 && editor.currentStep !== 4);
 </script>
 
 <svelte:head><title>Create | TripStitch</title></svelte:head>
 
-<AppShell title="Create" showBottomNav logoUrl={profileState.profile?.logoUrl}>
+<AppShell
+	title="Create"
+	showBottomNav
+	logoUrl={profileState.profile?.logoUrl}
+	subtitle={desktopSubtitle}
+	statusBadge={showEditor ? 'Draft auto-saved' : undefined}
+>
+	{#snippet desktopActions()}
+		{#if showEditor}
+			<button
+				class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-border bg-card text-text-primary text-sm font-medium hover:bg-accent-light transition-colors cursor-pointer shadow-[2px_2px_0_var(--color-border)]"
+				onclick={handleExitEditor}
+				disabled={isExporting}
+			>
+				<SignOut size={14} weight="bold" />
+				Exit
+			</button>
+		{/if}
+	{/snippet}
+
 	{#if !showEditor}
 		<!-- Tool chooser -->
 		<div class="space-y-4">
@@ -451,128 +484,161 @@
 			</div>
 		</div>
 	{:else}
-	<StepIndicator steps={editor.stepLabels} current={editor.currentStep} />
+	<StepIndicator
+		steps={editor.stepLabels}
+		current={editor.currentStep}
+		estimatedDuration={durationEstimate.formatted}
+		onstep={(i) => { if (!isExporting && i <= editor.currentStep) editor.currentStep = i; }}
+	/>
 
-	{#if editor.currentStep === 0}
-		<TitleStep
-			bind:title={editor.title}
-			bind:titleColor={editor.titleColor}
-			bind:titleDescription={editor.titleDescription}
-			bind:fontId={editor.fontId}
-			bind:tripDate={editor.tripDate}
-			bind:showLogoOnTitle={editor.showLogoOnTitle}
-			{brandColors}
-			bind:secondaryColor={editor.secondaryColor}
-			profileSecondaryColor={profileState.profile?.secondaryColor ?? '#0a0f1e'}
-			preferredFontId={profileState.profile?.preferredFontId}
-			titleMediaPreviewUrl={editor.titleMediaPreviewUrl}
-			logoUrl={profileState.profile?.logoUrl ?? null}
-		isPro={profileState.isPro}
-			bind:aspectRatio={editor.aspectRatio}
-			bind:mapStyle={editor.mapStyle}
-			onmedia={(file) => editor.updateTitleMedia(file)}
-			onremovemedia={() => editor.removeTitleMedia()}
-			onnext={() => editor.nextStep()}
-		/>
-	{:else if editor.currentStep === 1}
-		<LocationsStep
-			locations={editor.locations}
-			canAdd={editor.canAddLocation}
-			maxClipsPerLocation={editor.limits.maxClipsPerLocation}
-			maxLocations={editor.limits.maxLocations}
-			onadd={(loc) => editor.addLocation({ name: loc.name, lat: loc.lat, lng: loc.lng, city: loc.city, state: loc.state, country: loc.country })}
-			onremove={(id) => editor.removeLocation(id)}
-			onaddclip={(locId, file, dur) => editor.addClipToLocation(locId, file, dur)}
-			onremoveclip={(locId, clipId) => editor.removeClip(locId, clipId)}
-			onmoveclip={(locId, from, to) => editor.moveClip(locId, from, to)}
-			ontransport={(id, mode) => editor.updateLocationTransport(id, mode)}
-			onlabel={(id, label) => editor.updateLocationLabel(id, label)}
-			ondescription={(id, desc) => editor.updateLocationDescription(id, desc)}
-			onrating={(id, rating) => editor.updateLocationRating(id, rating)}
-			onpricetier={(id, tier) => editor.updateLocationPriceTier(id, tier)}
-			onclipanimation={(locId, clipId, style) => editor.updateClipAnimation(locId, clipId, style)}
-			onclipduration={(locId, clipId, dur) => editor.updateClipDuration(locId, clipId, dur)}
-			oncliptrim={(locId, clipId, start, end) => editor.updateClipTrim(locId, clipId, start, end)}
-			onnext={() => editor.nextStep()}
-			onback={() => editor.prevStep()}
-		/>
-	{:else if editor.currentStep === 2}
-		<ReviewStep
-			locations={editor.locations}
-			mapStyle={editor.mapStyle}
-			titleColor={editor.titleColor}
-			bind:tags={editor.tags}
-			bind:visibility={editor.visibility}
-			title={editor.title}
-			titleDescription={editor.titleDescription}
-			fontId={editor.fontId}
-			secondaryColor={editor.secondaryColor}
-			titleMediaFile={editor.titleMediaFile}
-			logoUrl={profileState.profile?.logoUrl}
-			showLogoOnTitle={editor.showLogoOnTitle}
-			aspectRatio={editor.aspectRatio}
-			username={profileState.profile?.username ?? ''}
-			displayName={profileState.profile?.displayName ?? ''}
-			socialLinks={profileState.isPro ? (profileState.profile?.socialLinks ?? {}) : {}}
-			estimatedDuration={durationEstimate.formatted}
-			{hasOutro}
-			{canShowOutro}
-			bind:includeOutro={editor.includeOutro}
-			onremove={(id) => editor.removeLocation(id)}
-			onmove={(from, to) => editor.moveLocation(from, to)}
-			ontransport={(id, mode) => editor.updateLocationTransport(id, mode)}
-			onlabel={(id, label) => editor.updateLocationLabel(id, label)}
-			onnext={() => editor.nextStep()}
-			onback={() => editor.prevStep()}
-		/>
-	{:else if editor.currentStep === 3}
-		<ExportStep
-			canExport={editor.canExport && support.canExport}
-			{isExporting}
-			{progress}
-			{error}
-			browserSupported={support.canExport}
-			browserWarnings={support.warnings}
-			exportSteps={exportSteps}
-			estimatedDuration={durationEstimate.formatted}
-			{exportElapsed}
-			{exportPaused}
-			onexport={handleExport}
-			onback={() => editor.prevStep()}
-			oncancel={handleCancel}
-			onretry={handleRetry}
-		/>
-	{:else if editor.currentStep === 4 && videoUrl && videoBlob}
-		<AudioEditor
-			{videoUrl}
-			videoBlob={videoBlob}
-			{videoSegments}
-			locations={editor.locations}
-			bind:musicSelection={editor.musicSelection}
-			bind:musicVolume={editor.musicVolume}
-			bind:keepOriginalAudio={editor.keepOriginalAudio}
-			bind:voiceOverVolume={editor.voiceOverVolume}
-			title="Add Audio"
-			applyLabel="Apply & Continue"
-			skipLabel="Skip"
-			showBackArrow={false}
-			onback={handleAudioSkip}
-			onapply={handleAudioApply}
-		/>
-	{:else if editor.currentStep === 5 && videoUrl && videoBlob}
-		<ExportResult
-			{videoUrl}
-			videoBlob={videoBlob}
-			tripTitle={editor.title}
-			tripDescription={editor.titleDescription}
-			tripTags={editor.tags}
-			tripDate={editor.tripDate}
-			locations={editor.locations}
-			{shareUrl}
-			ondownload={handleDownload}
-			ondashboard={handleDashboard}
-			oncopylink={handleCopyLink}
-		/>
-	{/if}
+	<div class="grid grid-cols-1 {useTwoPane ? 'md:grid-cols-[minmax(0,1fr)_minmax(0,420px)]' : ''} gap-6 md:gap-8">
+		<div class="min-w-0">
+			{#if editor.currentStep === 0}
+				<TitleStep
+					bind:title={editor.title}
+					bind:titleColor={editor.titleColor}
+					bind:titleDescription={editor.titleDescription}
+					bind:fontId={editor.fontId}
+					bind:tripDate={editor.tripDate}
+					bind:showLogoOnTitle={editor.showLogoOnTitle}
+					{brandColors}
+					bind:secondaryColor={editor.secondaryColor}
+					profileSecondaryColor={profileState.profile?.secondaryColor ?? '#0a0f1e'}
+					preferredFontId={profileState.profile?.preferredFontId}
+					titleMediaPreviewUrl={editor.titleMediaPreviewUrl}
+					logoUrl={profileState.profile?.logoUrl ?? null}
+					isPro={profileState.isPro}
+					bind:aspectRatio={editor.aspectRatio}
+					bind:mapStyle={editor.mapStyle}
+					onmedia={(file) => editor.updateTitleMedia(file)}
+					onremovemedia={() => editor.removeTitleMedia()}
+					onnext={() => editor.nextStep()}
+				/>
+			{:else if editor.currentStep === 1}
+				<LocationsStep
+					locations={editor.locations}
+					canAdd={editor.canAddLocation}
+					maxClipsPerLocation={editor.limits.maxClipsPerLocation}
+					maxLocations={editor.limits.maxLocations}
+					onadd={(loc) => editor.addLocation({ name: loc.name, lat: loc.lat, lng: loc.lng, city: loc.city, state: loc.state, country: loc.country })}
+					onremove={(id) => editor.removeLocation(id)}
+					onaddclip={(locId, file, dur) => editor.addClipToLocation(locId, file, dur)}
+					onremoveclip={(locId, clipId) => editor.removeClip(locId, clipId)}
+					onmoveclip={(locId, from, to) => editor.moveClip(locId, from, to)}
+					ontransport={(id, mode) => editor.updateLocationTransport(id, mode)}
+					onlabel={(id, label) => editor.updateLocationLabel(id, label)}
+					ondescription={(id, desc) => editor.updateLocationDescription(id, desc)}
+					onrating={(id, rating) => editor.updateLocationRating(id, rating)}
+					onpricetier={(id, tier) => editor.updateLocationPriceTier(id, tier)}
+					onclipanimation={(locId, clipId, style) => editor.updateClipAnimation(locId, clipId, style)}
+					onclipduration={(locId, clipId, dur) => editor.updateClipDuration(locId, clipId, dur)}
+					oncliptrim={(locId, clipId, start, end) => editor.updateClipTrim(locId, clipId, start, end)}
+					onnext={() => editor.nextStep()}
+					onback={() => editor.prevStep()}
+				/>
+			{:else if editor.currentStep === 2}
+				<ReviewStep
+					locations={editor.locations}
+					mapStyle={editor.mapStyle}
+					titleColor={editor.titleColor}
+					bind:tags={editor.tags}
+					bind:visibility={editor.visibility}
+					title={editor.title}
+					titleDescription={editor.titleDescription}
+					fontId={editor.fontId}
+					secondaryColor={editor.secondaryColor}
+					titleMediaFile={editor.titleMediaFile}
+					logoUrl={profileState.profile?.logoUrl}
+					showLogoOnTitle={editor.showLogoOnTitle}
+					aspectRatio={editor.aspectRatio}
+					username={profileState.profile?.username ?? ''}
+					displayName={profileState.profile?.displayName ?? ''}
+					socialLinks={profileState.isPro ? (profileState.profile?.socialLinks ?? {}) : {}}
+					estimatedDuration={durationEstimate.formatted}
+					{hasOutro}
+					{canShowOutro}
+					bind:includeOutro={editor.includeOutro}
+					onremove={(id) => editor.removeLocation(id)}
+					onmove={(from, to) => editor.moveLocation(from, to)}
+					ontransport={(id, mode) => editor.updateLocationTransport(id, mode)}
+					onlabel={(id, label) => editor.updateLocationLabel(id, label)}
+					onnext={() => editor.nextStep()}
+					onback={() => editor.prevStep()}
+				/>
+			{:else if editor.currentStep === 3}
+				<ExportStep
+					canExport={editor.canExport && support.canExport}
+					{isExporting}
+					{progress}
+					{error}
+					browserSupported={support.canExport}
+					browserWarnings={support.warnings}
+					exportSteps={exportSteps}
+					estimatedDuration={durationEstimate.formatted}
+					{exportElapsed}
+					{exportPaused}
+					onexport={handleExport}
+					onback={() => editor.prevStep()}
+					oncancel={handleCancel}
+					onretry={handleRetry}
+				/>
+			{:else if editor.currentStep === 4 && videoUrl && videoBlob}
+				<AudioEditor
+					{videoUrl}
+					videoBlob={videoBlob}
+					{videoSegments}
+					locations={editor.locations}
+					bind:musicSelection={editor.musicSelection}
+					bind:musicVolume={editor.musicVolume}
+					bind:keepOriginalAudio={editor.keepOriginalAudio}
+					bind:voiceOverVolume={editor.voiceOverVolume}
+					title="Add Audio"
+					applyLabel="Apply & Continue"
+					skipLabel="Skip"
+					showBackArrow={false}
+					onback={handleAudioSkip}
+					onapply={handleAudioApply}
+				/>
+			{:else if editor.currentStep === 5 && videoUrl && videoBlob}
+				<ExportResult
+					{videoUrl}
+					videoBlob={videoBlob}
+					tripTitle={editor.title}
+					tripDescription={editor.titleDescription}
+					tripTags={editor.tags}
+					tripDate={editor.tripDate}
+					locations={editor.locations}
+					{shareUrl}
+					ondownload={handleDownload}
+					ondashboard={handleDashboard}
+					oncopylink={handleCopyLink}
+				/>
+			{/if}
+		</div>
+
+		{#if useTwoPane}
+			<div class="hidden md:block">
+				<div class="sticky top-20">
+					<LivePreviewPane
+						step={editor.currentStep}
+						title={editor.title}
+						titleColor={editor.titleColor}
+						titleDescription={editor.titleDescription}
+						fontId={editor.fontId}
+						secondaryColor={editor.secondaryColor}
+						titleMediaPreviewUrl={editor.titleMediaPreviewUrl}
+						logoUrl={profileState.profile?.logoUrl ?? null}
+						showLogoOnTitle={editor.showLogoOnTitle}
+						tripDate={editor.tripDate}
+						aspectRatio={editor.aspectRatio}
+						mapStyle={editor.mapStyle}
+						locations={editor.locations}
+						{videoUrl}
+						estimatedDuration={durationEstimate.formatted}
+					/>
+				</div>
+			</div>
+		{/if}
+	</div>
 	{/if}
 </AppShell>

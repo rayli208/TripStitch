@@ -11,7 +11,7 @@
 	import { preloadFont } from '$lib/utils/fontLoader';
 	import SkeletonProfile from '$lib/components/ui/SkeletonProfile.svelte';
 	import themeState from '$lib/state/theme.svelte';
-	import { CaretDown, Check, Upload, Sun, Moon, Desktop, Globe, MapTrifold, Camera, Trash, Warning, Crown, Lock, CreditCard, CalendarBlank } from 'phosphor-svelte';
+	import { Check, Upload, Sun, Moon, Desktop, Globe, MapTrifold, Trash, Warning, Crown, Lock, CreditCard, CalendarBlank } from 'phosphor-svelte';
 	import tripsState from '$lib/state/trips.svelte';
 	import { cancelMembership, openBillingPortal } from '$lib/services/subscriptionService';
 	import { PUBLIC_STRIPE_MONTHLY_PRICE_ID, PUBLIC_STRIPE_YEARLY_PRICE_ID } from '$env/static/public';
@@ -44,11 +44,6 @@
 	let preferredFontId = $state(DEFAULT_FONT_ID);
 	let globeStyle = $state<GlobeStyle>('dark');
 	let mapDisplay = $state<MapDisplay>('globe');
-
-	// ── Section collapse state ──
-	let brandingOpen = $state(true);
-	let mapSectionOpen = $state(true);
-	let socialsOpen = $state(true);
 
 	const GLOBE_STYLES: { id: GlobeStyle; name: string }[] = [
 		{ id: 'dark', name: 'Dark' },
@@ -197,6 +192,68 @@
 		}
 	});
 
+	function handleDiscard() {
+		if (!isDirty) return;
+		if (!confirm('Discard unsaved changes?')) return;
+		formPopulated = false; // re-populate from current profile snapshot
+	}
+
+	// ── Sidebar section nav (desktop) ──
+	type SectionId = 'account' | 'appearance' | 'branding' | 'map-display' | 'social-links' | 'subscription' | 'danger-zone';
+	const sidebarSections: { id: SectionId; label: string; danger?: boolean }[] = [
+		{ id: 'account', label: 'Account' },
+		{ id: 'appearance', label: 'Appearance' },
+		{ id: 'branding', label: 'Branding' },
+		{ id: 'map-display', label: 'Map display' },
+		{ id: 'social-links', label: 'Social links' },
+		{ id: 'subscription', label: 'Subscription' },
+		{ id: 'danger-zone', label: 'Danger zone', danger: true }
+	];
+	let activeSection = $state<SectionId>('account');
+
+	// Suppress the IntersectionObserver briefly after a click so the smooth-scroll
+	// doesn't snap the active highlight back to whatever section is mid-viewport
+	let suppressObserverUntil = 0;
+
+	function scrollToSection(id: SectionId) {
+		const el = document.getElementById(id);
+		if (!el) return;
+		// Set active state immediately so the sidebar reflects the click
+		activeSection = id;
+		suppressObserverUntil = Date.now() + 800;
+		el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	}
+
+	$effect(() => {
+		if (profileState.loading) return;
+		// Defer one frame so the conditionally-rendered sections (Subscription/Danger zone)
+		// are in the DOM before we observe them
+		let observer: IntersectionObserver | null = null;
+		const setup = () => {
+			observer = new IntersectionObserver(
+				(entries) => {
+					if (Date.now() < suppressObserverUntil) return;
+					const visible = entries
+						.filter((e) => e.isIntersecting)
+						.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+					if (visible[0]?.target?.id) {
+						activeSection = visible[0].target.id as SectionId;
+					}
+				},
+				{ rootMargin: '-80px 0px -40% 0px', threshold: 0 }
+			);
+			for (const s of sidebarSections) {
+				const el = document.getElementById(s.id);
+				if (el) observer.observe(el);
+			}
+		};
+		const raf = requestAnimationFrame(setup);
+		return () => {
+			cancelAnimationFrame(raf);
+			observer?.disconnect();
+		};
+	});
+
 	async function handleSave() {
 		if (hasValidationErrors) {
 			errorMsg = usernameError || displayNameError || websiteError;
@@ -342,11 +399,59 @@
 	}
 </style>
 
-<AppShell title="Profile" showBottomNav logoUrl={profileState.profile?.logoUrl}>
+<AppShell
+	title="Profile"
+	showBottomNav
+	logoUrl={profileState.profile?.logoUrl}
+	statusBadge={isDirty ? 'Unsaved changes' : undefined}
+>
+	{#snippet desktopActions()}
+		<button
+			class="px-3 py-1.5 rounded-lg border-2 border-border bg-card text-text-secondary text-sm font-medium hover:bg-page transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-[2px_2px_0_var(--color-border)]"
+			onclick={handleDiscard}
+			disabled={!isDirty || saving}
+		>
+			Discard
+		</button>
+		<Button variant="primary" onclick={handleSave} disabled={!canSave}>
+			{#if saving}
+				<span class="flex items-center gap-2">
+					<span class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+					Saving...
+				</span>
+			{:else}
+				Save profile
+			{/if}
+		</Button>
+	{/snippet}
+
 	{#if profileState.loading}
 		<SkeletonProfile />
 	{:else}
-		<div class="max-w-lg space-y-2 pb-20">
+		<!-- Desktop: two-pane (sticky sidebar + scrollable content). Mobile: single column. -->
+		<div class="md:grid md:grid-cols-[180px_minmax(0,1fr)] md:gap-8">
+			<!-- Sidebar (desktop only) -->
+			<aside class="hidden md:block">
+				<nav class="sticky top-20 space-y-1">
+					{#each sidebarSections as section}
+						<button
+							class="w-full text-left px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer
+								{activeSection === section.id
+									? section.danger
+										? 'bg-error/10 text-error'
+										: 'bg-accent-light text-accent'
+									: section.danger
+										? 'text-error/70 hover:text-error hover:bg-error/5'
+										: 'text-text-muted hover:text-text-primary hover:bg-card'}"
+							onclick={() => scrollToSection(section.id)}
+						>
+							{section.label}
+						</button>
+					{/each}
+				</nav>
+			</aside>
+
+			<div class="space-y-3 md:space-y-6 pb-20 md:pb-6 md:max-w-2xl">
 			{#if errorMsg}
 				<div class="bg-error-light border border-error text-error text-sm rounded-lg px-4 py-3">
 					{errorMsg}
@@ -354,12 +459,15 @@
 			{/if}
 
 			<!-- ═══════════ SECTION: Account ═══════════ -->
-			<section class="bg-card border-2 border-border rounded-xl p-5 space-y-4 {ready ? 'animate-fade-up fill-both delay-50' : 'opacity-0'}">
-				<h2 class="text-base font-semibold text-text-primary">Account</h2>
+			<section id="account" class="bg-card border-2 border-border rounded-xl p-5 md:p-6 space-y-5 scroll-mt-20 {ready ? 'animate-fade-up fill-both delay-50' : 'opacity-0'}">
+				<div>
+					<p class="hidden md:block text-[11px] font-bold uppercase tracking-wider text-text-muted">Settings</p>
+					<h2 class="text-lg md:text-xl font-bold text-text-primary">Account</h2>
+				</div>
 
-				<!-- Avatar -->
-				<div class="flex items-center gap-4">
-					<div class="relative group">
+				<!-- Avatar with explicit Upload / Remove buttons -->
+				<div class="flex items-start gap-4">
+					<div class="relative shrink-0">
 						{#if avatarUrl}
 							<img
 								src={avatarUrl}
@@ -372,75 +480,75 @@
 								{initials}
 							</div>
 						{/if}
-
-						<!-- Upload overlay -->
-						<button
-							class="absolute inset-0 rounded-full bg-overlay/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-							onclick={() => avatarInput?.click()}
-							disabled={avatarUploading}
-							aria-label="Change avatar"
-						>
-							{#if avatarUploading}
+						{#if avatarUploading}
+							<div class="absolute inset-0 rounded-full bg-overlay/50 flex items-center justify-center">
 								<div class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-							{:else}
-								<Camera size={20} weight="bold" class="text-white" />
-							{/if}
-						</button>
+							</div>
+						{/if}
 					</div>
 
 					<div class="flex-1 min-w-0">
-						<p class="text-sm font-medium text-text-primary">Profile photo</p>
-						<div class="flex items-center gap-2 mt-1">
+						<p class="text-sm font-semibold text-text-primary mb-2">Profile photo</p>
+						<div class="flex items-center gap-2 flex-wrap">
 							<button
-								class="text-xs text-accent hover:text-accent-hover transition-colors cursor-pointer"
+								class="px-3 py-1.5 rounded-lg border-2 border-border bg-page text-text-primary text-xs font-medium hover:bg-accent-light transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
 								onclick={() => avatarInput?.click()}
 								disabled={avatarUploading}
 							>
-								{avatarUrl ? 'Change' : 'Upload'}
+								<Upload size={12} weight="bold" />
+								Upload
 							</button>
 							{#if avatarUrl && profileState.profile?.avatarUrl}
 								<button
-									class="text-xs text-error hover:text-error transition-colors cursor-pointer"
+									class="px-3 py-1.5 rounded-lg border-2 border-border bg-page text-error text-xs font-medium hover:bg-error/10 transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
 									onclick={handleRemoveAvatar}
 									disabled={avatarUploading}
 								>
+									<Trash size={12} weight="bold" />
 									Remove
 								</button>
 							{/if}
 						</div>
+						<p class="text-[11px] text-text-muted mt-2">JPG, PNG, SVG up to 2MB.</p>
 					</div>
 
 					<input bind:this={avatarInput} type="file" accept="image/*" class="hidden" onchange={handleAvatarUpload} />
 				</div>
 
-				<div>
-					<Input label="Username" placeholder="e.g. raytravel" bind:value={username} oninput={(e: Event) => checkUsernameAvailability((e.target as HTMLInputElement).value)} />
-					<div class="flex items-center justify-between mt-1.5">
-						<p class="text-xs text-text-muted">
-							Your public URL: <span class="font-mono">/u/{username || '...'}</span>
-						</p>
-						{#if usernameStatus === 'checking'}
-							<span class="w-3 h-3 border border-border border-t-accent rounded-full animate-spin inline-block flex-shrink-0"></span>
-						{:else if usernameStatus === 'available'}
-							<span class="text-xs text-success flex-shrink-0">Available</span>
-						{:else if usernameStatus === 'taken'}
-							<span class="text-xs text-error flex-shrink-0">Taken</span>
+				<!-- Username + Display Name (side-by-side on desktop) -->
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div>
+						<Input label="Username" placeholder="e.g. raytravel" bind:value={username} oninput={(e: Event) => checkUsernameAvailability((e.target as HTMLInputElement).value)} />
+						<div class="flex items-center justify-between mt-1.5">
+							<p class="text-xs text-text-muted truncate">
+								<span class="font-mono">/u/{username || '...'}</span>
+							</p>
+							{#if usernameStatus === 'checking'}
+								<span class="w-3 h-3 border border-border border-t-accent rounded-full animate-spin inline-block shrink-0"></span>
+							{:else if usernameStatus === 'available'}
+								<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-success/10 text-success border border-success/30 text-[10px] font-medium shrink-0">
+									<Check size={10} weight="bold" />
+									Available
+								</span>
+							{:else if usernameStatus === 'taken'}
+								<span class="text-xs text-error shrink-0">Taken</span>
+							{/if}
+						</div>
+						{#if usernameError && (usernameClean ? !isUsernameUnchanged : true)}
+							<p class="text-xs text-error mt-1">{usernameError}</p>
 						{/if}
 					</div>
-					{#if usernameError && (usernameClean ? !isUsernameUnchanged : true)}
-						<p class="text-xs text-error mt-1">{usernameError}</p>
-					{/if}
+
+					<div>
+						<Input label="Display Name" placeholder="Your name" bind:value={displayName} />
+						{#if displayNameError && displayName !== undefined}
+							<p class="text-xs text-error mt-1">{displayNameError}</p>
+						{/if}
+					</div>
 				</div>
 
 				<div>
-					<Input label="Display Name" placeholder="Your name" bind:value={displayName} />
-					{#if displayNameError && displayName !== undefined}
-						<p class="text-xs text-error mt-1">{displayNameError}</p>
-					{/if}
-				</div>
-
-				<div>
-					<label class="block text-sm font-medium text-text-secondary mb-1">Bio</label>
+					<label class="block text-xs font-bold uppercase tracking-wider text-text-muted mb-1.5">Bio</label>
 					<textarea
 						bind:value={bio}
 						placeholder="Tell people about your travels..."
@@ -451,8 +559,8 @@
 			</section>
 
 		<!-- ═══════════ SECTION: Appearance ═══════════ -->
-			<section class="bg-card border-2 border-border rounded-xl p-5 space-y-4 {ready ? 'animate-fade-up fill-both delay-100' : 'opacity-0'}">
-				<h2 class="text-base font-semibold text-text-primary">Appearance</h2>
+			<section id="appearance" class="bg-card border-2 border-border rounded-xl p-5 md:p-6 space-y-4 scroll-mt-20 {ready ? 'animate-fade-up fill-both delay-100' : 'opacity-0'}">
+				<h2 class="text-lg md:text-xl font-bold text-text-primary">Appearance</h2>
 				<div class="grid grid-cols-3 gap-2">
 					{#each [
 						{ id: 'system', label: 'System', icon: 'monitor' },
@@ -477,25 +585,16 @@
 			</section>
 
 			<!-- ═══════════ SECTION: Branding ═══════════ -->
-			<section class="bg-card border-2 border-border rounded-xl overflow-hidden {ready ? 'animate-fade-up fill-both delay-150' : 'opacity-0'}">
-				<button
-					class="w-full flex items-center justify-between p-5 cursor-pointer text-left"
-					onclick={() => brandingOpen = !brandingOpen}
-				>
-					<div class="flex items-center gap-2">
-					<h2 class="text-base font-semibold text-text-primary">Branding</h2>
-					{#if !profileState.isPro}
-						<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/15 text-accent text-[9px] font-bold uppercase tracking-wider">
-							<Crown size={8} weight="fill" /> Pro
-						</span>
-					{/if}
+			<section id="branding" class="bg-card border-2 border-border rounded-xl p-5 md:p-6 space-y-5 scroll-mt-20 {ready ? 'animate-fade-up fill-both delay-150' : 'opacity-0'}">
+				<div class="flex items-center gap-2">
+					<h2 class="text-lg md:text-xl font-bold text-text-primary">Branding</h2>
+					<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/15 text-accent text-[9px] font-bold uppercase tracking-wider">
+						<Crown size={8} weight="fill" /> Pro
+					</span>
 				</div>
-					<CaretDown size={20} weight="bold" class="transition-transform {brandingOpen ? 'rotate-180' : ''}" />
-				</button>
 
-				{#if brandingOpen}
-					{#if profileState.isPro}
-					<div class="px-5 pb-5 space-y-5 border-t border-border pt-4">
+				{#if profileState.isPro}
+					<div class="space-y-5">
 						<!-- Logo -->
 						<div>
 							<span class="block text-sm font-medium text-text-secondary mb-1.5">Logo / Brand Mark</span>
@@ -601,32 +700,21 @@
 							</div>
 						</div>
 					</div>
-					{:else}
-					<div class="px-5 pb-5 border-t border-border pt-4">
-						<div class="text-center py-4">
-							<Lock size={24} weight="bold" class="text-text-muted mx-auto mb-2" />
-							<p class="text-sm text-text-muted mb-3">Custom logo, colors, and fonts are available with Pro.</p>
-							<a href="/pricing" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-white text-sm font-bold hover:bg-accent-hover transition-colors">
-								<Crown size={14} weight="fill" /> Upgrade to Pro
-							</a>
-						</div>
+				{:else}
+					<div class="text-center py-4">
+						<Lock size={24} weight="bold" class="text-text-muted mx-auto mb-2" />
+						<p class="text-sm text-text-muted mb-3">Custom logo, colors, and fonts are available with Pro.</p>
+						<a href="/pricing" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-white text-sm font-bold hover:bg-accent-hover transition-colors">
+							<Crown size={14} weight="fill" /> Upgrade to Pro
+						</a>
 					</div>
-					{/if}
 				{/if}
 			</section>
 
 			<!-- ═══════════ SECTION: Map Display ═══════════ -->
-			<section class="bg-card border-2 border-border rounded-xl overflow-hidden {ready ? 'animate-fade-up fill-both delay-200' : 'opacity-0'}">
-				<button
-					class="w-full flex items-center justify-between p-5 cursor-pointer text-left"
-					onclick={() => mapSectionOpen = !mapSectionOpen}
-				>
-					<h2 class="text-base font-semibold text-text-primary">Map Display</h2>
-					<CaretDown size={20} weight="bold" class="transition-transform {mapSectionOpen ? 'rotate-180' : ''}" />
-				</button>
-
-				{#if mapSectionOpen}
-					<div class="px-5 pb-5 space-y-4 border-t border-border pt-4">
+			<section id="map-display" class="bg-card border-2 border-border rounded-xl p-5 md:p-6 space-y-4 scroll-mt-20 {ready ? 'animate-fade-up fill-both delay-200' : 'opacity-0'}">
+				<h2 class="text-lg md:text-xl font-bold text-text-primary">Map display</h2>
+				<div class="space-y-4">
 						<p class="text-xs text-text-muted">Choose how your trips are displayed on your profile page.</p>
 
 						<!-- Globe / Map toggle -->
@@ -674,30 +762,20 @@
 								<p class="text-xs text-warning mt-2">Set a primary color in Branding for the custom style to work.</p>
 							{/if}
 						</div>
-					</div>
-				{/if}
+				</div>
 			</section>
 
 			<!-- ═══════════ SECTION: Social Links ═══════════ -->
-			<section class="bg-card border-2 border-border rounded-xl overflow-hidden {ready ? 'animate-fade-up fill-both delay-250' : 'opacity-0'}">
-				<button
-					class="w-full flex items-center justify-between p-5 cursor-pointer text-left"
-					onclick={() => socialsOpen = !socialsOpen}
-				>
-					<div class="flex items-center gap-2">
-					<h2 class="text-base font-semibold text-text-primary">Social Links</h2>
-					{#if !profileState.isPro}
-						<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/15 text-accent text-[9px] font-bold uppercase tracking-wider">
-							<Crown size={8} weight="fill" /> Pro
-						</span>
-					{/if}
+			<section id="social-links" class="bg-card border-2 border-border rounded-xl p-5 md:p-6 space-y-4 scroll-mt-20 {ready ? 'animate-fade-up fill-both delay-250' : 'opacity-0'}">
+				<div class="flex items-center gap-2">
+					<h2 class="text-lg md:text-xl font-bold text-text-primary">Social links</h2>
+					<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/15 text-accent text-[9px] font-bold uppercase tracking-wider">
+						<Crown size={8} weight="fill" /> Pro
+					</span>
 				</div>
-					<CaretDown size={20} weight="bold" class="transition-transform {socialsOpen ? 'rotate-180' : ''}" />
-				</button>
 
-				{#if socialsOpen}
-					{#if profileState.isPro}
-					<div class="px-5 pb-5 space-y-3 border-t border-border pt-4">
+				{#if profileState.isPro}
+					<div class="space-y-3">
 						<Input label="Instagram" placeholder="@username or full URL" bind:value={instagram} />
 						<Input label="TikTok" placeholder="@username or full URL" bind:value={tiktok} />
 						<Input label="YouTube" placeholder="Channel URL" bind:value={youtube} />
@@ -708,25 +786,22 @@
 							{/if}
 						</div>
 					</div>
-					{:else}
-					<div class="px-5 pb-5 border-t border-border pt-4">
-						<div class="text-center py-4">
-							<Lock size={24} weight="bold" class="text-text-muted mx-auto mb-2" />
-							<p class="text-sm text-text-muted mb-3">Social links in your video outro are available with Pro.</p>
-							<a href="/pricing" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-white text-sm font-bold hover:bg-accent-hover transition-colors">
-								<Crown size={14} weight="fill" /> Upgrade to Pro
-							</a>
-						</div>
+				{:else}
+					<div class="text-center py-4">
+						<Lock size={24} weight="bold" class="text-text-muted mx-auto mb-2" />
+						<p class="text-sm text-text-muted mb-3">Social links in your video outro are available with Pro.</p>
+						<a href="/pricing" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-white text-sm font-bold hover:bg-accent-hover transition-colors">
+							<Crown size={14} weight="fill" /> Upgrade to Pro
+						</a>
 					</div>
-					{/if}
 				{/if}
 			</section>
 
 			<!-- ═══════════ SECTION: Subscription ═══════════ -->
 		{#if profileState.isPro}
-			<section class="bg-card border-2 border-accent/30 rounded-xl p-5 space-y-4 {ready ? 'animate-fade-up fill-both delay-300' : 'opacity-0'}">
+			<section id="subscription" class="bg-card border-2 border-accent/30 rounded-xl p-5 md:p-6 space-y-4 scroll-mt-20 {ready ? 'animate-fade-up fill-both delay-300' : 'opacity-0'}">
 				<div class="flex items-center justify-between">
-					<h2 class="text-base font-semibold text-text-primary">Subscription</h2>
+					<h2 class="text-lg md:text-xl font-bold text-text-primary">Subscription</h2>
 					<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-accent/15 text-accent text-xs font-bold">
 						<Crown size={12} weight="fill" /> Active
 					</span>
@@ -804,7 +879,8 @@
 				{/if}
 			</section>
 		{:else}
-			<section class="bg-card border-2 border-border rounded-xl p-5 space-y-3 {ready ? 'animate-fade-up fill-both delay-300' : 'opacity-0'}">
+			<section id="subscription" class="bg-card border-2 border-border rounded-xl p-5 md:p-6 space-y-3 scroll-mt-20 {ready ? 'animate-fade-up fill-both delay-300' : 'opacity-0'}">
+				<h2 class="text-lg md:text-xl font-bold text-text-primary">Subscription</h2>
 				<div class="flex items-center gap-3">
 					<div class="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center">
 						<Crown size={18} weight="bold" class="text-accent" />
@@ -820,37 +896,44 @@
 			</section>
 		{/if}
 
-		<!-- ═══════════ SECTION: Delete Account ═══════════ -->
-			<section class="bg-card border-2 border-error/30 rounded-xl p-5 {ready ? 'animate-fade-up fill-both delay-350' : 'opacity-0'}">
+		<!-- ═══════════ SECTION: Danger Zone ═══════════ -->
+			<section id="danger-zone" class="bg-card border-2 border-error/40 rounded-xl p-5 md:p-6 space-y-4 scroll-mt-20 {ready ? 'animate-fade-up fill-both delay-350' : 'opacity-0'}">
+				<div>
+					<h2 class="text-lg md:text-xl font-bold text-error">Danger zone</h2>
+					<p class="text-xs md:text-sm text-text-muted mt-1">
+						Permanently delete your account, trips, media, and profile. This cannot be undone.
+					</p>
+				</div>
+
 				{#if deleteStep === 'idle'}
 					<button
-						class="text-sm font-medium text-error hover:text-error/80 transition-colors cursor-pointer flex items-center gap-2"
+						class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-error bg-error/10 text-error text-sm font-bold hover:bg-error/20 transition-colors cursor-pointer shadow-[2px_2px_0_var(--color-border)]"
 						onclick={() => deleteStep = 'confirm'}
 					>
-						<Trash size={16} weight="bold" />
-						Delete Account
+						<Trash size={14} weight="bold" />
+						Delete account
 					</button>
 				{:else if deleteStep === 'confirm'}
-					<div class="space-y-3">
-						<div class="flex items-start gap-3">
-							<Warning size={20} weight="fill" class="text-error flex-shrink-0 mt-0.5" />
+					<div class="space-y-3 pt-2 border-t-2 border-error/20">
+						<div class="flex items-start gap-3 pt-3">
+							<Warning size={20} weight="fill" class="text-error shrink-0 mt-0.5" />
 							<div>
 								<p class="text-sm font-semibold text-error">Are you sure?</p>
 								<p class="text-xs text-text-muted mt-1">This will permanently delete your account, all your trips, media, and profile data. This action cannot be undone.</p>
 							</div>
 						</div>
-						<div class="flex gap-2">
-							<button
-								class="flex-1 text-sm py-2 rounded-lg bg-error hover:bg-error/80 text-white font-bold transition-colors cursor-pointer"
-								onclick={handleDeleteAccount}
-							>
-								Yes, delete everything
-							</button>
+						<div class="flex flex-col-reverse sm:flex-row gap-2">
 							<button
 								class="flex-1 text-sm py-2 rounded-lg bg-border hover:bg-primary-light text-text-secondary transition-colors cursor-pointer"
 								onclick={() => deleteStep = 'idle'}
 							>
 								Cancel
+							</button>
+							<button
+								class="flex-1 text-sm py-2 rounded-lg bg-error hover:bg-error/80 text-white font-bold transition-colors cursor-pointer"
+								onclick={handleDeleteAccount}
+							>
+								Yes, delete everything
 							</button>
 						</div>
 					</div>
@@ -861,25 +944,48 @@
 					</div>
 				{/if}
 			</section>
+
+			<!-- Desktop sign out -->
+			<div class="hidden md:flex justify-end pt-2">
+				<button
+					class="text-sm text-text-muted hover:text-error transition-colors cursor-pointer"
+					onclick={async () => { await authState.signOut(); goto('/signin'); }}
+				>
+					Sign out
+				</button>
+			</div>
+		</div>
 		</div>
 
-		<!-- ═══════════ Sticky bottom save bar ═══════════ -->
-		<div class="fixed left-0 right-0 z-30 border-t-2 border-border bg-page/95 backdrop-blur-sm {ready ? 'animate-fade-up fill-both delay-350' : 'opacity-0'}" style="bottom: calc(4rem + env(safe-area-inset-bottom, 0px) + 8px);">
+		<!-- ═══════════ Sticky bottom save bar (mobile only) ═══════════ -->
+		<div class="md:hidden fixed left-0 right-0 z-30 border-t-2 border-border bg-page/95 backdrop-blur-sm {ready ? 'animate-fade-up fill-both delay-350' : 'opacity-0'}" style="bottom: calc(4rem + env(safe-area-inset-bottom, 0px) + 8px);">
 			<div class="max-w-lg mx-auto px-4 pt-3 pb-4 flex items-center gap-3">
-				<Button variant="primary" onclick={handleSave} disabled={!canSave}>
+				<Button variant="primary" onclick={handleSave} disabled={!canSave} class="w-full">
 					{#if saving}
-						<div class="w-4 h-4 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+						<span class="flex items-center justify-center gap-2">
+							<span class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+							Saving...
+						</span>
+					{:else}
+						Save profile
 					{/if}
-					{saving ? 'Saving...' : 'Save Profile'}
-				</Button>
-				{#if isDirty}
-					<span class="text-xs text-warning font-medium">Unsaved changes</span>
-				{/if}
-				<div class="flex-1"></div>
-				<Button variant="secondary" onclick={async () => { await authState.signOut(); goto('/signin'); }}>
-					Sign Out
 				</Button>
 			</div>
+			{#if isDirty}
+				<div class="absolute -top-7 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/15 border border-warning/40 text-warning text-[10px] font-bold uppercase tracking-wider whitespace-nowrap">
+					Unsaved changes
+				</div>
+			{/if}
+		</div>
+
+		<!-- Mobile sign out (below sticky save bar to keep it focused on save) -->
+		<div class="md:hidden mt-4 mb-32 flex justify-center">
+			<button
+				class="text-sm text-text-muted hover:text-error transition-colors cursor-pointer"
+				onclick={async () => { await authState.signOut(); goto('/signin'); }}
+			>
+				Sign out
+			</button>
 		</div>
 	{/if}
 </AppShell>

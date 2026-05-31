@@ -123,7 +123,7 @@
 		<div class="absolute z-20 mt-1 w-full bg-card border-2 border-border rounded-lg shadow-[4px_4px_0_var(--color-border)] overflow-hidden">
 			{#each suggestions as suggestion}
 				<button
-					class="w-full text-left px-3 py-2 text-sm text-text-secondary hover:bg-border transition-colors cursor-pointer"
+					class="w-full text-left px-3 py-2 text-sm text-text-secondary hover:bg-accent-light hover:text-text-primary transition-colors cursor-pointer"
 					onclick={() => select(suggestion)}
 				>
 					{suggestion.text}

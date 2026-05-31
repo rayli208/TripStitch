@@ -54,7 +54,12 @@
 
 <svelte:head><title>Edit Blog | TripStitch</title></svelte:head>
 
-<AppShell title="Edit Blog" showBack onback={() => goto('/trips')}>
+<AppShell
+	title="Edit Blog"
+	showBottomNav
+	logoUrl={profileState.profile?.logoUrl}
+	subtitle={blog ? `${blog.title} · ${blog.visibility === 'draft' ? 'draft' : blog.visibility}` : 'Edit Blog'}
+>
 	{#if loading}
 		<div class="flex justify-center py-20">
 			<Spinner size="lg" />

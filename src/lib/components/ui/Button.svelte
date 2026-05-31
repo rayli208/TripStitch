@@ -5,12 +5,14 @@
 		variant = 'primary',
 		size = 'md',
 		disabled = false,
+		class: classes = '',
 		onclick,
 		children
 	}: {
 		variant?: 'primary' | 'secondary' | 'ghost';
 		size?: 'sm' | 'md' | 'lg';
 		disabled?: boolean;
+		class?: string;
 		onclick?: () => void;
 		children: Snippet;
 	} = $props();
@@ -32,7 +34,7 @@
 
 <button
 	type="button"
-	class="{baseClasses} {variantClasses[variant]} {sizeClasses[size]}"
+	class="{baseClasses} {variantClasses[variant]} {sizeClasses[size]} {classes}"
 	{disabled}
 	{onclick}
 >

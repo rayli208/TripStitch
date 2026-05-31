@@ -1,6 +1,7 @@
 <script lang="ts">
 	import LocationCardView from './LocationCardView.svelte';
 	import RouteBlockView from './RouteBlockView.svelte';
+	import { extractYoutubeId } from './extensions/youtubeEmbed';
 	import type { BlogLocation, BlogRoute, RouteStop, PriceTier } from '$lib/types';
 
 	let { content }: { content: Record<string, unknown> } = $props();
@@ -111,6 +112,22 @@
 			<LocationCardView location={nodeToLocation(node)} />
 		{:else if node.type === 'routeBlock'}
 			<RouteBlockView route={nodeToRoute(node)} />
+		{:else if node.type === 'youtubeEmbed'}
+			{@const youtubeId = extractYoutubeId((node.attrs?.src as string) ?? '')}
+			{#if youtubeId}
+				<figure class="relative my-6 rounded-xl overflow-hidden border-2 border-border shadow-[3px_3px_0_var(--color-border)] bg-overlay">
+					<span class="absolute top-3 left-3 z-10 inline-block px-2 py-0.5 rounded text-[10px] font-extrabold tracking-wider text-white" style="background:#FF0000">YouTube</span>
+					<div class="relative w-full" style="padding-top: 56.25%;">
+						<iframe
+							src="https://www.youtube.com/embed/{youtubeId}"
+							title={(node.attrs?.title as string) ?? 'YouTube video'}
+							allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+							allowfullscreen
+							class="absolute inset-0 w-full h-full border-0"
+						></iframe>
+					</div>
+				</figure>
+			{/if}
 		{/if}
 	{/each}
 </div>

@@ -830,7 +830,6 @@
 						<li><a href="/signin" class="hover:text-accent transition-colors">Get Started</a></li>
 						<li><a href="#features" class="hover:text-accent transition-colors">Features</a></li>
 						<li><a href="#pricing" class="hover:text-accent transition-colors">Pricing</a></li>
-						<li><a href="/explore" class="hover:text-accent transition-colors">Explore Trips</a></li>
 						<li><a href="/signin" class="hover:text-accent transition-colors">Write a Blog</a></li>
 					</ul>
 				</div>

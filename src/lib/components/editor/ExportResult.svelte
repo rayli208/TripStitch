@@ -103,13 +103,13 @@
 
 	<div class="flex flex-col gap-3 w-full">
 		{#if ondownload}
-			<Button variant="primary" onclick={ondownload}>
+			<Button variant="primary" onclick={ondownload} class="w-full">
 				Save Video
 			</Button>
 		{/if}
 
 		{#if oneditaudio}
-			<Button variant="ghost" onclick={oneditaudio}>
+			<Button variant="ghost" onclick={oneditaudio} class="w-full">
 				<span class="flex items-center gap-2">
 					<MusicNote size={16} weight="bold" />
 					Edit Audio
@@ -205,7 +205,7 @@
 		</div>
 
 		{#if canShareFiles}
-			<Button variant="ghost" onclick={shareToApp}>
+			<Button variant="ghost" onclick={shareToApp} class="w-full">
 				<span class="flex items-center gap-2">
 					<ShareNetwork size={16} weight="bold" />
 					Share
@@ -236,7 +236,7 @@
 		{/if}
 
 		{#if ondashboard}
-			<Button variant="ghost" onclick={ondashboard}>
+			<Button variant="ghost" onclick={ondashboard} class="w-full">
 				View My Trips
 			</Button>
 		{/if}

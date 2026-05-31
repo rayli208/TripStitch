@@ -14,8 +14,10 @@
 		LinkBreak,
 		Image,
 		MapPin,
-		Path
+		Path,
+		YoutubeLogo
 	} from 'phosphor-svelte';
+	import { extractYoutubeId } from './extensions/youtubeEmbed';
 
 	let {
 		editor,
@@ -34,6 +36,38 @@
 	let showLinkInput = $state(false);
 	let linkUrl = $state('');
 	let linkInputEl: HTMLInputElement | undefined;
+
+	let showYoutubeInput = $state(false);
+	let youtubeUrl = $state('');
+	let youtubeError = $state('');
+	let youtubeInputEl: HTMLInputElement | undefined;
+
+	function openYoutubeInput() {
+		youtubeUrl = '';
+		youtubeError = '';
+		showYoutubeInput = true;
+		setTimeout(() => youtubeInputEl?.focus(), 0);
+	}
+
+	function applyYoutube() {
+		const url = youtubeUrl.trim();
+		const id = extractYoutubeId(url);
+		if (!id) {
+			youtubeError = 'Could not parse a YouTube URL. Try a youtube.com/watch or youtu.be link.';
+			return;
+		}
+		editor?.chain().focus().insertYoutubeEmbed({ src: url }).run();
+		showYoutubeInput = false;
+		youtubeUrl = '';
+		youtubeError = '';
+	}
+
+	function cancelYoutube() {
+		showYoutubeInput = false;
+		youtubeUrl = '';
+		youtubeError = '';
+		editor?.chain().focus().run();
+	}
 
 	function openLinkInput() {
 		if (editor?.isActive('link')) {
@@ -184,6 +218,16 @@
 				<Image size={18} weight="bold" />
 			</button>
 
+			<!-- YouTube -->
+			<button
+				type="button"
+				class="toolbar-btn"
+				onclick={openYoutubeInput}
+				title="Insert YouTube Video"
+			>
+				<YoutubeLogo size={18} weight="bold" class="text-[#FF0000]" />
+			</button>
+
 			<div class="w-px h-5 bg-border mx-1"></div>
 
 			<!-- Custom blocks -->
@@ -230,6 +274,40 @@
 				>
 					Cancel
 				</button>
+			</div>
+		{/if}
+
+		<!-- YouTube URL input -->
+		{#if showYoutubeInput}
+			<div class="space-y-1.5">
+				<div class="flex gap-2 items-center">
+					<YoutubeLogo size={18} weight="bold" class="text-[#FF0000] shrink-0" />
+					<input
+						bind:this={youtubeInputEl}
+						type="url"
+						class="flex-1 bg-page border-2 border-border rounded-lg px-3 py-1.5 text-sm shadow-[2px_2px_0_var(--color-border)] focus:outline-none focus:border-accent"
+						bind:value={youtubeUrl}
+						placeholder="https://youtube.com/watch?v=..."
+						onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyYoutube(); } else if (e.key === 'Escape') cancelYoutube(); }}
+					/>
+					<button
+						type="button"
+						class="px-3 py-1.5 text-xs font-bold bg-accent text-white rounded-lg border-2 border-border cursor-pointer transition-all shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px]"
+						onclick={applyYoutube}
+					>
+						Embed
+					</button>
+					<button
+						type="button"
+						class="px-3 py-1.5 text-xs font-bold text-text-muted rounded-lg border-2 border-border cursor-pointer transition-all hover:bg-accent-light"
+						onclick={cancelYoutube}
+					>
+						Cancel
+					</button>
+				</div>
+				{#if youtubeError}
+					<p class="text-xs text-error pl-7">{youtubeError}</p>
+				{/if}
 			</div>
 		{/if}
 	</div>

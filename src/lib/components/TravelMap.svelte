@@ -67,7 +67,8 @@
 		}
 		dismissSelection();
 
-		const maplibregl = (await import('maplibre-gl')).default;
+		const mod = await import('maplibre-gl');
+		const maplibregl: any = (mod as any).default ?? mod;
 		// Store ref for handleFitAll
 		(globalThis as any).__maplibregl = maplibregl;
 

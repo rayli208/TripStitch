@@ -707,18 +707,22 @@
 
 		<!-- Audio action buttons -->
 		{#if recordingPhase === 'idle'}
-			<div class="flex flex-col gap-3 w-full">
-				{#if hasAnyAudio}
-					<Button variant="primary" onclick={handleApplyAndSave}>
-						{applyLabel}
-					</Button>
-				{/if}
+			<div class="flex flex-col-reverse sm:flex-row sm:justify-between gap-3 w-full">
 				<button
-					class="text-sm text-text-muted hover:text-text-secondary cursor-pointer transition-colors text-center"
+					class="text-sm text-text-muted hover:text-text-secondary cursor-pointer transition-colors text-center px-4 py-2"
 					onclick={onback}
 				>
 					{skipLabel ?? (hasAnyAudio ? 'Back without applying' : 'Back to video')}
 				</button>
+				{#if hasAnyAudio}
+					<Button
+						variant="primary"
+						onclick={handleApplyAndSave}
+						class="w-full sm:w-auto"
+					>
+						{applyLabel}
+					</Button>
+				{/if}
 			</div>
 		{/if}
 	</div>

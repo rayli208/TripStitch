@@ -28,7 +28,7 @@
 	}
 </script>
 
-<nav class="fixed bottom-0 inset-x-0 z-40 bg-page border-t-3 border-border" style="padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);">
+<nav class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-page border-t-3 border-border" style="padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);">
 	<div class="max-w-lg mx-auto flex items-center justify-around h-16">
 		{#each tabs as tab}
 			<a

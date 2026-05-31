@@ -36,6 +36,11 @@
 
 <svelte:head><title>Write Blog | TripStitch</title></svelte:head>
 
-<AppShell title="Write Blog" showBack onback={() => goto('/create')}>
+<AppShell
+	title="Write Blog"
+	showBottomNav
+	logoUrl={profileState.profile?.logoUrl}
+	subtitle="New Blog · Pro"
+>
 	<BlogEditor onsaved={handleSaved} />
 </AppShell>

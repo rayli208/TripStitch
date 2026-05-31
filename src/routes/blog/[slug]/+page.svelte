@@ -4,14 +4,14 @@
 	import { fetchBlogBySlug, getBlogUrl } from '$lib/services/blogService';
 	import type { SharedBlog } from '$lib/types';
 	import BlogContentRenderer from '$lib/components/blog/BlogContentRenderer.svelte';
-	import VideoEmbed from '$lib/components/ui/VideoEmbed.svelte';
 	import Spinner from '$lib/components/ui/Spinner.svelte';
-	import { ArrowLeft, ShareNetwork, Clock, MapPin, CalendarBlank, Tag } from 'phosphor-svelte';
-	import toastState from '$lib/state/toast.svelte';
+	import authState from '$lib/state/auth.svelte';
+	import { ShareNetwork, Clock, MapPin, CalendarBlank, Plus, Eye, ArrowRight, Check } from 'phosphor-svelte';
 
 	const slug = page.params.slug!;
 	let blog = $state<SharedBlog | null>(null);
 	let loading = $state(true);
+	let linkCopied = $state(false);
 
 	$effect(() => {
 		loadBlog();
@@ -22,26 +22,31 @@
 		blog = await fetchBlogBySlug(slug);
 		loading = false;
 		if (!blog) {
-			goto('/explore');
+			goto('/trips');
 		}
 	}
 
-	function share() {
+	async function share() {
 		if (!blog) return;
 		const url = getBlogUrl(blog.slug);
-		if (navigator.share) {
-			navigator.share({ title: blog.title, url });
-		} else {
-			navigator.clipboard.writeText(url);
-			toastState.show('Link copied!');
+		if (typeof navigator !== 'undefined' && navigator.share) {
+			try {
+				await navigator.share({ title: blog.title, url });
+				return;
+			} catch {
+				/* fall through */
+			}
 		}
+		navigator.clipboard.writeText(url);
+		linkCopied = true;
+		setTimeout(() => { linkCopied = false; }, 2000);
 	}
 
 	const publishDate = $derived(
 		blog?.publishedAt
-			? new Date(blog.publishedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+			? new Date(blog.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 			: blog?.createdAt
-				? new Date(blog.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+				? new Date(blog.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 				: ''
 	);
 
@@ -50,12 +55,31 @@
 		const match = blog.youtubeUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^&?#]+)/);
 		return match?.[1] ?? null;
 	});
+
+	// Try to derive a reads count if present, otherwise hide
+	const readsCount = $derived<number | null>((blog as unknown as { reads?: number })?.reads ?? null);
+
+	// First city/region label for the location pill
+	const regionLabel = $derived.by(() => {
+		if (!blog) return null;
+		const cities = blog.cities ?? [];
+		const countries = blog.countries ?? [];
+		if (cities.length && countries.length) return `${cities[0]}, ${countries[0]}`;
+		if (cities.length) return cities[0];
+		if (countries.length) return countries[0];
+		return null;
+	});
 </script>
 
 <svelte:head>
 	{#if blog}
 		<title>{blog.title} | TripStitch</title>
 		<meta name="description" content={blog.excerpt} />
+		<meta property="og:title" content={blog.title} />
+		<meta property="og:description" content={blog.excerpt} />
+		{#if blog.coverImageUrl}
+			<meta property="og:image" content={blog.coverImageUrl} />
+		{/if}
 	{/if}
 </svelte:head>
 
@@ -65,102 +89,227 @@
 	</div>
 {:else if blog}
 	<div class="min-h-screen bg-page">
-		<!-- Top bar -->
-		<div class="sticky top-0 z-20 bg-page/80 backdrop-blur-md border-b-2 border-border">
-			<div class="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-				<button type="button" class="p-2 -ml-2 cursor-pointer" onclick={() => history.back()}>
-					<ArrowLeft size={20} weight="bold" />
-				</button>
-				<span class="text-sm font-bold text-text-muted">TripStitch</span>
-				<button
-					type="button"
-					class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold border-2 border-border rounded-lg bg-card shadow-[2px_2px_0_var(--color-border)] hover:shadow-[3px_3px_0_var(--color-border)] transition-all cursor-pointer"
-					onclick={share}
-				>
-					<ShareNetwork size={14} weight="bold" />
-					Share
-				</button>
+		<!-- ═══════════ Top bar ═══════════ -->
+		<div class="sticky top-0 z-30 border-b-2 border-border bg-page/95 backdrop-blur-sm">
+			<div class="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+				<a href="/" class="flex items-center gap-1.5 shrink-0 hover:opacity-80 transition-opacity">
+					<img src="/favicon-192.png" alt="" class="h-5" />
+					<span class="hidden sm:inline text-sm font-extrabold tracking-tight"><span class="text-text-primary">Trip</span><span class="text-accent">Stitch</span></span>
+				</a>
+				<div class="flex items-center gap-2 ml-auto">
+					<button
+						type="button"
+						class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-bold border-2 border-border rounded-lg bg-page hover:bg-accent-light hover:border-accent transition-all shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer"
+						onclick={share}
+					>
+						{#if linkCopied}
+							<Check size={14} weight="bold" class="text-success" />
+							<span class="hidden sm:inline">Copied!</span>
+						{:else}
+							<ShareNetwork size={14} weight="bold" />
+							<span class="hidden sm:inline">Share</span>
+						{/if}
+					</button>
+					<a
+						href="/create"
+						class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-bold border-2 border-border rounded-lg bg-accent text-white hover:bg-accent-hover transition-all shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer"
+					>
+						<span class="hidden sm:inline">Start your own</span>
+						<span class="sm:hidden">Start</span>
+						<Plus size={14} weight="bold" />
+					</a>
+				</div>
 			</div>
 		</div>
 
-		<div class="max-w-2xl mx-auto px-4 py-6">
+		<!-- ═══════════ Article ═══════════ -->
+		<article class="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
 			<!-- Cover image -->
 			{#if blog.coverImageUrl}
-				<div class="rounded-xl overflow-hidden border-2 border-border shadow-[3px_3px_0_var(--color-border)] mb-6">
-					<img src={blog.coverImageUrl} alt={blog.title} class="w-full h-48 sm:h-64 object-cover" />
+				<div class="rounded-2xl overflow-hidden border-2 border-border shadow-[4px_4px_0_var(--color-border)] mb-6">
+					<img src={blog.coverImageUrl} alt={blog.title} class="w-full h-56 sm:h-72 md:h-96 object-cover" />
 				</div>
 			{/if}
 
-			<!-- Category + meta -->
-			<div class="flex flex-wrap items-center gap-3 text-xs text-text-muted mb-3">
-				<span class="px-2 py-1 font-bold bg-accent-light rounded-lg border border-border capitalize">{blog.category}</span>
-				<span class="flex items-center gap-1"><Clock size={12} /> {blog.readingTime} min read</span>
+			<!-- Region pill -->
+			{#if regionLabel}
+				<div class="mb-3">
+					<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-card border-2 border-border text-xs font-bold text-text-secondary">
+						<MapPin size={11} weight="fill" class="text-accent" />
+						{regionLabel}
+					</span>
+				</div>
+			{/if}
+
+			<!-- Meta row: category · date · locations · reads -->
+			<div class="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-text-muted mb-4">
+				<span class="inline-flex items-center px-2 py-0.5 rounded font-extrabold uppercase tracking-wider text-[10px] bg-accent-light border border-border text-accent">
+					{blog.category}
+				</span>
 				{#if publishDate}
-					<span class="flex items-center gap-1"><CalendarBlank size={12} /> {publishDate}</span>
+					<span class="flex items-center gap-1"><CalendarBlank size={12} weight="bold" /> {publishDate}</span>
 				{/if}
 				{#if blog.locations.length > 0}
-					<span class="flex items-center gap-1"><MapPin size={12} /> {blog.locations.length} locations</span>
+					<span class="flex items-center gap-1"><MapPin size={12} weight="bold" /> {blog.locations.length} locations</span>
+				{/if}
+				<span class="flex items-center gap-1"><Clock size={12} weight="bold" /> {blog.readingTime} min read</span>
+				{#if readsCount}
+					<span class="flex items-center gap-1"><Eye size={12} weight="bold" /> {readsCount.toLocaleString()} reads</span>
 				{/if}
 			</div>
 
 			<!-- Title -->
-			<h1 class="text-2xl sm:text-3xl font-bold text-text-primary mb-2">{blog.title}</h1>
+			<h1 class="text-3xl sm:text-4xl md:text-5xl font-extrabold text-text-primary leading-tight tracking-tight mb-3">
+				{blog.title}
+			</h1>
 			{#if blog.subtitle}
-				<p class="text-base text-text-muted mb-4">{blog.subtitle}</p>
+				<p class="text-lg sm:text-xl text-text-secondary leading-relaxed mb-6">{blog.subtitle}</p>
 			{/if}
 
-			<!-- Author -->
-			<a href="/u/{blog.username}" class="flex items-center gap-3 mb-6">
-				<img src={blog.userAvatarUrl} alt={blog.userDisplayName} class="w-10 h-10 rounded-full border-2 border-border" />
-				<div>
-					<div class="text-sm font-bold text-text-primary">{blog.userDisplayName}</div>
-					<div class="text-xs text-text-muted">@{blog.username}</div>
+			<!-- Author card -->
+			<div class="flex items-center gap-3 sm:gap-4 mb-6 pb-6 border-b-2 border-border">
+				<a href="/u/{blog.username}" class="shrink-0">
+					{#if blog.userAvatarUrl}
+						<img src={blog.userAvatarUrl} alt={blog.userDisplayName} referrerpolicy="no-referrer" class="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-border object-cover" />
+					{:else}
+						<div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-border bg-accent-light flex items-center justify-center text-accent font-bold">
+							{blog.userDisplayName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
+						</div>
+					{/if}
+				</a>
+				<div class="flex-1 min-w-0">
+					<a href="/u/{blog.username}" class="block">
+						<p class="text-sm sm:text-base font-bold text-text-primary hover:text-accent transition-colors truncate">
+							{blog.userDisplayName}
+						</p>
+						<p class="text-xs text-text-muted truncate">@{blog.username}</p>
+					</a>
 				</div>
-			</a>
+				<div class="flex items-center gap-2 shrink-0">
+					{#if !authState.isSignedIn || authState.user?.id !== blog.userId}
+						<button
+							type="button"
+							class="px-3 py-1.5 text-xs sm:text-sm font-bold rounded-lg border-2 border-border bg-accent text-white shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
+							onclick={() => goto(authState.isSignedIn && blog ? `/u/${blog.username}` : '/signin')}
+						>
+							Follow
+						</button>
+					{/if}
+					<a
+						href="/u/{blog.username}"
+						class="hidden sm:inline-flex px-3 py-1.5 text-sm font-bold rounded-lg border-2 border-border bg-card hover:bg-accent-light transition-colors cursor-pointer shadow-[2px_2px_0_var(--color-border)]"
+					>
+						View profile
+					</a>
+				</div>
+			</div>
 
 			<!-- Tags -->
 			{#if blog.tags.length > 0}
-				<div class="flex flex-wrap gap-2 mb-6">
+				<div class="flex flex-wrap gap-1.5 mb-6">
 					{#each blog.tags as tag}
-						<span class="flex items-center gap-1 px-2 py-1 text-xs font-bold bg-accent-light rounded-lg border border-border">
-							<Tag size={10} />
-							{tag}
+						<span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-card border-2 border-border text-xs font-bold text-text-secondary">
+							#{tag}
 						</span>
 					{/each}
 				</div>
 			{/if}
 
-			<!-- YouTube video -->
+			<!-- Featured YouTube video (from blog metadata) -->
 			{#if youtubeId}
-				<div class="mb-6 rounded-xl overflow-hidden border-2 border-border shadow-[2px_2px_0_var(--color-border)]">
+				<figure class="relative mb-8 rounded-2xl overflow-hidden border-2 border-border shadow-[4px_4px_0_var(--color-border)] bg-overlay">
+					<span class="absolute top-3 left-3 z-10 inline-block px-2 py-0.5 rounded text-[10px] font-extrabold tracking-wider text-white" style="background:#FF0000">YouTube</span>
 					<div class="relative w-full" style="padding-top: 56.25%;">
 						<iframe
 							src="https://www.youtube.com/embed/{youtubeId}"
-							title="YouTube video"
-							frameborder="0"
+							title="{blog.title}"
 							allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
 							allowfullscreen
-							class="absolute inset-0 w-full h-full"
+							class="absolute inset-0 w-full h-full border-0"
 						></iframe>
 					</div>
-				</div>
+				</figure>
 			{/if}
 
-			<!-- Content -->
-			<BlogContentRenderer content={blog.content} />
+			<!-- Body content -->
+			<div class="prose-blog">
+				<BlogContentRenderer content={blog.content} />
+			</div>
 
-			<!-- Footer -->
-			<div class="mt-10 pt-6 border-t-2 border-border">
-				<div class="text-center">
-					<p class="text-sm text-text-muted mb-3">Made with TripStitch</p>
+			<!-- ═══════════ Footer ═══════════ -->
+			<footer class="mt-12 pt-6 border-t-2 border-border space-y-4">
+				<p class="text-center text-sm text-text-muted">
+					Made with <a href="/" class="font-extrabold text-accent hover:underline">TripStitch</a>
+				</p>
+				<div class="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:justify-center">
+					<button
+						type="button"
+						class="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-bold rounded-lg border-2 border-border bg-card hover:bg-accent-light transition-colors cursor-pointer shadow-[2px_2px_0_var(--color-border)]"
+						onclick={share}
+					>
+						<ShareNetwork size={14} weight="bold" />
+						Share this post
+					</button>
 					<a
 						href="/u/{blog.username}"
-						class="inline-block px-4 py-2 text-sm font-bold border-2 border-border rounded-lg bg-accent text-white shadow-[2px_2px_0_var(--color-border)] hover:shadow-[3px_3px_0_var(--color-border)] transition-all"
+						class="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-bold rounded-lg border-2 border-border bg-accent text-white shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
 					>
 						View {blog.userDisplayName}'s profile
+						<ArrowRight size={14} weight="bold" />
 					</a>
 				</div>
-			</div>
-		</div>
+			</footer>
+		</article>
 	</div>
 {/if}
+
+<style>
+	/* Cinematic typography for blog body content */
+	.prose-blog :global(h2) {
+		font-size: 1.625rem;
+		font-weight: 800;
+		line-height: 1.2;
+		margin: 2.25rem 0 0.75rem;
+		color: var(--color-text-primary);
+	}
+	.prose-blog :global(h3) {
+		font-size: 1.25rem;
+		font-weight: 800;
+		line-height: 1.25;
+		margin: 1.75rem 0 0.5rem;
+		color: var(--color-text-primary);
+	}
+	.prose-blog :global(p) {
+		font-size: 1.0625rem;
+		line-height: 1.75;
+		margin: 0.85rem 0;
+		color: var(--color-text-secondary);
+	}
+	.prose-blog :global(p strong),
+	.prose-blog :global(p b) {
+		color: var(--color-text-primary);
+	}
+	.prose-blog :global(ul),
+	.prose-blog :global(ol) {
+		font-size: 1.0625rem;
+		line-height: 1.75;
+		color: var(--color-text-secondary);
+	}
+	/* Cinematic blockquote — orange accent bar */
+	.prose-blog :global(blockquote) {
+		position: relative;
+		margin: 1.5rem 0;
+		padding: 0.75rem 1.25rem;
+		border-left: 4px solid var(--color-accent);
+		background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+		border-radius: 0 8px 8px 0;
+		font-style: italic;
+		font-size: 1.0625rem;
+		line-height: 1.7;
+		color: var(--color-text-primary);
+	}
+	.prose-blog :global(blockquote p) {
+		margin: 0.25rem 0;
+		color: inherit;
+	}
+</style>

@@ -8,6 +8,7 @@
 	import CharacterCount from '@tiptap/extension-character-count';
 	import { LocationCardExtension } from './extensions/locationCard';
 	import { RouteBlockExtension } from './extensions/routeBlock';
+	import { YoutubeEmbedExtension } from './extensions/youtubeEmbed';
 
 	let {
 		content = {},
@@ -48,7 +49,8 @@
 			}),
 				CharacterCount,
 				LocationCardExtension,
-				RouteBlockExtension
+				RouteBlockExtension,
+				YoutubeEmbedExtension
 			],
 			content: Object.keys(initialContent).length > 0 ? initialContent : undefined,
 			onUpdate: ({ editor: e }) => {

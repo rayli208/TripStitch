@@ -51,6 +51,28 @@ service cloud.firestore {
                     && resource.data.userId == request.auth.uid;
     }
 
+    // ── Routes cache ──
+    // Shared global cache of road-following route geometries. Same physical
+    // route between two stops gets fetched from OpenRouteService once, then
+    // every subsequent user reads it from Firestore for free (vs. another
+    // ORS call against the daily quota).
+    //
+    // Read: public (geometry is not sensitive)
+    // Create / Update: authenticated users only, payload must look like a
+    //   route doc, geometry hard-capped at 4000 numbers (2000 [lng,lat] pairs)
+    //   to prevent storage bloat.
+    // Delete: blocked — let TTL / staleness check handle expiry instead.
+    match /routes/{routeId} {
+      allow read: if true;
+      allow create, update: if request.auth != null
+                            && request.resource.data.flatCoords is list
+                            && request.resource.data.flatCoords.size() >= 4
+                            && request.resource.data.flatCoords.size() <= 4000
+                            && request.resource.data.profile is string
+                            && request.resource.data.fetchedAt is number;
+      allow delete: if false;
+    }
+
     // ── Username index ──
     // Anyone can read (username availability checks, resolving usernames)
     // Create: only if the uid field matches the authenticated user
