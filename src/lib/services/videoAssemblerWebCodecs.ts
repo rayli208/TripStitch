@@ -26,6 +26,8 @@ import {
 	playVideoAccelerated
 } from './videoProcessor';
 import { createFrameEncoder, type FrameEncoder } from './webCodecsEncoder';
+import { storeVideoTrack } from './audioRemux';
+import { avcCodecForResolution, bitrateForResolution } from '$lib/constants/limits';
 import { createWebCodecsExportGuard, type WebCodecsExportGuard } from './exportGuard';
 import { totalDistance, totalTravelTime } from '$lib/utils/distance';
 import { suggestTransportMode } from '$lib/utils/distance';
@@ -96,7 +98,8 @@ export async function assembleVideoWebCodecs(
 	const ctx = canvas.getContext('2d')!;
 
 	const encoder = createFrameEncoder({
-		width, height, fps: TARGET_FPS, bitrate: 5_000_000
+		width, height, fps: TARGET_FPS, // bitrate auto-scales with resolution (5/16/40 Mbps)
+		retainChunks: true // keep raw chunks so audio can be muxed in losslessly later
 	});
 
 	let map: maplibregl.Map | null = null;
@@ -341,6 +344,8 @@ export async function assembleVideoWebCodecs(
 
 		const finalBlob = await encoder.finalize();
 		console.log(`[TripStitch/WebCodecs] MP4 blob: ${(finalBlob.size / 1024 / 1024).toFixed(1)} MB`);
+		// Stash the raw video track so the audio step can mux audio in without re-encoding.
+		storeVideoTrack(finalBlob, encoder.getRetainedTrack());
 
 		if (map && mapContainer) {
 			destroyMap(map, mapContainer);
@@ -350,12 +355,23 @@ export async function assembleVideoWebCodecs(
 
 		const url = URL.createObjectURL(finalBlob);
 		const totalTime = ((performance.now() - assemblyStart) / 1000).toFixed(1);
+		// Quality analysis: compare the target bitrate we asked for against what the file
+		// actually achieved, so you can tell whether the higher-res export is paying off.
+		const durationSec = timelineCursor || (encoder.frameCount / TARGET_FPS);
+		const targetBitrate = bitrateForResolution(width, height);
+		const actualBitrate = durationSec > 0 ? (finalBlob.size * 8) / durationSec : 0;
+		const megapixels = ((width * height) / 1_000_000).toFixed(1);
 		console.log('[TripStitch/WebCodecs] ═══════════════════════════════════════════════════════');
-		console.log(`[TripStitch/WebCodecs] VIDEO ASSEMBLY COMPLETE`);
-		console.log(`[TripStitch/WebCodecs]   Total wall time: ${totalTime}s`);
-		console.log(`[TripStitch/WebCodecs]   Estimated video duration: ${timelineCursor.toFixed(1)}s`);
-		console.log(`[TripStitch/WebCodecs]   Final blob: ${(finalBlob.size / 1024 / 1024).toFixed(1)} MB`);
-		console.log(`[TripStitch/WebCodecs]   Total frames encoded: ${encoder.frameCount}`);
+		console.log(`[TripStitch/WebCodecs] 📊 EXPORT SUMMARY`);
+		console.log(`[TripStitch/WebCodecs]   Resolution:    ${width}x${height} (${megapixels} MP)`);
+		console.log(`[TripStitch/WebCodecs]   Codec:         ${avcCodecForResolution(width, height)} (H.264)`);
+		console.log(`[TripStitch/WebCodecs]   Frame rate:    ${TARGET_FPS} fps`);
+		console.log(`[TripStitch/WebCodecs]   Target bitrate: ${(targetBitrate / 1_000_000).toFixed(1)} Mbps`);
+		console.log(`[TripStitch/WebCodecs]   Actual bitrate: ${(actualBitrate / 1_000_000).toFixed(1)} Mbps`);
+		console.log(`[TripStitch/WebCodecs]   Duration:      ${durationSec.toFixed(1)}s`);
+		console.log(`[TripStitch/WebCodecs]   Frames:        ${encoder.frameCount}`);
+		console.log(`[TripStitch/WebCodecs]   File size:     ${(finalBlob.size / 1024 / 1024).toFixed(1)} MB`);
+		console.log(`[TripStitch/WebCodecs]   Wall time:     ${totalTime}s`);
 		console.log('[TripStitch/WebCodecs] ═══════════════════════════════════════════════════════');
 		return { blob: finalBlob, url, segments: timeline };
 	} catch (err) {

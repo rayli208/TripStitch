@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import authState from '$lib/state/auth.svelte';
 	import tripsState from '$lib/state/trips.svelte';
+	import profileState from '$lib/state/profile.svelte';
 	import type { AspectRatio } from '$lib/types';
 	import type { AssemblyProgress } from '$lib/services/videoAssembler';
 	import { checkBrowserSupport, getSupportedMimeType, getFileExtension } from '$lib/utils/browserCompat';
@@ -18,6 +19,7 @@
 			goto('/signin');
 			return;
 		}
+		profileState.load(); // needed so isPro is known when choosing export resolution
 		tripsState.subscribe();
 		return () => tripsState.unsubscribe();
 	});
@@ -64,7 +66,12 @@
 				trip,
 				aspectRatio,
 				(p) => { progress = p; },
-				abortController.signal
+				abortController.signal,
+				undefined, // mapStyle (defaulted)
+				undefined, // logoUrl
+				undefined, // secondaryColor
+				undefined, // outroInfo
+				profileState.isPro ? 'pro' : 'free'
 			);
 
 			videoBlob = result.blob;

@@ -3,6 +3,8 @@
  * Only loaded on browsers that support WebCodecs (Chrome 94+, Safari 16.4+).
  */
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
+import { avcCodecForResolution, bitrateForResolution } from '$lib/constants/limits';
+import type { RetainedTrack } from './audioRemux';
 
 export interface FrameEncoder {
 	/** Encode the current canvas contents as the next video frame */
@@ -11,16 +13,24 @@ export interface FrameEncoder {
 	readonly frameCount: number;
 	/** Flush encoder, finalize muxer, return MP4 blob */
 	finalize(): Promise<Blob>;
+	/** Raw encoded video chunks (only when `retainChunks` was set) — for lossless audio remux. */
+	getRetainedTrack(): RetainedTrack | null;
 }
 
 export function createFrameEncoder(config: {
 	width: number;
 	height: number;
 	fps: number;
-	bitrate: number;
+	/** Optional; when omitted, scales with resolution (5/16/40 Mbps for 1080p/1440p/4K). */
+	bitrate?: number;
+	/** Retain raw encoded chunks so audio can later be muxed in without re-encoding video. */
+	retainChunks?: boolean;
 }): FrameEncoder {
-	const { width, height, fps, bitrate } = config;
+	const { width, height, fps, retainChunks } = config;
+	const bitrate = config.bitrate ?? bitrateForResolution(width, height);
+	const codec = avcCodecForResolution(width, height);
 	const frameDurationMicros = Math.round(1_000_000 / fps);
+	const retained: RetainedTrack['chunks'] = [];
 
 	const target = new ArrayBufferTarget();
 	const muxer = new Muxer({
@@ -42,13 +52,12 @@ export function createFrameEncoder(config: {
 			// has null duration which mp4-muxer's addVideoChunk rejects.
 			const data = new Uint8Array(chunk.byteLength);
 			chunk.copyTo(data);
-			muxer.addVideoChunkRaw(
-				data,
-				chunk.type as 'key' | 'delta',
-				chunk.timestamp,
-				chunk.duration ?? frameDurationMicros,
-				meta ?? undefined
-			);
+			const type = chunk.type as 'key' | 'delta';
+			const duration = chunk.duration ?? frameDurationMicros;
+			muxer.addVideoChunkRaw(data, type, chunk.timestamp, duration, meta ?? undefined);
+			if (retainChunks) {
+				retained.push({ data, type, timestamp: chunk.timestamp, duration, meta: meta ?? undefined });
+			}
 		},
 		error: (err) => {
 			console.error('[WebCodecsEncoder] Encoder error:', err);
@@ -57,7 +66,7 @@ export function createFrameEncoder(config: {
 	});
 
 	encoder.configure({
-		codec: 'avc1.4d0028', // H.264 Main Profile Level 4.0
+		codec, // H.264 Main Profile; level scales with resolution (L4.0 → L5.1)
 		width,
 		height,
 		bitrate,
@@ -67,11 +76,15 @@ export function createFrameEncoder(config: {
 		avc: { format: 'avc' } // AVC format (length-prefixed NALUs) required by mp4-muxer
 	});
 
-	console.log(`[WebCodecsEncoder] Configured: ${width}x${height} @ ${fps}fps, ${(bitrate / 1_000_000).toFixed(1)}Mbps`);
+	console.log(`[WebCodecsEncoder] Configured: ${width}x${height} @ ${fps}fps, ${(bitrate / 1_000_000).toFixed(1)}Mbps, codec=${codec}`);
 
 	return {
 		get frameCount() {
 			return encodedFrames;
+		},
+
+		getRetainedTrack(): RetainedTrack | null {
+			return retainChunks ? { chunks: retained, width, height, fps } : null;
 		},
 
 		encodeFrame(canvas: HTMLCanvasElement) {

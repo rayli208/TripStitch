@@ -5,6 +5,8 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import { FONTS, DEFAULT_BRAND_COLORS, getFontById, googleFontsUrl, fontFamily } from '$lib/constants/fonts';
 	import { preloadFont } from '$lib/utils/fontLoader';
+	import { isHeic, normalizeImageFile } from '$lib/utils/imageUtils';
+	import toast from '$lib/state/toast.svelte';
 	import { Upload, X, CaretDown, Check, MapTrifold, Broadcast, Mountains, Compass, Moon, Sun, Lock, Crown } from 'phosphor-svelte';
 
 	let {
@@ -66,11 +68,21 @@
 	let fontDropdownOpen = $state(false);
 	let fileInput: HTMLInputElement;
 
-	function handleFile(e: Event) {
-		const file = (e.target as HTMLInputElement).files?.[0];
+	async function handleFile(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const file = input.files?.[0];
 		if (!file) return;
-		if (!file.type.startsWith('image/')) return;
-		onmedia?.(file);
+		// HEIC files report an empty `file.type` outside Safari, so accept them by extension too.
+		if (!file.type.startsWith('image/') && !isHeic(file)) return;
+		try {
+			const normalized = await normalizeImageFile(file);
+			onmedia?.(normalized);
+		} catch (err) {
+			console.error('Failed to process cover image', err);
+			toast.error("Couldn't process that image. Please try a different one.");
+		} finally {
+			input.value = ''; // allow re-selecting the same file
+		}
 	}
 
 	const primaryBrandColor = $derived(brandColors.length > 0 ? brandColors[0] : undefined);
@@ -136,7 +148,7 @@
 		<input
 			bind:this={fileInput}
 			type="file"
-			accept="image/*"
+			accept="image/*,.heic,.heif"
 			class="hidden"
 			onchange={handleFile}
 		/>

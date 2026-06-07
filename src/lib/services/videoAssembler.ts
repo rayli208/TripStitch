@@ -17,6 +17,8 @@ import {
 	drawWhiteFlashToCanvas
 } from './videoProcessor';
 import { createExportGuard, type ExportGuard } from './exportGuard';
+import { setActiveExportResolution } from './mapCore';
+import { getResolutionLadder, getResolutionForTier, type UserTier } from '$lib/constants/limits';
 import { totalDistance, totalTravelTime } from '$lib/utils/distance';
 import { suggestTransportMode } from '$lib/utils/distance';
 import { fetchAllRouteGeometries } from './routeService';
@@ -62,6 +64,62 @@ export interface AssemblyResult {
 
 export type ProgressCallback = (progress: AssemblyProgress) => void;
 
+/**
+ * Cap the export resolution by device memory/cores. 4K H.264 encode is memory-
+ * hungry, and `isConfigSupported` only reports codec capability — not whether the
+ * tab will run out of memory mid-encode. So we gate the high rungs on having
+ * enough RAM/cores. Returns the max allowed frame area (px); Infinity = no cap.
+ */
+function deviceResolutionCap(): number {
+	if (typeof navigator === 'undefined') return Infinity;
+	const mem = (navigator as { deviceMemory?: number }).deviceMemory; // GB, Chromium only
+	const cores = navigator.hardwareConcurrency || 0;
+	if (mem !== undefined && mem < 4) return 1920 * 1088; // weak → cap at 1080p
+	if ((mem !== undefined && mem < 8) || (cores > 0 && cores < 8)) return 2560 * 1440; // mid → cap at 1440p
+	return Infinity; // capable → allow 4K (still gated by isConfigSupported below)
+}
+
+/**
+ * Decide the export resolution: walk the tier's ladder (best → safest), skipping
+ * rungs the device can't afford, and pick the highest that the WebCodecs encoder
+ * actually supports. Always lands on the proven baseline as a last resort.
+ */
+async function selectExportResolution(
+	aspectRatio: AspectRatio,
+	tier: UserTier
+): Promise<{ width: number; height: number; webCodecsOk: boolean }> {
+	const cap = deviceResolutionCap();
+	const fullLadder = getResolutionLadder(aspectRatio, tier);
+	const candidates = fullLadder.filter((r) => r.width * r.height <= cap);
+	const finalCandidates = candidates.length > 0 ? candidates : [getResolutionForTier(aspectRatio, tier)];
+
+	const capLabel = cap === Infinity ? 'none (4K allowed)' : `${(cap / 1_000_000).toFixed(1)} MP`;
+	const mem = typeof navigator !== 'undefined' ? (navigator as { deviceMemory?: number }).deviceMemory : undefined;
+	const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency : undefined;
+	console.log('[TripStitch] ── Resolution selection ──────────────────────────────');
+	console.log(`[TripStitch]   Tier: ${tier} | deviceMemory: ${mem ?? 'unknown'}GB | cores: ${cores ?? 'unknown'} | cap: ${capLabel}`);
+	console.log(`[TripStitch]   Ladder for ${aspectRatio}: ${fullLadder.map((r) => `${r.width}x${r.height}`).join(' → ')}`);
+	if (candidates.length < fullLadder.length) {
+		const dropped = fullLadder.filter((r) => r.width * r.height > cap).map((r) => `${r.width}x${r.height}`);
+		console.log(`[TripStitch]   Skipped (device cap): ${dropped.join(', ')}`);
+	}
+
+	for (const res of finalCandidates) {
+		const ok = await canUseWebCodecs(res.width, res.height);
+		console.log(`[TripStitch]   Probe ${res.width}x${res.height}: ${ok ? '✅ supported' : '❌ unsupported'}`);
+		if (ok) {
+			console.log(`[TripStitch]   ▶ Selected ${res.width}x${res.height} via WebCodecs (tier=${tier})`);
+			console.log('[TripStitch] ──────────────────────────────────────────────────────');
+			return { ...res, webCodecsOk: true };
+		}
+	}
+	// Nothing WebCodecs-supported → MediaRecorder at the safest baseline.
+	const base = finalCandidates[finalCandidates.length - 1];
+	console.log(`[TripStitch]   ▶ No WebCodecs support — MediaRecorder fallback at ${base.width}x${base.height}`);
+	console.log('[TripStitch] ──────────────────────────────────────────────────────');
+	return { ...base, webCodecsOk: false };
+}
+
 /** Main pipeline: routes to WebCodecs (fast) or MediaRecorder (fallback) path */
 export async function assembleVideo(
 	trip: Trip,
@@ -71,16 +129,23 @@ export async function assembleVideo(
 	mapStyle: MapStyle = 'streets',
 	logoUrl?: string | null,
 	secondaryColor: string = '#0a0f1e',
-	outroInfo?: OutroInfo
+	outroInfo?: OutroInfo,
+	tier: UserTier = 'free'
 ): Promise<AssemblyResult> {
-	const { width, height } = getResolution(aspectRatio);
-	if (await canUseWebCodecs(width, height)) {
-		console.log('[TripStitch] WebCodecs supported — using fast pipeline');
-		const { assembleVideoWebCodecs } = await import('./videoAssemblerWebCodecs');
-		return assembleVideoWebCodecs(trip, aspectRatio, onProgress, abortSignal, mapStyle, logoUrl, secondaryColor, outroInfo);
+	const { width, height, webCodecsOk } = await selectExportResolution(aspectRatio, tier);
+	// Pin the chosen dimensions so every renderer uses them consistently.
+	setActiveExportResolution({ width, height });
+	try {
+		if (webCodecsOk) {
+			console.log('[TripStitch] WebCodecs supported — using fast pipeline');
+			const { assembleVideoWebCodecs } = await import('./videoAssemblerWebCodecs');
+			return await assembleVideoWebCodecs(trip, aspectRatio, onProgress, abortSignal, mapStyle, logoUrl, secondaryColor, outroInfo);
+		}
+		console.log('[TripStitch] WebCodecs not available — using MediaRecorder fallback');
+		return await assembleVideoMediaRecorder(trip, aspectRatio, onProgress, abortSignal, mapStyle, logoUrl, secondaryColor, outroInfo);
+	} finally {
+		setActiveExportResolution(null);
 	}
-	console.log('[TripStitch] WebCodecs not available — using MediaRecorder fallback');
-	return assembleVideoMediaRecorder(trip, aspectRatio, onProgress, abortSignal, mapStyle, logoUrl, secondaryColor, outroInfo);
 }
 
 /** MediaRecorder fallback pipeline: single-pass recording (original implementation) */

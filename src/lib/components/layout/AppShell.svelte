@@ -12,6 +12,7 @@
 		statusBadge,
 		showBack = false,
 		showBottomNav = false,
+		fullWidth = false,
 		onback,
 		logoUrl,
 		actions,
@@ -23,6 +24,7 @@
 		statusBadge?: string;
 		showBack?: boolean;
 		showBottomNav?: boolean;
+		fullWidth?: boolean;
 		onback?: () => void;
 		logoUrl?: string | null;
 		actions?: Snippet;
@@ -130,7 +132,7 @@
 		</div>
 	</header>
 
-	<main class="max-w-lg md:max-w-7xl mx-auto px-4 md:px-6 py-6 {showBottomNav ? 'pb-28 md:pb-6' : ''}">
+	<main class="{fullWidth ? '' : 'max-w-lg md:max-w-7xl mx-auto px-4 md:px-6 py-6'} {showBottomNav ? 'pb-28 md:pb-6' : ''}">
 		{@render children()}
 	</main>
 	{#if showBottomNav}

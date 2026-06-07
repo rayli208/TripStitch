@@ -317,8 +317,9 @@
 					{#each filteredTrips as trip (trip.id)}
 						<TripCard
 							{trip}
+							onview={() => goto(`/trip/${trip.id}`)}
 							onedit={() => goto(`/trip/${trip.id}/edit`)}
-							onlinks={() => goto(`/trip/${trip.id}/edit`)}
+							onlinks={() => goto(`/trip/${trip.id}/links`)}
 							onshare={() => {
 								navigator.clipboard.writeText(getShareUrl(trip.id));
 								toast.success('Link copied!');

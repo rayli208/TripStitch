@@ -760,7 +760,7 @@
 						</li>
 						<li class="flex items-start gap-2.5 text-sm text-text-secondary">
 							<Check size={18} weight="bold" class="text-accent flex-shrink-0 mt-0.5" />
-							<span>Up to <strong>4K</strong> export resolution</span>
+							<span>Up to <strong>4K Ultra HD</strong> export — keep your 3K/4K camera footage razor-sharp instead of capped at 1080p</span>
 						</li>
 						<li class="flex items-start gap-2.5 text-sm text-text-secondary">
 							<PaintBrush size={18} weight="bold" class="text-accent flex-shrink-0 mt-0.5" />

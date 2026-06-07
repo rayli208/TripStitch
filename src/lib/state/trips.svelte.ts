@@ -103,6 +103,7 @@ function createTripsState() {
 						titleMediaFile: null,
 						titleMediaPreviewUrl: null,
 						titleMediaType: null,
+						coverImageUrl: data.coverImageUrl ?? null,
 						showLogoOnTitle: data.showLogoOnTitle ?? false,
 						fontId: data.fontId ?? 'inter',
 						mapStyle: data.mapStyle ?? 'streets',

@@ -7,7 +7,10 @@
 	import { parseAllVideoLinks } from '$lib/utils/videoEmbed';
 	import { fetchRouteGeometry } from '$lib/services/routeService';
 	import VideoEmbed from '$lib/components/ui/VideoEmbed.svelte';
+	import AppShell from '$lib/components/layout/AppShell.svelte';
+	import ShareFooter from '$lib/components/ShareFooter.svelte';
 	import authState from '$lib/state/auth.svelte';
+	import profileState from '$lib/state/profile.svelte';
 	import { Star, StarHalf, Car, PersonSimpleHike, Buildings, SunHorizon, Backpack, ForkKnife, Mountains, Leaf, Bank, Camera, CaretLeft, MapPin, ArrowRight, NavigationArrow, ShareNetwork, Check, Bicycle, FilePdf } from 'phosphor-svelte';
 	import type { Component } from 'svelte';
 
@@ -42,6 +45,10 @@
 
 	$effect(() => {
 		loadTrip();
+	});
+
+	$effect(() => {
+		if (authState.isSignedIn) profileState.load();
 	});
 
 	async function loadTrip() {
@@ -567,7 +574,35 @@
 		</div>
 	</div>
 {:else if trip}
-	<div class="grain min-h-screen bg-page">
+	{#snippet pageActions()}
+		<button
+			class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-border text-xs sm:text-sm font-bold bg-page hover:bg-accent-light hover:border-accent transition-all shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+			onclick={downloadPdf}
+			disabled={pdfGenerating}
+		>
+			{#if pdfGenerating}
+				<div class="w-3.5 h-3.5 border-2 border-accent/30 border-t-accent rounded-full animate-spin"></div>
+				<span class="hidden sm:inline">Saving...</span>
+			{:else}
+				<FilePdf size={14} weight="bold" class="text-accent" />
+				<span class="hidden sm:inline">PDF</span>
+			{/if}
+		</button>
+		<button
+			class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-border text-xs sm:text-sm font-bold bg-accent text-white hover:bg-accent-hover transition-all shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer"
+			onclick={shareTrip}
+		>
+			{#if linkCopied}
+				<Check size={14} weight="bold" />
+				<span class="hidden sm:inline">Copied!</span>
+			{:else}
+				<ShareNetwork size={14} weight="bold" />
+				<span class="hidden sm:inline">Share</span>
+			{/if}
+		</button>
+	{/snippet}
+
+	{#snippet tripBody(trip: SharedTrip)}
 		<!-- Grain filter -->
 		<svg class="hidden">
 			<filter id="grain-filter-trip">
@@ -575,72 +610,43 @@
 			</filter>
 		</svg>
 
-		<!-- Top bar -->
-		<div class="sticky top-0 z-30 border-b-3 border-border bg-page/95 backdrop-blur-sm">
-			<div class="max-w-6xl mx-auto px-6 sm:px-8 py-3 flex items-center justify-between gap-3">
-				<a href="/" class="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity">
-					{#if trip.userLogoUrl}
-						<img src={trip.userLogoUrl} alt="Logo" class="h-7 w-7 rounded-md object-contain border-2 border-border bg-page p-0.5" />
-					{:else}
-						<img src="/favicon-192.png" alt="" class="h-6" />
-					{/if}
-					<span class="hidden sm:inline text-sm font-extrabold tracking-tight"><span class="text-text-primary">Trip</span><span class="text-accent">Stitch</span></span>
-				</a>
-				<button
-					class="hidden sm:flex text-sm text-text-muted hover:text-text-primary transition-colors cursor-pointer items-center gap-1 font-medium"
-					onclick={() => { if (window.history.length > 1) history.back(); else window.location.href = '/'; }}
-				>
-					<CaretLeft size={16} weight="bold" />
-					Back
-				</button>
-				<div class="flex items-center gap-2 sm:gap-2 ml-auto">
-					<!-- Save button (sign-in CTA for guests, bookmark for users) -->
-					{#if !authState.isSignedIn}
+		{#if !authState.isSignedIn}
+			<!-- Guest top bar -->
+			<div class="sticky top-0 z-30 border-b-3 border-border bg-page/95 backdrop-blur-sm">
+				<div class="max-w-6xl mx-auto px-6 sm:px-8 py-3 flex items-center justify-between gap-3">
+					<a href="/" class="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity">
+						{#if trip.userLogoUrl}
+							<img src={trip.userLogoUrl} alt="Logo" class="h-7 w-7 rounded-md object-contain border-2 border-border bg-page p-0.5" />
+						{:else}
+							<img src="/favicon-192.png" alt="" class="h-6" />
+						{/if}
+						<span class="hidden sm:inline text-sm font-extrabold tracking-tight"><span class="text-text-primary">Trip</span><span class="text-accent">Stitch</span></span>
+					</a>
+					<button
+						class="hidden sm:flex text-sm text-text-muted hover:text-text-primary transition-colors cursor-pointer items-center gap-1 font-medium"
+						onclick={() => { if (window.history.length > 1) history.back(); else window.location.href = '/'; }}
+					>
+						<CaretLeft size={16} weight="bold" />
+						Back
+					</button>
+					<div class="flex items-center gap-2 sm:gap-2 ml-auto">
 						<a
 							href="/signin"
 							class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-border text-xs sm:text-sm font-bold bg-page hover:bg-accent-light hover:border-accent transition-all shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer"
 						>
 							Save
 						</a>
-					{/if}
-					<!-- PDF download -->
-					<button
-						class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-border text-xs sm:text-sm font-bold bg-page hover:bg-accent-light hover:border-accent transition-all shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-						onclick={downloadPdf}
-						disabled={pdfGenerating}
-					>
-						{#if pdfGenerating}
-							<div class="w-3.5 h-3.5 border-2 border-accent/30 border-t-accent rounded-full animate-spin"></div>
-							<span class="hidden sm:inline">Saving...</span>
-						{:else}
-							<FilePdf size={14} weight="bold" class="text-accent" />
-							<span class="hidden sm:inline">PDF</span>
-						{/if}
-					</button>
-					<!-- Share button -->
-					<button
-						class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-border text-xs sm:text-sm font-bold bg-accent text-white hover:bg-accent-hover transition-all shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer"
-						onclick={shareTrip}
-					>
-						{#if linkCopied}
-							<Check size={14} weight="bold" />
-							<span class="hidden sm:inline">Copied!</span>
-						{:else}
-							<ShareNetwork size={14} weight="bold" />
-							<span class="hidden sm:inline">Share</span>
-						{/if}
-					</button>
-					{#if !authState.isSignedIn}
+						{@render pageActions()}
 						<a
 							href="/signin"
 							class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold text-text-primary hover:text-accent transition-colors cursor-pointer"
 						>
 							Sign in
 						</a>
-					{/if}
+					</div>
 				</div>
 			</div>
-		</div>
+		{/if}
 
 		<!-- Hero -->
 		{#if trip.coverImageUrl}
@@ -962,16 +968,26 @@
 		{/if}
 
 		<!-- Footer -->
-		<footer class="border-t-3 border-border">
-			<div class="max-w-6xl mx-auto px-6 sm:px-8 py-6 flex items-center justify-between">
-				<a href="/" class="flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
-					<img src="/favicon-192.png" alt="" class="h-4" />
-					<span class="text-xs font-extrabold tracking-tight"><span class="text-text-primary">Trip</span><span class="text-accent">Stitch</span></span>
-				</a>
-				<p class="text-xs text-text-muted">
-					Made with <a href="/" class="text-accent hover:text-accent-hover font-bold">TripStitch</a>
-				</p>
+		<div class="max-w-6xl mx-auto px-6 sm:px-8 pb-10">
+			<ShareFooter
+				username={trip.username}
+				userDisplayName={trip.userDisplayName}
+				onshare={shareTrip}
+				shareLabel="Share this trip"
+				copied={linkCopied}
+			/>
+		</div>
+	{/snippet}
+
+	{#if authState.isSignedIn}
+		<AppShell fullWidth showBottomNav logoUrl={profileState.profile?.logoUrl} title={trip.title} actions={pageActions}>
+			<div class="grain bg-page">
+				{@render tripBody(trip)}
 			</div>
-		</footer>
-	</div>
+		</AppShell>
+	{:else}
+		<div class="grain min-h-screen bg-page">
+			{@render tripBody(trip)}
+		</div>
+	{/if}
 {/if}

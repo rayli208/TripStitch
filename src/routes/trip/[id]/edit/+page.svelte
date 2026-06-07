@@ -19,7 +19,7 @@
 	import ExportStep from '$lib/components/editor/ExportStep.svelte';
 	import AudioEditor from '$lib/components/editor/AudioEditor.svelte';
 	import ExportResult from '$lib/components/editor/ExportResult.svelte';
-	import { ImageSquare } from 'phosphor-svelte';
+	import { ImageSquare, SignOut } from 'phosphor-svelte';
 
 	const tripId = page.params.id!;
 
@@ -46,6 +46,8 @@
 	// Create editor and populate from saved trip once loaded
 	const editor = createEditorState();
 	let populated = $state(false);
+
+	const desktopSubtitle = $derived(`${editor.title || 'Untitled trip'} · editing`);
 
 	$effect(() => {
 		if (trip && !populated) {
@@ -218,6 +220,7 @@
 			titleMediaFile: editor.titleMediaFile,
 			titleMediaPreviewUrl: editor.titleMediaPreviewUrl,
 			titleMediaType: editor.titleMediaType,
+			coverImageUrl: trip?.coverImageUrl ?? null,
 			showLogoOnTitle: editor.showLogoOnTitle,
 			fontId: editor.fontId,
 			mapStyle: editor.mapStyle,
@@ -345,7 +348,23 @@
 	}
 </script>
 
-<AppShell title="Edit Trip" showBack onback={() => goto('/trips')} logoUrl={profileState.profile?.logoUrl}>
+<AppShell
+	title="Edit Trip"
+	showBottomNav
+	logoUrl={profileState.profile?.logoUrl}
+	subtitle={desktopSubtitle}
+>
+	{#snippet desktopActions()}
+		<button
+			class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-border bg-card text-text-primary text-sm font-medium hover:bg-accent-light transition-colors cursor-pointer shadow-[2px_2px_0_var(--color-border)]"
+			onclick={() => goto('/trips')}
+			disabled={isExporting}
+		>
+			<SignOut size={14} weight="bold" />
+			Exit
+		</button>
+	{/snippet}
+
 	{#if tripsState.loading || !populated}
 		<!-- Skeleton while trip loads -->
 		<div class="space-y-4 animate-pulse">

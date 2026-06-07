@@ -19,6 +19,12 @@
 		blog.visibility === 'public' ? 'Published' : blog.visibility === 'unlisted' ? 'Unlisted' : blog.visibility === 'private' ? 'Private' : 'Draft'
 	);
 
+	function handleView() {
+		if (blog.slug) {
+			goto(`/blog/${blog.slug}`);
+		}
+	}
+
 	function handleEdit() {
 		if (blog.slug) {
 			goto(`/blog/${blog.slug}/edit`);
@@ -49,8 +55,8 @@
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="relative w-full h-32 sm:h-36 cursor-pointer overflow-hidden"
-		onclick={handleEdit}
-		title="Edit {blog.title || 'Untitled'}"
+		onclick={handleView}
+		title="View {blog.title || 'Untitled'}"
 	>
 		{#if blog.coverImageUrl}
 			<img src={blog.coverImageUrl} alt="" class="absolute inset-0 w-full h-full object-cover" />

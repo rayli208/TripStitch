@@ -105,6 +105,7 @@ export interface Trip {
 	titleMediaFile: File | null;
 	titleMediaPreviewUrl: string | null;
 	titleMediaType: 'photo' | 'video' | null;
+	coverImageUrl: string | null;
 	showLogoOnTitle: boolean;
 	fontId: string;
 	mapStyle: MapStyle;

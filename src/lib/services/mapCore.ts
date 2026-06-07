@@ -19,7 +19,17 @@ interface ResolutionMap {
 	height: number;
 }
 
+// During an export the resolution is decided once (after probing device capability)
+// and pinned here, so every renderer that calls getResolution() agrees on the
+// dimensions. Cleared when the export finishes. Null = use the per-tier default.
+let activeExportResolution: ResolutionMap | null = null;
+
+export function setActiveExportResolution(res: ResolutionMap | null): void {
+	activeExportResolution = res;
+}
+
 export function getResolution(aspectRatio: AspectRatio, tier: UserTier = 'free'): ResolutionMap {
+	if (activeExportResolution) return activeExportResolution;
 	return getResolutionForTier(aspectRatio, tier);
 }
 

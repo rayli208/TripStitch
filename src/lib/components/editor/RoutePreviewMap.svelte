@@ -124,10 +124,20 @@
 		});
 	}
 
+	// Signature of only the inputs that affect what the map draws. The effect below
+	// still re-runs on every `locations` reassignment (e.g. editing a description
+	// replaces the array), but we rebuild the map only when this signature actually
+	// changes — otherwise typing a description would needlessly destroy/recreate the map.
+	let lastSig = '';
+
 	$effect(() => {
-		// Re-init whenever locations, style, or color change
-		const _deps = [locations.length, mapStyle, titleColor, locations.map(l => `${l.lat},${l.lng},${l.transportMode}`).join('|')];
-		void _deps;
+		const sig = JSON.stringify({
+			style: mapStyle,
+			color: titleColor,
+			points: locations.map((l) => [l.lat, l.lng, l.transportMode])
+		});
+		if (sig === lastSig) return;
+		lastSig = sig;
 		initMap();
 	});
 

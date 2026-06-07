@@ -221,6 +221,7 @@
 			titleMediaFile: editor.titleMediaFile,
 			titleMediaPreviewUrl: editor.titleMediaPreviewUrl,
 			titleMediaType: editor.titleMediaType,
+			coverImageUrl: null,
 			showLogoOnTitle: editor.showLogoOnTitle,
 			fontId: editor.fontId,
 			mapStyle: editor.mapStyle,

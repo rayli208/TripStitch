@@ -5,6 +5,7 @@
 	import { fetchUserTrips, getShareUrl } from '$lib/services/shareService';
 	import { fetchUserBlogs } from '$lib/services/blogService';
 	import BlogCard from '$lib/components/blog/BlogCard.svelte';
+	import AppShell from '$lib/components/layout/AppShell.svelte';
 	import TravelGlobe from '$lib/components/TravelGlobe.svelte';
 	import TravelMap from '$lib/components/TravelMap.svelte';
 	import { parseAllVideoLinks } from '$lib/utils/videoEmbed';
@@ -47,6 +48,10 @@
 
 	$effect(() => {
 		loadProfile();
+	});
+
+	$effect(() => {
+		if (authState.isSignedIn) profileState.load();
 	});
 
 	async function loadProfile() {
@@ -190,7 +195,7 @@
 		</div>
 	</div>
 {:else if profile}
-	<div class="grain min-h-screen bg-page">
+	{#snippet profileBody(profile: UserProfile)}
 		<!-- Grain filter -->
 		<svg class="hidden">
 			<filter id="grain-filter-profile">
@@ -198,22 +203,24 @@
 			</filter>
 		</svg>
 
-		<!-- Top bar -->
-		<div class="border-b-3 border-border bg-page">
-			<div class="max-w-3xl mx-auto px-6 sm:px-8 py-4 flex items-center justify-between">
-				<button
-					class="text-sm text-text-muted hover:text-text-primary transition-colors cursor-pointer flex items-center gap-1 font-medium"
-					onclick={() => { if (window.history.length > 1) history.back(); else window.location.href = '/'; }}
-				>
-					<CaretLeft size={16} weight="bold" />
-					Back
-				</button>
-				<a href="/" class="flex items-center gap-1.5 opacity-70 hover:opacity-100 transition-opacity">
-					<img src="/favicon-192.png" alt="" class="h-5" />
-					<span class="text-sm font-extrabold tracking-tight"><span class="text-text-primary">Trip</span><span class="text-accent">Stitch</span></span>
-				</a>
+		{#if !authState.isSignedIn}
+			<!-- Guest top bar -->
+			<div class="border-b-3 border-border bg-page">
+				<div class="max-w-3xl mx-auto px-6 sm:px-8 py-4 flex items-center justify-between">
+					<button
+						class="text-sm text-text-muted hover:text-text-primary transition-colors cursor-pointer flex items-center gap-1 font-medium"
+						onclick={() => { if (window.history.length > 1) history.back(); else window.location.href = '/'; }}
+					>
+						<CaretLeft size={16} weight="bold" />
+						Back
+					</button>
+					<a href="/" class="flex items-center gap-1.5 opacity-70 hover:opacity-100 transition-opacity">
+						<img src="/favicon-192.png" alt="" class="h-5" />
+						<span class="text-sm font-extrabold tracking-tight"><span class="text-text-primary">Trip</span><span class="text-accent">Stitch</span></span>
+					</a>
+				</div>
 			</div>
-		</div>
+		{/if}
 
 		<!-- Profile header card -->
 		<div class="max-w-3xl mx-auto px-6 sm:px-8 pt-8 {ready ? 'animate-fade-up fill-both' : 'opacity-0'}">
@@ -472,5 +479,17 @@
 				</p>
 			</div>
 		</footer>
-	</div>
+	{/snippet}
+
+	{#if authState.isSignedIn}
+		<AppShell fullWidth showBottomNav logoUrl={profileState.profile?.logoUrl} title="@{profile.username}">
+			<div class="grain bg-page">
+				{@render profileBody(profile)}
+			</div>
+		</AppShell>
+	{:else}
+		<div class="grain min-h-screen bg-page">
+			{@render profileBody(profile)}
+		</div>
+	{/if}
 {/if}

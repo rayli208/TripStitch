@@ -41,6 +41,14 @@ export function parseYouTubeUrl(url: string): ParsedVideo | null {
 				videoId = embedMatch[1];
 			}
 		}
+
+		// youtube.com/live/ID (live streams / premieres)
+		if (!videoId) {
+			const liveMatch = u.pathname.match(/\/live\/([a-zA-Z0-9_-]+)/);
+			if (liveMatch) {
+				videoId = liveMatch[1];
+			}
+		}
 	} catch {
 		return null;
 	}
@@ -59,14 +67,17 @@ export function parseYouTubeUrl(url: string): ParsedVideo | null {
 export function parseInstagramUrl(url: string): ParsedVideo | null {
 	try {
 		const u = new URL(url);
-		// instagram.com/reel/ID/ or instagram.com/p/ID/
-		const match = u.pathname.match(/\/(reel|p)\/([a-zA-Z0-9_-]+)/);
+		// instagram.com/reel/ID/, /reels/ID/, /tv/ID/, or /p/ID/
+		const match = u.pathname.match(/\/(reels?|tv|p)\/([a-zA-Z0-9_-]+)/);
 		if (!match) return null;
+
+		// Normalize: /reels/ID and /tv/ID embed via /reel/ID and /p/ID respectively
+		const type = match[1] === 'reels' ? 'reel' : match[1] === 'tv' ? 'p' : match[1];
 
 		return {
 			platform: 'instagram',
 			videoId: match[2],
-			embedUrl: `https://www.instagram.com/${match[1]}/${match[2]}/embed/`,
+			embedUrl: `https://www.instagram.com/${type}/${match[2]}/embed/`,
 			originalUrl: url,
 			isVertical: true
 		};
@@ -78,8 +89,10 @@ export function parseInstagramUrl(url: string): ParsedVideo | null {
 export function parseTikTokUrl(url: string): ParsedVideo | null {
 	try {
 		const u = new URL(url);
-		// tiktok.com/@user/video/ID
-		const match = u.pathname.match(/\/video\/(\d+)/);
+		// tiktok.com/@user/video/ID, /@user/photo/ID, or m.tiktok.com/v/ID.html
+		// NOTE: short links (vm./vt.tiktok.com/XXXX, /t/XXXX) are redirects with no
+		// numeric ID, so they can't be resolved client-side and aren't supported here.
+		const match = u.pathname.match(/\/(?:video|photo|v)\/(\d+)/);
 		if (!match) return null;
 
 		return {

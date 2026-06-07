@@ -5,8 +5,11 @@
 	import type { SharedBlog } from '$lib/types';
 	import BlogContentRenderer from '$lib/components/blog/BlogContentRenderer.svelte';
 	import Spinner from '$lib/components/ui/Spinner.svelte';
+	import AppShell from '$lib/components/layout/AppShell.svelte';
+	import ShareFooter from '$lib/components/ShareFooter.svelte';
 	import authState from '$lib/state/auth.svelte';
-	import { ShareNetwork, Clock, MapPin, CalendarBlank, Plus, Eye, ArrowRight, Check } from 'phosphor-svelte';
+	import profileState from '$lib/state/profile.svelte';
+	import { ShareNetwork, Clock, MapPin, CalendarBlank, Plus, Eye, Check } from 'phosphor-svelte';
 
 	const slug = page.params.slug!;
 	let blog = $state<SharedBlog | null>(null);
@@ -15,6 +18,10 @@
 
 	$effect(() => {
 		loadBlog();
+	});
+
+	$effect(() => {
+		if (authState.isSignedIn) profileState.load();
 	});
 
 	async function loadBlog() {
@@ -88,39 +95,45 @@
 		<Spinner size="lg" />
 	</div>
 {:else if blog}
-	<div class="min-h-screen bg-page">
-		<!-- ═══════════ Top bar ═══════════ -->
-		<div class="sticky top-0 z-30 border-b-2 border-border bg-page/95 backdrop-blur-sm">
-			<div class="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-				<a href="/" class="flex items-center gap-1.5 shrink-0 hover:opacity-80 transition-opacity">
-					<img src="/favicon-192.png" alt="" class="h-5" />
-					<span class="hidden sm:inline text-sm font-extrabold tracking-tight"><span class="text-text-primary">Trip</span><span class="text-accent">Stitch</span></span>
-				</a>
-				<div class="flex items-center gap-2 ml-auto">
-					<button
-						type="button"
-						class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-bold border-2 border-border rounded-lg bg-page hover:bg-accent-light hover:border-accent transition-all shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer"
-						onclick={share}
-					>
-						{#if linkCopied}
-							<Check size={14} weight="bold" class="text-success" />
-							<span class="hidden sm:inline">Copied!</span>
-						{:else}
-							<ShareNetwork size={14} weight="bold" />
-							<span class="hidden sm:inline">Share</span>
-						{/if}
-					</button>
-					<a
-						href="/create"
-						class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-bold border-2 border-border rounded-lg bg-accent text-white hover:bg-accent-hover transition-all shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer"
-					>
-						<span class="hidden sm:inline">Start your own</span>
-						<span class="sm:hidden">Start</span>
-						<Plus size={14} weight="bold" />
+	{#snippet shareButton()}
+		<button
+			type="button"
+			class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-bold border-2 border-border rounded-lg bg-page hover:bg-accent-light hover:border-accent transition-all shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer"
+			onclick={share}
+		>
+			{#if linkCopied}
+				<Check size={14} weight="bold" class="text-success" />
+				<span class="hidden sm:inline">Copied!</span>
+			{:else}
+				<ShareNetwork size={14} weight="bold" />
+				<span class="hidden sm:inline">Share</span>
+			{/if}
+		</button>
+	{/snippet}
+
+	{#snippet blogBody(blog: SharedBlog)}
+		{#if !authState.isSignedIn}
+			<!-- Guest top bar -->
+			<div class="sticky top-0 z-30 border-b-2 border-border bg-page/95 backdrop-blur-sm">
+				<div class="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+					<a href="/" class="flex items-center gap-1.5 shrink-0 hover:opacity-80 transition-opacity">
+						<img src="/favicon-192.png" alt="" class="h-5" />
+						<span class="hidden sm:inline text-sm font-extrabold tracking-tight"><span class="text-text-primary">Trip</span><span class="text-accent">Stitch</span></span>
 					</a>
+					<div class="flex items-center gap-2 ml-auto">
+						{@render shareButton()}
+						<a
+							href="/create"
+							class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-bold border-2 border-border rounded-lg bg-accent text-white hover:bg-accent-hover transition-all shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer"
+						>
+							<span class="hidden sm:inline">Start your own</span>
+							<span class="sm:hidden">Start</span>
+							<Plus size={14} weight="bold" />
+						</a>
+					</div>
 				</div>
 			</div>
-		</div>
+		{/if}
 
 		<!-- ═══════════ Article ═══════════ -->
 		<article class="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
@@ -237,30 +250,27 @@
 			</div>
 
 			<!-- ═══════════ Footer ═══════════ -->
-			<footer class="mt-12 pt-6 border-t-2 border-border space-y-4">
-				<p class="text-center text-sm text-text-muted">
-					Made with <a href="/" class="font-extrabold text-accent hover:underline">TripStitch</a>
-				</p>
-				<div class="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:justify-center">
-					<button
-						type="button"
-						class="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-bold rounded-lg border-2 border-border bg-card hover:bg-accent-light transition-colors cursor-pointer shadow-[2px_2px_0_var(--color-border)]"
-						onclick={share}
-					>
-						<ShareNetwork size={14} weight="bold" />
-						Share this post
-					</button>
-					<a
-						href="/u/{blog.username}"
-						class="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-bold rounded-lg border-2 border-border bg-accent text-white shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
-					>
-						View {blog.userDisplayName}'s profile
-						<ArrowRight size={14} weight="bold" />
-					</a>
-				</div>
-			</footer>
+			<ShareFooter
+				username={blog.username}
+				userDisplayName={blog.userDisplayName}
+				onshare={share}
+				shareLabel="Share this post"
+				copied={linkCopied}
+			/>
 		</article>
-	</div>
+	{/snippet}
+
+	{#if authState.isSignedIn}
+		<AppShell fullWidth showBottomNav logoUrl={profileState.profile?.logoUrl} title={blog.title} actions={shareButton}>
+			<div class="bg-page">
+				{@render blogBody(blog)}
+			</div>
+		</AppShell>
+	{:else}
+		<div class="min-h-screen bg-page">
+			{@render blogBody(blog)}
+		</div>
+	{/if}
 {/if}
 
 <style>

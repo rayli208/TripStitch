@@ -1,20 +1,33 @@
 <script lang="ts">
 	import type { Trip } from '$lib/types';
-	import { MapPin, PencilSimple, ShareNetwork, Trash } from 'phosphor-svelte';
+	import { MapPin, PencilSimple, ShareNetwork, Trash, YoutubeLogo, InstagramLogo, TiktokLogo, Plus } from 'phosphor-svelte';
+	import { getVideoUrl, parseVideoUrl } from '$lib/utils/videoEmbed';
 
 	let {
 		trip,
+		onview,
 		onedit,
 		onlinks,
 		ondelete,
 		onshare
 	}: {
 		trip: Trip;
+		onview: () => void;
 		onedit: () => void;
 		onlinks: () => void;
 		ondelete: () => void;
 		onshare?: () => void;
 	} = $props();
+
+	// ── Social video link status (YouTube / Instagram / TikTok) ──
+	const videoUrl = $derived(getVideoUrl(trip.videoLinks));
+	const linkPlatform = $derived(videoUrl ? parseVideoUrl(videoUrl)?.platform ?? null : null);
+	const platformIcon = $derived(
+		linkPlatform === 'youtube' ? YoutubeLogo : linkPlatform === 'instagram' ? InstagramLogo : linkPlatform === 'tiktok' ? TiktokLogo : null
+	);
+	const platformLabel = $derived(
+		linkPlatform === 'youtube' ? 'YouTube' : linkPlatform === 'instagram' ? 'Instagram' : linkPlatform === 'tiktok' ? 'TikTok' : ''
+	);
 
 	let confirmingDelete = $state(false);
 
@@ -32,6 +45,8 @@
 	);
 
 	const firstCity = $derived(trip.locations[0]?.city ?? trip.locations[0]?.name?.split(',')[0] ?? '');
+
+	const coverUrl = $derived(trip.coverImageUrl ?? trip.titleMediaPreviewUrl);
 
 	// ── "Cartoon route" — project the trip's actual lat/lng onto the cover area
 	// so the card silhouette reads like a simplified map of the real trip ──
@@ -97,13 +112,13 @@
 	<div
 		class="relative w-full h-32 sm:h-36 cursor-pointer overflow-hidden"
 		style="background: linear-gradient(135deg, {trip.titleColor}30 0%, {trip.titleColor}60 100%); border-bottom: 2px solid var(--color-border);"
-		onclick={onedit}
-		title="Edit {trip.title || 'Untitled trip'}"
+		onclick={onview}
+		title="View {trip.title || 'Untitled trip'}"
 	>
 		<!-- Cover image (if uploaded) -->
-		{#if trip.titleMediaPreviewUrl}
+		{#if coverUrl}
 			<img
-				src={trip.titleMediaPreviewUrl}
+				src={coverUrl}
 				alt=""
 				class="absolute inset-0 w-full h-full object-cover"
 			/>
@@ -111,7 +126,7 @@
 		{/if}
 
 		<!-- Cartoony route — pins positioned by real lat/lng with a dashed treasure-map path -->
-		{#if !trip.titleMediaPreviewUrl && routePoints.length > 0}
+		{#if !coverUrl && routePoints.length > 0}
 			<svg
 				class="absolute inset-0 w-full h-full"
 				viewBox="0 0 {VIEW_W} {VIEW_H}"
@@ -161,6 +176,30 @@
 		>
 			{statusLabel}
 		</span>
+
+		<!-- Video link badge (top-right) — shows linked platform, or prompts to add one -->
+		{#if linkPlatform && platformIcon}
+			{@const PlatformIcon = platformIcon}
+			<button
+				type="button"
+				class="absolute top-3 right-3 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider border-2 border-border bg-card text-text-primary shadow-[1px_1px_0_var(--color-border)] hover:bg-accent-light transition-colors cursor-pointer"
+				onclick={(e) => { e.stopPropagation(); onlinks(); }}
+				title="Edit {platformLabel} link"
+			>
+				<PlatformIcon size={11} weight="fill" class="text-accent" />
+				{platformLabel}
+			</button>
+		{:else}
+			<button
+				type="button"
+				class="absolute top-3 right-3 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider border-2 border-dashed border-border bg-card/80 text-text-muted hover:text-text-primary hover:border-accent transition-colors cursor-pointer"
+				onclick={(e) => { e.stopPropagation(); onlinks(); }}
+				title="Add a YouTube, Instagram, or TikTok link"
+			>
+				<Plus size={10} weight="bold" />
+				Add link
+			</button>
+		{/if}
 	</div>
 
 	<!-- Body -->

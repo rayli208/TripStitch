@@ -82,6 +82,10 @@
 
 			<ul class="space-y-2.5 mb-6">
 				<li class="flex items-start gap-2.5 text-sm text-text-secondary">
+					<Check size={16} weight="bold" class="text-accent flex-shrink-0 mt-0.5" />
+					<span>Up to <strong>4K Ultra HD</strong> export — keep your 3K/4K footage sharp (Free is capped at 1080p)</span>
+				</li>
+				<li class="flex items-start gap-2.5 text-sm text-text-secondary">
 					<Article size={16} weight="bold" class="text-accent flex-shrink-0 mt-0.5" />
 					<span><strong>Travel blogs</strong> with embedded locations and routes</span>
 				</li>

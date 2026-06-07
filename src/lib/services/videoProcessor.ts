@@ -725,6 +725,16 @@ export async function playVideoAccelerated(
 
 	console.log(`[VideoProcessor] playVideoAccelerated: ${file.name}, duration=${duration.toFixed(1)}s (${trimStartSec.toFixed(1)}s-${endTime.toFixed(1)}s), rate=${playbackRate}x, readyState=${video.readyState}`);
 
+	// Source-vs-output analysis — shows whether this clip's native resolution is being
+	// down-scaled (full detail kept) or up-scaled (output bigger than the source, so no
+	// extra detail beyond the source). Useful for judging the 4K export benefit per clip.
+	const srcW = video.videoWidth, srcH = video.videoHeight;
+	const hasDetail = srcW >= w && srcH >= h;
+	const relation = hasDetail
+		? `down-scale ×${(h / srcH).toFixed(2)} — source ≥ output, full detail retained`
+		: `UP-SCALE — output ${w}x${h} exceeds source ${srcW}x${srcH}; no extra detail beyond source`;
+	console.log(`[VideoProcessor] 🎬 Clip resolution: source ${srcW}x${srcH} → output ${w}x${h} | ${relation}`);
+
 	if (trimStartSec > 0) {
 		video.currentTime = trimStartSec;
 		await new Promise<void>((resolve) => { video.onseeked = () => resolve(); });

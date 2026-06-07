@@ -1,3 +1,5 @@
+import { avcCodecForResolution, bitrateForResolution } from '$lib/constants/limits';
+
 export interface BrowserSupport {
 	canExport: boolean;
 	method: 'mediarecorder' | 'webcodecs';
@@ -66,10 +68,10 @@ export async function canUseWebCodecs(w: number, h: number): Promise<boolean> {
 	console.log(`[WebCodecs] Checking support: ${w}x${h}, isApple=${isApple}, vendor=${navigator.vendor}`);
 	try {
 		const config = {
-			codec: 'avc1.4d0028',
+			codec: avcCodecForResolution(w, h),
 			width: w,
 			height: h,
-			bitrate: 5_000_000,
+			bitrate: bitrateForResolution(w, h),
 			framerate: 30,
 			avc: { format: 'avc' as const }
 		};

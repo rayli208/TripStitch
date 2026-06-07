@@ -1,4 +1,66 @@
 import { getSupportedMimeType } from '$lib/utils/browserCompat';
+import { bitrateForResolution } from '$lib/constants/limits';
+import { canRemuxAudio, getVideoTrack, remuxVideoWithAudio } from './audioRemux';
+
+interface OfflineMixOpts {
+	voiceOverBuffer: AudioBuffer | null;
+	originalBuffer: AudioBuffer | null;
+	musicBuffer: AudioBuffer | null;
+	voiceOverGain: number;
+	originalGain: number;
+	musicGain: number;
+	musicStartOffset: number;
+	videoDuration: number;
+}
+
+/** Render the mixed audio (voice-over + original + music, with gains/offset/fade) to a
+ *  single AudioBuffer offline — faster than real time and deterministic. Mirrors the
+ *  live mixing graph used by the MediaRecorder path exactly. */
+async function renderMixedAudioOffline(opts: OfflineMixOpts): Promise<AudioBuffer> {
+	const { voiceOverBuffer, originalBuffer, musicBuffer, videoDuration } = opts;
+	const sampleRate = 48000;
+	const length = Math.max(1, Math.ceil(videoDuration * sampleRate));
+	const ctx = new OfflineAudioContext(2, length, sampleRate);
+
+	if (voiceOverBuffer) {
+		const s = ctx.createBufferSource();
+		s.buffer = voiceOverBuffer;
+		const g = ctx.createGain();
+		g.gain.value = opts.voiceOverGain;
+		s.connect(g).connect(ctx.destination);
+		s.start();
+	}
+	if (originalBuffer) {
+		const s = ctx.createBufferSource();
+		s.buffer = originalBuffer;
+		const g = ctx.createGain();
+		g.gain.value = opts.originalGain;
+		s.connect(g).connect(ctx.destination);
+		s.start();
+	}
+	if (musicBuffer) {
+		const s = ctx.createBufferSource();
+		s.buffer = musicBuffer;
+		const remaining = musicBuffer.duration - opts.musicStartOffset;
+		if (remaining < videoDuration) {
+			s.loop = true;
+			s.loopStart = 0;
+			s.loopEnd = musicBuffer.duration;
+		}
+		const g = ctx.createGain();
+		// Hold the chosen music gain from the start — without this initial value the
+		// GainNode defaults to 1.0 (full volume) until the fade-out, making music far
+		// louder than the preview. Then schedule the 3s fade-out before the end.
+		g.gain.value = opts.musicGain;
+		const fadeStart = Math.max(0, videoDuration - 3);
+		g.gain.setValueAtTime(opts.musicGain, fadeStart);
+		g.gain.linearRampToValueAtTime(0, videoDuration);
+		s.connect(g).connect(ctx.destination);
+		s.start(0, opts.musicStartOffset);
+	}
+
+	return await ctx.startRendering();
+}
 
 /** Check if the browser supports voice-over recording and merging */
 export function canRecordVoiceOver(): boolean {
@@ -314,6 +376,46 @@ export async function mergeVoiceOver(
 		}
 	}
 
+	// ── Fast path: lossless remux (no video re-encode) ──
+	// If the WebCodecs pipeline retained this video's raw track and the browser can
+	// AAC-encode, mux the mixed audio in without re-encoding the video — preserves full
+	// quality (critical for 4K). Any failure falls through to the MediaRecorder path.
+	if (canRemuxAudio(videoBlob)) {
+		try {
+			const track = getVideoTrack(videoBlob)!;
+			const remuxDuration = track.chunks.length / track.fps;
+			console.log(`[AudioMerge] ▶ Lossless remux path (video ${track.width}x${track.height}, ${remuxDuration.toFixed(1)}s)`);
+			onProgress?.(25, 'Mixing audio (lossless)...');
+			const mixed = await renderMixedAudioOffline({
+				voiceOverBuffer,
+				originalBuffer,
+				musicBuffer,
+				voiceOverGain: voiceOverGain ?? 1.0,
+				originalGain: originalGain ?? 0.2,
+				musicGain: musicGain ?? 0.7,
+				musicStartOffset: musicStartOffset ?? 0,
+				videoDuration: remuxDuration
+			});
+			onProgress?.(70, 'Writing MP4...');
+			const blob = await remuxVideoWithAudio(videoBlob, mixed);
+			await audioCtx.close();
+			const url = URL.createObjectURL(blob);
+			const totalTime = ((performance.now() - mergeStart) / 1000).toFixed(1);
+			onProgress?.(100, 'Done!');
+			console.log('[AudioMerge] ═══════════════════════════════════════════════════════');
+			console.log('[AudioMerge] MERGE COMPLETE (lossless remux — video NOT re-encoded)');
+			console.log(`[AudioMerge]   Total wall time: ${totalTime}s`);
+			console.log(`[AudioMerge]   Input video: ${(videoBlob.size / 1024 / 1024).toFixed(1)}MB`);
+			console.log(`[AudioMerge]   Output: ${(blob.size / 1024 / 1024).toFixed(1)}MB`);
+			console.log(`[AudioMerge]   Tracks mixed: ${[voiceOverBuffer && 'voiceover', originalBuffer && 'original', musicBuffer && 'music'].filter(Boolean).join(', ') || 'none'}`);
+			console.log('[AudioMerge] ═══════════════════════════════════════════════════════');
+			return { blob, url };
+		} catch (err) {
+			console.warn('[AudioMerge] Lossless remux failed — falling back to re-encode merge:', err);
+			// fall through to the MediaRecorder path below
+		}
+	}
+
 	onProgress?.(15, 'Setting up video playback...');
 	const video = document.createElement('video');
 	const videoUrl = URL.createObjectURL(videoBlob);
@@ -417,8 +519,12 @@ export async function mergeVoiceOver(
 
 	const mimeType = getSupportedMimeType();
 	console.log(`[AudioMerge] Combined stream: ${combinedStream.getTracks().length} tracks (video: ${videoTrack?.readyState ?? 'none'}, audio: ${audioTrack?.readyState ?? 'none'})`);
-	const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: 5_000_000 });
-	console.log(`[AudioMerge] Merge recorder created: mimeType=${recorder.mimeType}`);
+	// This step re-encodes the video to mux in audio. Scale the bitrate to the actual
+	// resolution — otherwise a 4K export would be re-compressed down to 5 Mbps here,
+	// throwing away all the quality the high-res encode produced.
+	const mergeBitrate = bitrateForResolution(video.videoWidth || 1920, video.videoHeight || 1080);
+	const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: mergeBitrate });
+	console.log(`[AudioMerge] Merge recorder created: mimeType=${recorder.mimeType}, videoBitrate=${(mergeBitrate / 1_000_000).toFixed(1)}Mbps (for ${video.videoWidth}x${video.videoHeight})`);
 	const chunks: Blob[] = [];
 	recorder.ondataavailable = (e) => {
 		if (e.data.size > 0) chunks.push(e.data);
