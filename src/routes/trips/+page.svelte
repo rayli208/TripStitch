@@ -14,6 +14,7 @@
 	import TravelGlobe from '$lib/components/TravelGlobe.svelte';
 	import TravelMap from '$lib/components/TravelMap.svelte';
 	import { MagnifyingGlass, Plus, GlobeHemisphereWest, Crown, ShareNetwork, CaretDown } from 'phosphor-svelte';
+	import type { Trip } from '$lib/types';
 
 	type TripFilter = 'all' | 'published' | 'drafts' | 'blogs';
 	type SortKey = 'recent' | 'oldest' | 'title';
@@ -50,9 +51,11 @@
 		};
 	});
 
-	// Derived counts
-	const publishedTripCount = $derived(tripsState.trips.filter(t => t.visibility === 'public').length);
-	const draftTripCount = $derived(tripsState.trips.filter(t => t.visibility !== 'public').length);
+	// Published = made it through every step (not a draft) AND set to public. Everything else —
+	// unfinished drafts, or finished-but-unlisted/private trips — lives under "Drafts".
+	const isPublishedTrip = (t: Trip) => t.visibility === 'public' && !t.draft;
+	const publishedTripCount = $derived(tripsState.trips.filter(isPublishedTrip).length);
+	const draftTripCount = $derived(tripsState.trips.filter(t => !isPublishedTrip(t)).length);
 	const totalCountries = $derived.by(() => {
 		const countries = new Set<string>();
 		for (const t of tripsState.trips) {
@@ -65,8 +68,8 @@
 	// Filter + sort
 	const filteredTrips = $derived.by(() => {
 		let trips = [...tripsState.trips];
-		if (activeFilter === 'published') trips = trips.filter(t => t.visibility === 'public');
-		else if (activeFilter === 'drafts') trips = trips.filter(t => t.visibility !== 'public');
+		if (activeFilter === 'published') trips = trips.filter(isPublishedTrip);
+		else if (activeFilter === 'drafts') trips = trips.filter(t => !isPublishedTrip(t));
 		const q = searchQuery.trim().toLowerCase();
 		if (q) trips = trips.filter(t => t.title.toLowerCase().includes(q));
 		if (sortBy === 'recent') trips.sort((a, b) => b.createdAt.localeCompare(a.createdAt));

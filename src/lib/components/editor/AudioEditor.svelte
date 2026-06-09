@@ -7,8 +7,13 @@
 		mergeVoiceOver,
 		createAudioRecorder,
 		createWaveformRenderer,
+		createOriginalAudioPreview,
+		createMusicPreview,
 		type AudioRecorderHandle,
-		type WaveformRenderer
+		type WaveformRenderer,
+		type OriginalAudioGroup,
+		type OriginalAudioPreview,
+		type MusicPreview
 	} from '$lib/services/voiceOverService';
 	import MusicPicker from './MusicPicker.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -22,6 +27,7 @@
 		musicSelection = $bindable<MusicSelection | null>(null),
 		musicVolume = $bindable(70),
 		keepOriginalAudio = $bindable(true),
+		originalVolume = $bindable(100),
 		voiceOverVolume = $bindable(100),
 		title = 'Edit Audio',
 		applyLabel = 'Apply Audio & Save',
@@ -37,6 +43,7 @@
 		musicSelection?: MusicSelection | null;
 		musicVolume?: number;
 		keepOriginalAudio?: boolean;
+		originalVolume?: number;
 		voiceOverVolume?: number;
 		title?: string;
 		applyLabel?: string;
@@ -55,6 +62,9 @@
 	let voiceOverBlob = $state<Blob | null>(null);
 	let voiceOverUrl = $state<string | null>(null);
 	const hasAnyAudio = $derived(!!musicBlob || !!voiceOverBlob);
+	// Whether there's anything to bake into the video: music, voice-over, or the clips' own
+	// original sound. Without this, an "original audio only" export would have no Apply button.
+	const hasApplicableAudio = $derived(hasAnyAudio || (keepOriginalAudio && hasVideoWithAudio));
 
 	// Inline voice recording state
 	type RecordingPhase = 'idle' | 'countdown' | 'recording';
@@ -75,6 +85,13 @@
 		clip: '#A855F7',
 		route: '#22C55E'
 	};
+	// Short human labels for the segment "kind" (the segment's own label is the place name).
+	const SEGMENT_KIND: Record<string, string> = {
+		title: 'Intro',
+		map: 'Map transition',
+		clip: 'Your clip',
+		route: 'Route recap'
+	};
 
 	let recCurrentTime = $state(0);
 	let recDuration = $state(0);
@@ -86,11 +103,24 @@
 			: 0
 	);
 
-	let activeSegment = $derived.by(() => {
-		if (!videoSegments.length || !recDuration) return null;
+	// Map real recording time → assembly-timeline seconds (the two are ~equal but not exact).
+	let recScale = $derived(segEstimatedDuration > 0 && recDuration > 0 ? recDuration / segEstimatedDuration : 1);
+
+	let activeIndex = $derived.by(() => {
+		if (!videoSegments.length || !recDuration) return -1;
 		const scaledTime = (recCurrentTime / recDuration) * segEstimatedDuration;
-		return videoSegments.find(s => scaledTime >= s.startSec && scaledTime < s.startSec + s.durationSec) ?? null;
+		return videoSegments.findIndex(s => scaledTime >= s.startSec && scaledTime < s.startSec + s.durationSec);
 	});
+	let activeSegment = $derived(activeIndex >= 0 ? videoSegments[activeIndex] : null);
+	let nextSegment = $derived(activeIndex >= 0 && activeIndex < videoSegments.length - 1 ? videoSegments[activeIndex + 1] : null);
+
+	// Real seconds until the next segment begins (for the countdown / "get ready" cue).
+	let secondsUntilNext = $derived.by(() => {
+		if (!nextSegment) return null;
+		return Math.max(0, nextSegment.startSec * recScale - recCurrentTime);
+	});
+	// True in the final moments before a transition — drives the urgent countdown UI.
+	let transitionImminent = $derived(secondsUntilNext != null && secondsUntilNext <= 3);
 
 	let recProgressPct = $derived(recDuration > 0 ? (recCurrentTime / recDuration) * 100 : 0);
 
@@ -105,9 +135,8 @@
 	let mergePercent = $state(0);
 	let mergeMsg = $state('');
 
-	// Video + music playback elements
+	// Video + voice-over playback elements (music is handled via Web Audio, below)
 	let videoEl: HTMLVideoElement | undefined = $state();
-	let musicAudioEl: HTMLAudioElement | undefined = $state();
 	let voPreviewAudioEl: HTMLAudioElement | undefined = $state();
 	let videoDuration = $state(0);
 
@@ -123,53 +152,64 @@
 		return () => vid.removeEventListener('loadedmetadata', handleMeta);
 	});
 
-	// Sync music playback with video
+	// ─── Music live preview (Web Audio) ─────────────────────────
+	// Music plays through a real gain node (instant, reliable volume) and a natively-looping
+	// buffer source (a short song seamlessly fills a long video) — mirroring the export mixer.
+	// Rebuilt only when the track or its start offset changes; volume is a cheap gain tweak.
+	let musicPreview = $state<MusicPreview | null>(null);
+
+	// Rebuild only when the track changes (NOT on offset/volume — those are cheap live tweaks,
+	// handled by the effects below, so dragging the scrubber/slider doesn't re-decode the song).
 	$effect(() => {
-		if (!videoEl || !musicAudioEl || !musicBlob) return;
-		const vid = videoEl;
-		const mus = musicAudioEl;
-		const offset = musicStartOffset;
-
-		function syncTime() {
-			mus.currentTime = offset + vid.currentTime;
-		}
-		function handlePlay() {
-			syncTime();
-			// Expected: autoplay restrictions may prevent playback
-			mus.play().catch(() => {});
-		}
-		function handlePause() { mus.pause(); }
-		function handleSeeked() { syncTime(); }
-		function handleTimeUpdate() {
-			if (mus.ended || mus.currentTime >= mus.duration) {
-				mus.currentTime = 0;
-				// Expected: autoplay restrictions may prevent playback
-				if (!vid.paused) mus.play().catch(() => {});
-			}
-		}
-
-		vid.addEventListener('play', handlePlay);
-		vid.addEventListener('pause', handlePause);
-		vid.addEventListener('seeked', handleSeeked);
-		mus.addEventListener('timeupdate', handleTimeUpdate);
+		if (!musicBlob) return;
+		let disposed = false;
+		let preview: MusicPreview | null = null;
+		// Start muted; the volume effect sets the real level.
+		createMusicPreview(musicBlob, 0, 0).then((p) => {
+			if (disposed || !p) { p?.dispose(); return; }
+			preview = p;
+			musicPreview = p;
+			if (videoEl && !videoEl.paused) p.play(videoEl.currentTime);
+		});
 		return () => {
-			vid.removeEventListener('play', handlePlay);
-			vid.removeEventListener('pause', handlePause);
-			vid.removeEventListener('seeked', handleSeeked);
-			mus.removeEventListener('timeupdate', handleTimeUpdate);
-			mus.pause();
+			disposed = true;
+			preview?.dispose();
+			if (musicPreview === preview) musicPreview = null;
 		};
 	});
 
-	// Keep music volume in sync — mute during voice recording
+	// Apply the song start offset live (cheap reschedule, no re-decode).
 	$effect(() => {
-		if (!musicAudioEl) return;
-		if (recordingPhase !== 'idle') {
-			musicAudioEl.volume = 0;
-			musicAudioEl.pause();
-		} else {
-			musicAudioEl.volume = musicVolume / 100;
-		}
+		if (!musicPreview) return;
+		musicPreview.setOffset(musicStartOffset, videoEl?.currentTime ?? 0, !!videoEl && !videoEl.paused);
+	});
+
+	// Sync music to the video's play/pause/seek.
+	$effect(() => {
+		if (!videoEl || !musicPreview) return;
+		const vid = videoEl;
+		const p = musicPreview;
+		const onPlay = () => p.play(vid.currentTime);
+		const onPause = () => p.pause();
+		const onSeeked = () => p.seek(vid.currentTime, !vid.paused);
+		const onEnded = () => p.pause();
+		vid.addEventListener('play', onPlay);
+		vid.addEventListener('pause', onPause);
+		vid.addEventListener('seeked', onSeeked);
+		vid.addEventListener('ended', onEnded);
+		return () => {
+			vid.removeEventListener('play', onPlay);
+			vid.removeEventListener('pause', onPause);
+			vid.removeEventListener('seeked', onSeeked);
+			vid.removeEventListener('ended', onEnded);
+			p.pause();
+		};
+	});
+
+	// Keep music volume in sync — muted while recording a voice-over.
+	$effect(() => {
+		if (!musicPreview) return;
+		musicPreview.setVolume(recordingPhase !== 'idle' ? 0 : musicVolume / 100);
 	});
 
 	// Sync voice-over preview audio with video
@@ -205,6 +245,65 @@
 		} else {
 			voPreviewAudioEl.volume = voiceOverVolume / 100;
 		}
+	});
+
+	// ─── Original-audio live preview ─────────────────────────────
+	// The assembled preview video has no audio track, so to actually *hear* the clips' original
+	// sound (in preview and as a monitor while narrating) we decode the source clips and play
+	// them through Web Audio, synced to the video playhead.
+	let originalPreview = $state<OriginalAudioPreview | null>(null);
+
+	// Build/decode the preview graph once we have clips with audio. Intentionally does NOT depend
+	// on keepOriginalAudio/originalVolume (those are handled by the volume effect) so toggling
+	// them doesn't force an expensive re-decode.
+	$effect(() => {
+		if (!hasVideoWithAudio || videoSegments.length === 0) return;
+		const groups = buildOriginalGroups();
+		if (groups.length === 0) return;
+		let disposed = false;
+		let preview: OriginalAudioPreview | null = null;
+		// Start muted; the volume effect sets the real level (avoids re-decoding on toggle/slider).
+		createOriginalAudioPreview(groups, 0).then((p) => {
+			if (disposed || !p) { p?.dispose(); return; }
+			preview = p;
+			originalPreview = p;
+			// If the video is already playing, fall into sync immediately.
+			if (videoEl && !videoEl.paused) p.play(videoEl.currentTime);
+		});
+		return () => {
+			disposed = true;
+			preview?.dispose();
+			if (originalPreview === preview) originalPreview = null;
+		};
+	});
+
+	// Sync the preview to the video element's play/pause/seek.
+	$effect(() => {
+		if (!videoEl || !originalPreview) return;
+		const vid = videoEl;
+		const p = originalPreview;
+		const onPlay = () => p.play(vid.currentTime);
+		const onPause = () => p.pause();
+		const onSeeked = () => p.seek(vid.currentTime, !vid.paused);
+		const onEnded = () => p.pause();
+		vid.addEventListener('play', onPlay);
+		vid.addEventListener('pause', onPause);
+		vid.addEventListener('seeked', onSeeked);
+		vid.addEventListener('ended', onEnded);
+		return () => {
+			vid.removeEventListener('play', onPlay);
+			vid.removeEventListener('pause', onPause);
+			vid.removeEventListener('seeked', onSeeked);
+			vid.removeEventListener('ended', onEnded);
+			p.pause();
+		};
+	});
+
+	// Keep the preview volume in sync with the toggle/slider; cap while recording to limit mic bleed.
+	$effect(() => {
+		if (!originalPreview) return;
+		const base = keepOriginalAudio ? originalVolume / 100 : 0;
+		originalPreview.setVolume(recordingPhase !== 'idle' ? Math.min(0.4, base) : base);
 	});
 
 	// Waveform: connect during recording
@@ -276,7 +375,8 @@
 
 		if (videoEl) {
 			videoEl.muted = !keepOriginalAudio;
-			videoEl.volume = keepOriginalAudio ? 0.15 : 0;
+			// Monitor the clips' own sound while narrating, capped low to limit mic bleed.
+			videoEl.volume = keepOriginalAudio ? Math.min(0.4, originalVolume / 100) : 0;
 			try {
 				await videoEl.play();
 			} catch (e) {
@@ -317,8 +417,9 @@
 		if (voiceOverUrl) URL.revokeObjectURL(voiceOverUrl);
 		voiceOverUrl = URL.createObjectURL(blob);
 
-		// Auto-lower music volume so voice-over is prominent
+		// Auto-lower music + original audio so the voice-over stays prominent
 		if (musicVolume > 20) musicVolume = 20;
+		if (originalVolume > 30) originalVolume = 30;
 
 		if (videoEl) videoEl.pause();
 		waveformRenderer?.stop();
@@ -351,11 +452,55 @@
 
 	// ─── Audio merge ─────────────────────────────────────────────
 
+	// Build the original-audio timeline from the source clips. Each location's `clip-*`
+	// timeline segment gives the start offset; clips within it play back-to-back (photos are
+	// silent gaps). The renderer decodes each source file and lays its audio at the right spot.
+	function buildOriginalGroups(): OriginalAudioGroup[] {
+		const groups: OriginalAudioGroup[] = [];
+		const clipSegs = videoSegments.filter((s) => s.type === 'clip');
+		console.log(`[OrigAudio] buildOriginalGroups: ${videoSegments.length} segment(s), ${clipSegs.length} clip-segment(s), ${locations.length} location(s)`);
+		console.log('[OrigAudio] segments:', videoSegments.map((s) => `${s.id}[${s.type}]@${s.startSec.toFixed(1)}s`).join(', '));
+		for (const seg of videoSegments) {
+			if (seg.type !== 'clip') continue;
+			const locId = seg.id.startsWith('clip-') ? seg.id.slice(5) : seg.id;
+			const loc = locations.find((l) => l.id === locId);
+			if (!loc) {
+				console.warn(`[OrigAudio] segment ${seg.id}: no matching location for id "${locId}" — skipping`);
+				continue;
+			}
+			const clips = [...loc.clips].filter((c) => c.file).sort((a, b) => a.order - b.order);
+			console.log(`[OrigAudio] segment ${seg.id} → location "${loc.name}": ${loc.clips.length} clip(s), ${clips.length} with files [${loc.clips.map((c) => `${c.type ?? '?'}:${c.file ? 'file' : 'NO-FILE'}`).join(', ')}]`);
+			const items: OriginalAudioGroup['items'] = [];
+			for (const clip of clips) {
+				if (clip.type === 'video' && clip.file) {
+					items.push({ clip: { file: clip.file, trimStartSec: clip.trimStartSec ?? 0, trimEndSec: clip.trimEndSec ?? null } });
+				} else if (clip.type === 'photo') {
+					items.push({ photoSec: clip.durationSec ?? 3 });
+				}
+			}
+			if (items.length) groups.push({ startSec: seg.startSec, items });
+		}
+		const videoItems = groups.reduce((n, g) => n + g.items.filter((i) => i.clip).length, 0);
+		console.log(`[OrigAudio] buildOriginalGroups result: ${groups.length} group(s), ${videoItems} video item(s)`);
+		return groups;
+	}
+
 	async function handleApplyAndSave() {
-		if (!musicBlob && !voiceOverBlob) {
+		const wantsOriginal = keepOriginalAudio && hasVideoWithAudio;
+		console.log('[OrigAudio] ═══ handleApplyAndSave ═══');
+		console.log(`[OrigAudio] keepOriginalAudio=${keepOriginalAudio}, hasVideoWithAudio=${hasVideoWithAudio}, wantsOriginal=${wantsOriginal}`);
+		console.log(`[OrigAudio] musicBlob=${!!musicBlob}, voiceOverBlob=${!!voiceOverBlob}`);
+
+		// Nothing to mix in → keep the assembled video as-is.
+		if (!musicBlob && !voiceOverBlob && !wantsOriginal) {
+			console.warn('[OrigAudio] Nothing to apply (no music, no VO, no original) → keeping silent assembled video');
 			onapply(null, null);
 			return;
 		}
+
+		const originalGroups = wantsOriginal ? buildOriginalGroups() : [];
+		console.log(`[OrigAudio] originalGroups passed to merge: ${originalGroups.length}`);
+		const originalGain = originalVolume / 100;
 
 		merging = true;
 		mergePercent = 0;
@@ -363,7 +508,8 @@
 
 		// Pause playback
 		videoEl?.pause();
-		musicAudioEl?.pause();
+		musicPreview?.pause();
+		originalPreview?.pause();
 		voPreviewAudioEl?.pause();
 
 		try {
@@ -373,10 +519,11 @@
 				keepOriginalAudio,
 				(pct, msg) => { mergePercent = pct; mergeMsg = msg; },
 				voiceOverVolume / 100,
-				0.2,
+				originalGain,
 				musicBlob,
 				musicVolume / 100,
-				musicStartOffset
+				musicStartOffset,
+				originalGroups
 			);
 			merging = false;
 			onapply(result.blob, result.url);
@@ -455,14 +602,6 @@
 </style>
 
 <!-- Hidden audio elements for real-time preview -->
-{#if musicSelection?.previewUrl}
-	<!-- svelte-ignore a11y_media_has_caption -->
-	<audio
-		bind:this={musicAudioEl}
-		src={musicSelection.previewUrl}
-		onloadeddata={() => { if (musicAudioEl) musicAudioEl.volume = musicVolume / 100; }}
-	></audio>
-{/if}
 {#if voiceOverUrl}
 	<!-- svelte-ignore a11y_media_has_caption -->
 	<audio bind:this={voPreviewAudioEl} src={voiceOverUrl}></audio>
@@ -501,38 +640,98 @@
 			<h3 class="text-xl font-semibold text-text-primary">{title}</h3>
 		</div>
 
-		<!-- Segment timeline (during recording) -->
+		<!-- Segment timeline + pacing HUD (during recording) -->
 		{#if recordingPhase === 'recording' && videoSegments.length > 0 && recDuration > 0}
-			<div class="flex items-center gap-2 w-full px-0.5">
-				<span class="text-[10px] text-text-muted font-mono w-7 shrink-0">{formatTime(recCurrentTime)}</span>
-				<div class="relative flex-1 h-2 bg-border rounded-full overflow-hidden">
-					{#each videoSegments as seg}
-						{@const leftPct = (seg.startSec / segEstimatedDuration) * 100}
-						{@const widthPct = (seg.durationSec / segEstimatedDuration) * 100}
-						<div
-							class="absolute top-0 h-full opacity-50"
-							style="left: {leftPct}%; width: {widthPct}%; background: {SEGMENT_COLORS[seg.type]}"
-						></div>
-					{/each}
+			<div class="w-full space-y-2">
+				<!-- Now / Next pacing row -->
+				<div class="flex items-stretch gap-2">
+					<!-- NOW -->
 					<div
-						class="absolute top-0 left-0 h-full bg-white/20 rounded-full"
-						style="width: {recProgressPct}%"
-					></div>
-					<div
-						class="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-white rounded-full shadow-sm z-10"
-						style="left: calc({recProgressPct}% - 5px)"
-					></div>
-					{#each videoSegments as seg, i}
-						{#if i > 0}
-							{@const leftPct = (seg.startSec / segEstimatedDuration) * 100}
-							<div
-								class="absolute top-0 h-full w-px bg-text-muted/50"
-								style="left: {leftPct}%"
-							></div>
+						class="flex-1 min-w-0 rounded-lg px-3 py-2 border-2 transition-colors"
+						style="border-color: {activeSegment ? SEGMENT_COLORS[activeSegment.type] : 'var(--color-border)'}; background: {activeSegment ? SEGMENT_COLORS[activeSegment.type] + '1a' : 'transparent'}"
+					>
+						<p class="text-[9px] font-bold uppercase tracking-wider text-text-muted">Now narrating</p>
+						{#if activeSegment}
+							{#key activeSegment.id}
+								<div class="flex items-center gap-1.5 fade-slide-in">
+									<span class="w-2 h-2 rounded-full shrink-0" style="background: {SEGMENT_COLORS[activeSegment.type]}"></span>
+									<span class="text-sm font-bold text-text-primary truncate">{activeSegment.label}</span>
+								</div>
+								<p class="text-[10px] text-text-muted truncate">{SEGMENT_KIND[activeSegment.type] ?? ''}</p>
+							{/key}
+						{:else}
+							<p class="text-sm font-bold text-text-primary">—</p>
 						{/if}
+					</div>
+					<!-- NEXT / countdown -->
+					<div
+						class="flex-1 min-w-0 rounded-lg px-3 py-2 border-2 transition-all duration-200 {transitionImminent ? 'animate-pulse-red' : ''}"
+						style="border-color: {nextSegment && transitionImminent ? SEGMENT_COLORS[nextSegment.type] : 'var(--color-border)'}; background: {nextSegment && transitionImminent ? SEGMENT_COLORS[nextSegment.type] + '26' : 'transparent'}"
+					>
+						<p class="text-[9px] font-bold uppercase tracking-wider text-text-muted flex items-center justify-between">
+							<span>Coming up</span>
+							{#if nextSegment && secondsUntilNext != null}
+								<span class="font-mono {transitionImminent ? 'text-red-400' : 'text-text-muted'}">in {Math.ceil(secondsUntilNext)}s</span>
+							{/if}
+						</p>
+						{#if nextSegment}
+							<div class="flex items-center gap-1.5">
+								<span class="w-2 h-2 rounded-full shrink-0" style="background: {SEGMENT_COLORS[nextSegment.type]}"></span>
+								<span class="text-sm font-bold text-text-primary truncate">{nextSegment.label}</span>
+							</div>
+							<p class="text-[10px] truncate {nextSegment.type === 'clip' ? 'text-purple-400 font-semibold' : 'text-text-muted'}">{SEGMENT_KIND[nextSegment.type] ?? ''}</p>
+						{:else}
+							<p class="text-sm font-bold text-text-primary">Finishing up</p>
+						{/if}
+					</div>
+				</div>
+
+				<!-- Timeline bar with clip markers -->
+				<div class="flex items-center gap-2 w-full px-0.5">
+					<span class="text-[10px] text-text-muted font-mono w-7 shrink-0">{formatTime(recCurrentTime)}</span>
+					<div class="relative flex-1 h-3.5 bg-border rounded-full overflow-hidden">
+						{#each videoSegments as seg}
+							{@const leftPct = (seg.startSec / segEstimatedDuration) * 100}
+							{@const widthPct = (seg.durationSec / segEstimatedDuration) * 100}
+							<div
+								class="absolute top-0 h-full transition-opacity {activeSegment?.id === seg.id ? 'opacity-90' : 'opacity-40'}"
+								style="left: {leftPct}%; width: {widthPct}%; background: {SEGMENT_COLORS[seg.type]}"
+							></div>
+						{/each}
+						<!-- played overlay -->
+						<div
+							class="absolute top-0 left-0 h-full bg-black/25"
+							style="width: {recProgressPct}%"
+						></div>
+						<!-- segment dividers -->
+						{#each videoSegments as seg, i}
+							{#if i > 0}
+								{@const leftPct = (seg.startSec / segEstimatedDuration) * 100}
+								<div class="absolute top-0 h-full w-px bg-white/40" style="left: {leftPct}%"></div>
+							{/if}
+						{/each}
+						<!-- playhead -->
+						<div
+							class="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white rounded-full shadow-md ring-2 ring-black/20 z-10"
+							style="left: calc({recProgressPct}% - 7px)"
+						></div>
+					</div>
+					<span class="text-[10px] text-text-muted font-mono w-7 shrink-0 text-right">{formatTime(recDuration)}</span>
+				</div>
+
+				<!-- Clip flags: where your own clips fall, so you can plan your narration -->
+				<div class="relative h-4 mx-9">
+					{#each videoSegments.filter((s) => s.type === 'clip') as seg}
+						{@const centerPct = ((seg.startSec + seg.durationSec / 2) / segEstimatedDuration) * 100}
+						<div
+							class="absolute -translate-x-1/2 flex items-center gap-0.5"
+							style="left: {centerPct}%"
+						>
+							<span class="w-1.5 h-1.5 rounded-full" style="background: {SEGMENT_COLORS.clip}"></span>
+							<span class="text-[8px] font-semibold text-purple-400 whitespace-nowrap max-w-16 truncate">{seg.label}</span>
+						</div>
 					{/each}
 				</div>
-				<span class="text-[10px] text-text-muted font-mono w-7 shrink-0 text-right">{formatTime(recDuration)}</span>
 			</div>
 		{/if}
 
@@ -599,6 +798,24 @@
 							<span class="text-[11px] text-white/90 font-medium truncate">{activeSegment.label}</span>
 						</div>
 					{/key}
+				{/if}
+
+				<!-- Transition cue: big, hard-to-miss "coming up" countdown before the next segment -->
+				{#if nextSegment && transitionImminent && !isPaused}
+					<div class="absolute inset-x-0 top-1/2 -translate-y-1/2 flex flex-col items-center z-20 pointer-events-none">
+						<div
+							class="rounded-2xl px-5 py-3 backdrop-blur-sm border-2 flex flex-col items-center gap-1 count-pulse"
+							style="background: rgba(0,0,0,0.55); border-color: {SEGMENT_COLORS[nextSegment.type]}; box-shadow: 0 0 32px {SEGMENT_COLORS[nextSegment.type]}66"
+						>
+							<span class="text-[10px] font-bold uppercase tracking-widest text-white/70">
+								{nextSegment.type === 'clip' ? '🎬 Your clip next' : 'Coming up'}
+							</span>
+							<span class="text-4xl font-extrabold text-white leading-none tabular-nums" style="text-shadow: 0 0 24px {SEGMENT_COLORS[nextSegment.type]}">
+								{Math.max(1, Math.ceil(secondsUntilNext ?? 0))}
+							</span>
+							<span class="text-xs font-semibold text-white/90 max-w-[60vw] truncate">{nextSegment.label}</span>
+						</div>
+					</div>
 				{/if}
 			{/if}
 		</div>
@@ -675,9 +892,9 @@
 					</div>
 				{/if}
 
-				<!-- Original Audio toggle -->
+				<!-- Original Audio toggle + volume -->
 				{#if hasVideoWithAudio}
-					<div class="border-t border-border px-4 py-3">
+					<div class="border-t border-border px-4 py-3 space-y-2">
 						<div class="flex items-center gap-3">
 							<SpeakerHigh size={16} weight="bold" class="text-amber-400 shrink-0" />
 							<span class="text-xs text-text-primary flex-1">Original Audio</span>
@@ -689,6 +906,20 @@
 								<div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform {keepOriginalAudio ? 'translate-x-4' : ''}"></div>
 							</button>
 						</div>
+						{#if keepOriginalAudio}
+							<div class="flex items-center gap-3 fade-slide-in">
+								<SpeakerHigh size={16} weight="bold" class="text-amber-400 shrink-0 opacity-0" />
+								<span class="text-xs text-text-primary w-14 shrink-0">Volume</span>
+								<input
+									type="range"
+									min="0"
+									max="100"
+									bind:value={originalVolume}
+									class="flex-1 bg-amber-400/30 text-amber-400"
+								/>
+								<span class="text-xs text-text-muted font-mono w-9 text-right">{originalVolume}%</span>
+							</div>
+						{/if}
 					</div>
 				{/if}
 
@@ -699,7 +930,7 @@
 						bind:musicVolume
 						{videoDuration}
 						compact
-						onvolumechange={(vol) => { if (musicAudioEl) musicAudioEl.volume = vol / 100; }}
+						onvolumechange={(vol) => musicPreview?.setVolume(vol / 100)}
 					/>
 				</div>
 			{/if}
@@ -712,9 +943,9 @@
 					class="text-sm text-text-muted hover:text-text-secondary cursor-pointer transition-colors text-center px-4 py-2"
 					onclick={onback}
 				>
-					{skipLabel ?? (hasAnyAudio ? 'Back without applying' : 'Back to video')}
+					{skipLabel ?? (hasApplicableAudio ? 'Back without applying' : 'Back to video')}
 				</button>
-				{#if hasAnyAudio}
+				{#if hasApplicableAudio}
 					<Button
 						variant="primary"
 						onclick={handleApplyAndSave}

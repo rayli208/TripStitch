@@ -112,6 +112,9 @@ export interface Trip {
 	tripDate: string;
 	tags: TripTag[];
 	visibility: TripVisibility;
+	/** True while the trip is still being created (not yet through the share screen). A draft
+	 *  never counts as published/discoverable regardless of `visibility`. */
+	draft?: boolean;
 	locations: Location[];
 	aspectRatio: AspectRatio;
 	videoLinks?: VideoLinks;
@@ -137,6 +140,7 @@ export interface SharedTrip {
 	coverImageUrl: string | null;
 	tags: TripTag[];
 	visibility: TripVisibility;
+	draft?: boolean;
 	locations: SharedLocation[];
 	aspectRatio: AspectRatio;
 	videoLinks?: VideoLinks;

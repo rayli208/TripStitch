@@ -55,6 +55,7 @@ function serializeTrip(trip: Trip, userId: string) {
 		tripDate: trip.tripDate ?? '',
 		tags: trip.tags ?? [],
 		visibility: trip.visibility ?? 'public',
+		draft: trip.draft ?? false,
 		aspectRatio: trip.aspectRatio,
 		createdAt: trip.createdAt,
 		updatedAt: trip.updatedAt,
@@ -149,6 +150,7 @@ function createTripsState() {
 						}),
 						tags: data.tags ?? [],
 						visibility: data.visibility ?? 'public',
+						draft: data.draft ?? false,
 						aspectRatio: data.aspectRatio,
 						videoLinks: data.videoLinks ?? undefined,
 						cities: data.cities ?? [],
@@ -219,6 +221,7 @@ function createTripsState() {
 			if (updates.updatedAt !== undefined) data.updatedAt = updates.updatedAt;
 			if (updates.tags !== undefined) data.tags = updates.tags;
 			if (updates.visibility !== undefined) data.visibility = updates.visibility;
+			if (updates.draft !== undefined) data.draft = updates.draft;
 
 			// Upload cover image if a new file is present
 			if (updates.titleMediaFile) {

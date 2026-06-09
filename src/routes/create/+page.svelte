@@ -157,6 +157,9 @@
 	let error = $state<string | null>(null);
 	let abortController = $state<AbortController | null>(null);
 	let shareUrl = $state<string | null>(null);
+	// Firestore doc id of the trip saved at the start of export. The trip is saved as a draft
+	// and only promoted to its chosen visibility once the user reaches the share screen.
+	let savedTripId = $state<string | null>(null);
 
 	const support = checkBrowserSupport();
 
@@ -228,6 +231,8 @@
 			tripDate: editor.tripDate,
 			tags: editor.tags,
 			visibility: editor.visibility,
+			// Saved as a draft now; promoted to its real visibility at the share screen.
+			draft: true,
 			locations: editor.locations,
 			aspectRatio: editor.aspectRatio,
 			cities: [] as string[],
@@ -238,6 +243,7 @@
 		};
 
 		const docId = await tripsState.addTrip(tripData);
+		savedTripId = docId ?? null;
 
 		progress = { step: 'init', message: 'Getting things ready...', current: 0, total: 1 };
 
@@ -326,17 +332,27 @@
 		setTimeout(() => URL.revokeObjectURL(url), 10000);
 	}
 
+	// Reaching the share screen = the user made it through every step, so the trip is now
+	// "finished". Promote it out of draft so its chosen visibility (public/unlisted/private)
+	// actually takes effect on the dashboard and in public discovery.
+	function finishCreation() {
+		if (savedTripId) {
+			tripsState.updateTrip(savedTripId, { draft: false, updatedAt: new Date().toISOString() });
+		}
+		editor.currentStep = 5;
+	}
+
 	function handleAudioApply(mergedBlob: Blob | null, mergedUrl: string | null) {
 		if (mergedBlob && mergedUrl) {
 			if (videoUrl) URL.revokeObjectURL(videoUrl);
 			videoBlob = mergedBlob;
 			videoUrl = mergedUrl;
 		}
-		editor.currentStep = 5;
+		finishCreation();
 	}
 
 	function handleAudioSkip() {
-		editor.currentStep = 5;
+		finishCreation();
 	}
 
 	function handleDashboard() {
@@ -592,6 +608,7 @@
 					bind:musicSelection={editor.musicSelection}
 					bind:musicVolume={editor.musicVolume}
 					bind:keepOriginalAudio={editor.keepOriginalAudio}
+					bind:originalVolume={editor.originalVolume}
 					bind:voiceOverVolume={editor.voiceOverVolume}
 					title="Add Audio"
 					applyLabel="Apply & Continue"

@@ -5,7 +5,7 @@
 	import { getTrackUrl, fetchTrackBlob, createTrackPreview } from '$lib/services/musicService';
 	import { uuid } from '$lib/utils/uuid';
 	import Button from '$lib/components/ui/Button.svelte';
-	import { MusicNote, CaretDown, Play, Pause, SpeakerHigh, Upload, ArrowsClockwise, Mountains, Coffee, FilmSlate, Confetti, Heart, Lightning } from 'phosphor-svelte';
+	import { MusicNote, CaretDown, Play, Pause, SpeakerHigh, Upload, ArrowsClockwise, Mountains, Coffee, FilmSlate, Confetti, Heart, Lightning, Check, X } from 'phosphor-svelte';
 	import type { Component } from 'svelte';
 
 	const MOOD_ICONS: Record<string, Component> = {
@@ -312,9 +312,9 @@
 	{#if expanded}
 		<div class="px-4 pb-4 space-y-3">
 			<!-- Mood filter chips -->
-			<div class="flex flex-wrap gap-2">
+			<div class="flex flex-wrap gap-1.5">
 				<button
-					class="px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer
+					class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer
 						{activeMood === null ? 'bg-accent text-white' : 'bg-border text-text-muted hover:text-text-primary'}"
 					onclick={() => { activeMood = null; }}
 				>
@@ -323,11 +323,11 @@
 				{#each MUSIC_MOODS as mood}
 					{@const MoodIcon = MOOD_ICONS[mood.id]}
 					<button
-						class="px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer
+						class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer
 							{activeMood === mood.id ? 'bg-accent text-white' : 'bg-border text-text-muted hover:text-text-primary'}"
 						onclick={() => { activeMood = activeMood === mood.id ? null : mood.id; }}
 					>
-						{#if MoodIcon}<MoodIcon size={14} weight="bold" />{/if}
+						{#if MoodIcon}<MoodIcon size={13} weight="bold" class="shrink-0" />{/if}
 						{mood.label}
 					</button>
 				{/each}
@@ -363,9 +363,19 @@
 							<p class="text-xs text-text-muted">{formatDuration(track.durationSec)}</p>
 						</div>
 
-						<!-- Select button -->
+						<!-- Select / deselect button -->
 						{#if isSelected}
-							<span class="text-xs text-accent font-medium px-2">Selected</span>
+							<button
+								class="group/sel inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer
+									bg-accent text-white hover:bg-error"
+								onclick={clearSelection}
+								title="Click to remove"
+							>
+								<Check size={12} weight="bold" class="group-hover/sel:hidden" />
+								<X size={12} weight="bold" class="hidden group-hover/sel:block" />
+								<span class="group-hover/sel:hidden">Selected</span>
+								<span class="hidden group-hover/sel:inline">Remove</span>
+							</button>
 						{:else}
 							<button
 								class="px-3 py-1 text-xs font-medium rounded-lg transition-colors cursor-pointer
@@ -396,16 +406,6 @@
 				class="hidden"
 				onchange={handleFileUpload}
 			/>
-
-			<!-- Clear selection -->
-			{#if musicSelection}
-				<button
-					class="text-xs text-text-muted hover:text-error transition-colors cursor-pointer"
-					onclick={clearSelection}
-				>
-					Remove music
-				</button>
-			{/if}
 		</div>
 	{/if}
 
@@ -539,6 +539,15 @@
 				/>
 				<span class="text-xs text-text-muted font-mono w-9 text-right">{musicVolume}%</span>
 			</div>
+
+			<!-- Remove music (always reachable while a track is selected) -->
+			<button
+				class="inline-flex items-center gap-1 text-xs text-text-muted hover:text-error transition-colors cursor-pointer"
+				onclick={clearSelection}
+			>
+				<X size={12} weight="bold" />
+				Remove music
+			</button>
 		</div>
 	{/if}
 </div>

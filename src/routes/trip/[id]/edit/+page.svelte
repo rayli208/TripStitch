@@ -323,17 +323,24 @@
 		setTimeout(() => URL.revokeObjectURL(url), 10000);
 	}
 
+	// Reaching the share screen means the user went through every step — if this trip was still
+	// a draft (e.g. resumed from an abandoned creation), it's now finished, so promote it.
+	function finishEditing() {
+		tripsState.updateTrip(tripId, { draft: false, updatedAt: new Date().toISOString() });
+		editor.currentStep = 5;
+	}
+
 	function handleAudioApply(mergedBlob: Blob | null, mergedUrl: string | null) {
 		if (mergedBlob && mergedUrl) {
 			if (videoUrl) URL.revokeObjectURL(videoUrl);
 			videoBlob = mergedBlob;
 			videoUrl = mergedUrl;
 		}
-		editor.currentStep = 5;
+		finishEditing();
 	}
 
 	function handleAudioSkip() {
-		editor.currentStep = 5;
+		finishEditing();
 	}
 
 	function handleDashboard() {
@@ -499,6 +506,7 @@
 				bind:musicSelection={editor.musicSelection}
 				bind:musicVolume={editor.musicVolume}
 				bind:keepOriginalAudio={editor.keepOriginalAudio}
+				bind:originalVolume={editor.originalVolume}
 				bind:voiceOverVolume={editor.voiceOverVolume}
 				title="Add Audio"
 				applyLabel="Apply & Continue"

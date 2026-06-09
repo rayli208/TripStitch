@@ -55,7 +55,8 @@
 		loading = true;
 		try {
 			trip = await fetchTrip(tripId);
-			if (trip && trip.visibility === 'private' && trip.userId !== authState.user?.id) {
+			// Private trips, and drafts still being created, are only viewable by their owner.
+			if (trip && (trip.visibility === 'private' || trip.draft) && trip.userId !== authState.user?.id) {
 				trip = null;
 			}
 			notFound = !trip;
@@ -194,6 +195,12 @@
 	// Click-to-pin: opens the popup for the selected stop, closes any other open popup.
 	// Clicking the same stop again toggles its popup closed and resets the view.
 	let openPopupId = $state<string | null>(null);
+
+	// Per-stop description expand/collapse in the sidebar.
+	let expandedDescId = $state<string | null>(null);
+	function toggleDesc(locId: string) {
+		expandedDescId = expandedDescId === locId ? null : locId;
+	}
 
 	function selectLocation(loc: { lng: number; lat: number; id: string }) {
 		if (!mapInstance) return;
@@ -929,7 +936,13 @@
 										{/if}
 									</div>
 									{#if loc.description}
-										<p class="text-[11px] text-text-muted mt-0.5 line-clamp-1">{loc.description}</p>
+										<!-- svelte-ignore a11y_no_static_element_interactions -->
+										<!-- svelte-ignore a11y_click_events_have_key_events -->
+										<p
+											class="text-[11px] text-text-muted mt-0.5 cursor-text {expandedDescId === loc.id ? 'whitespace-pre-wrap' : 'line-clamp-1'}"
+											title={expandedDescId === loc.id ? 'Click to collapse' : 'Click to read more'}
+											onclick={(e: MouseEvent) => { e.stopPropagation(); toggleDesc(loc.id); }}
+										>{loc.description}</p>
 									{/if}
 								</div>
 

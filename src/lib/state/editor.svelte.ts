@@ -35,6 +35,7 @@ export function createEditorState(initial?: {
 	let visibility = $state<TripVisibility>(initial?.visibility ?? 'public');
 	let tripDate = $state(initial?.tripDate ?? new Date().toISOString().slice(0, 10));
 	let keepOriginalAudio = $state(true);
+	let originalVolume = $state(100);
 	let musicSelection = $state<MusicSelection | null>(null);
 	let musicVolume = $state(70);
 	let voiceOverVolume = $state(100);
@@ -139,6 +140,12 @@ export function createEditorState(initial?: {
 		},
 		set keepOriginalAudio(v: boolean) {
 			keepOriginalAudio = v;
+		},
+		get originalVolume() {
+			return originalVolume;
+		},
+		set originalVolume(v: number) {
+			originalVolume = v;
 		},
 		get musicSelection() {
 			return musicSelection;

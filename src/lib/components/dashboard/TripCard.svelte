@@ -39,9 +39,9 @@
 			year: 'numeric'
 		})
 	);
-	const isPublished = $derived(trip.visibility === 'public');
+	const isPublished = $derived(trip.visibility === 'public' && !trip.draft);
 	const statusLabel = $derived(
-		trip.visibility === 'public' ? 'Published' : trip.visibility === 'unlisted' ? 'Unlisted' : 'Draft'
+		trip.draft ? 'Draft' : trip.visibility === 'public' ? 'Published' : trip.visibility === 'unlisted' ? 'Unlisted' : 'Draft'
 	);
 
 	const firstCity = $derived(trip.locations[0]?.city ?? trip.locations[0]?.name?.split(',')[0] ?? '');

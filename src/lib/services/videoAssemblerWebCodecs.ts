@@ -71,11 +71,16 @@ export async function assembleVideoWebCodecs(
 
 	let currentStep = 0;
 	const timeline: VideoSegmentInfo[] = [];
-	let timelineCursor = 0;
 
-	function addToTimeline(id: string, label: string, durationSec: number, type: VideoSegmentInfo['type']) {
-		timeline.push({ id, label, startSec: timelineCursor, durationSec, type });
-		timelineCursor += durationSec;
+	// Record a segment using the ACTUAL encoded frame range, not a logical/estimated duration.
+	// `startFrame` is encoder.frameCount captured just before the segment's frames were encoded.
+	// This keeps segment start times frame-exact, which is what the original-audio mixer relies
+	// on to line each clip's sound up with its video (logical durations drift by ~0.5s/segment).
+	function recordSegment(id: string, label: string, startFrame: number, type: VideoSegmentInfo['type']) {
+		const startSec = startFrame / TARGET_FPS;
+		const durationSec = Math.max(0, (encoder.frameCount - startFrame) / TARGET_FPS);
+		timeline.push({ id, label, startSec, durationSec, type });
+		console.log(`[TripStitch/WebCodecs] Segment "${label}" (${type}): ${startSec.toFixed(2)}s → ${(startSec + durationSec).toFixed(2)}s (${durationSec.toFixed(2)}s, frames ${startFrame}–${encoder.frameCount})`);
 	}
 
 	function emit(step: string, message: string) {
@@ -141,6 +146,7 @@ export async function assembleVideoWebCodecs(
 		const titleStart = performance.now();
 		checkAbort();
 		emit('title', 'Creating title card...');
+		const titleStartFrame = encoder.frameCount;
 		await generateTitleCardFrames(canvas, ctx, {
 			title: trip.title || 'My Trip',
 			titleColor: trip.titleColor || '#FFFFFF',
@@ -153,7 +159,7 @@ export async function assembleVideoWebCodecs(
 			secondaryColor
 		}, TARGET_FPS, onFrame, frameOverlay);
 		console.log(`[TripStitch/WebCodecs] Title card: ${((performance.now() - titleStart) / 1000).toFixed(1)}s wall, ${encoder.frameCount} frames total`);
-		addToTimeline('title', trip.title || 'Title', 2.5, 'title');
+		recordSegment('title', trip.title || 'Title', titleStartFrame, 'title');
 
 		// ── 2. CREATE REUSABLE MAP ──
 		console.log('[TripStitch/WebCodecs] ── Phase 2: Create Reusable Map ──');
@@ -205,6 +211,7 @@ export async function assembleVideoWebCodecs(
 			const flyStart = performance.now();
 			emit(`map-${location.id}`, `Rendering map for ${location.name}...`);
 
+			const mapStartFrame = encoder.frameCount;
 			await drawFlyToWithEncoder(
 				map, canvas, ctx, location, prevLocation, transportMode,
 				width, height,
@@ -214,9 +221,8 @@ export async function assembleVideoWebCodecs(
 			);
 
 			const displayName = location.label || location.name.split(',')[0];
-			const flyDuration = !prevLocation ? 4.5 : 5.8;
 			console.log(`[TripStitch/WebCodecs] Fly-to: ${((performance.now() - flyStart) / 1000).toFixed(1)}s wall`);
-			addToTimeline(`map-${location.id}`, displayName, flyDuration, 'map');
+			recordSegment(`map-${location.id}`, displayName, mapStartFrame, 'map');
 
 			checkAbort();
 
@@ -232,7 +238,8 @@ export async function assembleVideoWebCodecs(
 
 				// White flash before clips (OFFLINE)
 				generateWhiteFlashFrames(canvas, width, height, 0.1, TARGET_FPS, onFrame, frameOverlay);
-				timelineCursor += 0.1;
+				// Capture the start AFTER the flash so the clip's audio lines up with its first frame.
+				const clipStartFrame = encoder.frameCount;
 
 				for (let ci = 0; ci < clipsWithFiles.length; ci++) {
 					const clip = clipsWithFiles[ci];
@@ -262,11 +269,10 @@ export async function assembleVideoWebCodecs(
 					await sleep(50);
 				}
 
-				addToTimeline(`clip-${location.id}`, displayName, combinedDuration, 'clip');
+				recordSegment(`clip-${location.id}`, displayName, clipStartFrame, 'clip');
 
 				// White flash after clips (OFFLINE)
 				generateWhiteFlashFrames(canvas, width, height, 0.1, TARGET_FPS, onFrame, frameOverlay);
-				timelineCursor += 0.1;
 
 				console.log(`[TripStitch/WebCodecs] Clips: ${((performance.now() - clipStart) / 1000).toFixed(1)}s wall, ${combinedDuration.toFixed(1)}s video`);
 			}
@@ -277,6 +283,7 @@ export async function assembleVideoWebCodecs(
 		// ── 4. FINAL ROUTE (REAL-TIME) ──
 		console.log('[TripStitch/WebCodecs] ── Phase 4: Final Route Map ──');
 		emit('route', 'Drawing final route...');
+		const routeStartFrame = encoder.frameCount;
 		const routeGeometries = await routePromise;
 
 		const bounds = new maplibregl.LngLatBounds();
@@ -307,7 +314,7 @@ export async function assembleVideoWebCodecs(
 			trip.titleColor || '#FFFFFF', tripFontId, secondaryColor,
 			onFrame, frameOverlay
 		);
-		addToTimeline('route', 'Final Route', 4.5, 'route');
+		recordSegment('route', 'Final Route', routeStartFrame, 'route');
 
 		checkAbort();
 
@@ -315,6 +322,7 @@ export async function assembleVideoWebCodecs(
 		if (showOutro) {
 			console.log('[TripStitch/WebCodecs] ── Phase 5: Outro Card (offline) ──');
 			emit('outro', 'Creating outro card...');
+			const outroStartFrame = encoder.frameCount;
 			await generateOutroCardFrames(canvas, ctx, {
 				title: trip.title || 'My Trip',
 				titleColor: trip.titleColor || '#FFFFFF',
@@ -328,7 +336,7 @@ export async function assembleVideoWebCodecs(
 				displayName: outroInfo?.displayName,
 				socialLinks: outroInfo?.socialLinks
 			}, TARGET_FPS, onFrame, frameOverlay);
-			addToTimeline('outro', 'Outro', 3, 'outro');
+			recordSegment('outro', 'Outro', outroStartFrame, 'outro');
 		} else {
 			console.log('[TripStitch/WebCodecs] Skipping outro card (no profile content)');
 		}
@@ -357,7 +365,7 @@ export async function assembleVideoWebCodecs(
 		const totalTime = ((performance.now() - assemblyStart) / 1000).toFixed(1);
 		// Quality analysis: compare the target bitrate we asked for against what the file
 		// actually achieved, so you can tell whether the higher-res export is paying off.
-		const durationSec = timelineCursor || (encoder.frameCount / TARGET_FPS);
+		const durationSec = encoder.frameCount / TARGET_FPS;
 		const targetBitrate = bitrateForResolution(width, height);
 		const actualBitrate = durationSec > 0 ? (finalBlob.size * 8) / durationSec : 0;
 		const megapixels = ((width * height) / 1_000_000).toFixed(1);

@@ -45,6 +45,7 @@ function buildSharedTrip(
 		coverImageUrl: data.coverImageUrl ?? null,
 		tags: data.tags ?? [],
 		visibility: data.visibility ?? 'public',
+		draft: data.draft ?? false,
 		locations,
 		aspectRatio: data.aspectRatio ?? '9:16',
 		videoLinks: data.videoLinks ?? undefined,
@@ -88,7 +89,8 @@ export async function fetchUserTrips(userId: string, includeAll = false): Promis
 	for (const d of snap.docs) {
 		const data = d.data();
 		const visibility: TripVisibility = data.visibility ?? 'public';
-		if (!includeAll && visibility !== 'public') continue;
+		// Drafts (still mid-creation) are never publicly listed, even if marked public.
+		if (!includeAll && (visibility !== 'public' || data.draft)) continue;
 
 		const locations = (data.locations ?? []).map(mapLocation);
 		results.push(buildSharedTrip(d.id, data, locations, profile));
