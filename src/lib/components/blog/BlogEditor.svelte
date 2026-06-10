@@ -147,6 +147,9 @@
 		blogEditor.isSaving = true;
 
 		const now = new Date().toISOString();
+		// Autosaving an already-published post must not wipe its publish date
+		const existing = savedBlogId ? blogsState.getBlog(savedBlogId) : null;
+		const publishedAt = existing?.publishedAt ?? initial?.publishedAt ?? null;
 		const blogData: BlogPost = {
 			id: savedBlogId ?? '',
 			userId: '',
@@ -170,7 +173,7 @@
 			countries: [],
 			createdAt: now,
 			updatedAt: now,
-			publishedAt: null
+			publishedAt
 		};
 
 		try {
@@ -197,6 +200,9 @@
 		blogEditor.isSaving = true;
 
 		const now = new Date().toISOString();
+		// Re-publishing must not reset the original publish date
+		const existing = savedBlogId ? blogsState.getBlog(savedBlogId) : null;
+		const publishedAt = existing?.publishedAt ?? initial?.publishedAt ?? now;
 		const blogData: BlogPost = {
 			id: savedBlogId ?? '',
 			userId: '',
@@ -220,27 +226,27 @@
 			countries: [],
 			createdAt: now,
 			updatedAt: now,
-			publishedAt: now
+			publishedAt
 		};
 
 		try {
+			let slug = '';
 			if (savedBlogId) {
-				await blogsState.updateBlog(savedBlogId, {
+				slug = (await blogsState.updateBlog(savedBlogId, {
 					...blogData,
 					updatedAt: now,
-					publishedAt: now
-				});
+					publishedAt
+				})) ?? '';
 			} else {
-				const docId = await blogsState.addBlog({ ...blogData, publishedAt: now });
+				const docId = await blogsState.addBlog(blogData);
 				if (docId) savedBlogId = docId;
+				slug = blogData.slug;
 			}
 			// Clean up any images the user removed since the last save
 			await cleanupRemovedImages();
 			blogEditor.markSaved();
-			// Find the blog to get the slug
-			const saved = blogsState.getBlog(savedBlogId!);
 			if (onsaved && savedBlogId) {
-				onsaved(savedBlogId, saved?.slug ?? '');
+				onsaved(savedBlogId, slug || (blogsState.getBlog(savedBlogId)?.slug ?? ''));
 			}
 		} catch (err) {
 			console.error('[BlogEditor] Publish failed:', err);

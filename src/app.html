@@ -11,6 +11,10 @@
 		<meta name="mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+		<!-- Page-specific head (prerendered pages inject their own meta/og tags
+		     here; it must come BEFORE the site-wide defaults below because social
+		     crawlers use the first occurrence of each og:* property) -->
+		%sveltekit.head%
 		<meta name="description" content="Turn your travel photos into cinematic videos with animated map transitions, custom branding, and voice-over — all in your browser. Free, no watermarks." />
 		<meta property="og:type" content="website" />
 		<meta property="og:site_name" content="TripStitch" />
@@ -19,7 +23,6 @@
 		<meta property="og:image:height" content="630" />
 		<meta name="twitter:card" content="summary_large_image" />
 		<meta name="twitter:image" content="https://tripstitch.blog/logo-title.png" />
-		<link rel="canonical" href="https://tripstitch.blog" />
 		<script>
 			(function() {
 				var s = localStorage.getItem('theme-mode');
@@ -29,7 +32,6 @@
 				}
 				})();
 		</script>
-		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
 		<div style="display: contents">%sveltekit.body%</div>

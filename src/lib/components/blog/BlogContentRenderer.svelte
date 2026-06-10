@@ -2,9 +2,17 @@
 	import LocationCardView from './LocationCardView.svelte';
 	import RouteBlockView from './RouteBlockView.svelte';
 	import { extractYoutubeId } from './extensions/youtubeEmbed';
+	import { extractHeadings } from '$lib/utils/blogToc';
 	import type { BlogLocation, BlogRoute, RouteStop, PriceTier } from '$lib/types';
+	import { X } from 'phosphor-svelte';
 
 	let { content }: { content: Record<string, unknown> } = $props();
+
+	let lightboxSrc = $state<string | null>(null);
+
+	// Anchor ids for h2/h3, keyed by heading occurrence order — must agree
+	// with the TOC, which uses the same extractHeadings()
+	const headingIds = $derived(extractHeadings(content).map((h) => h.id));
 
 	interface TipTapNode {
 		type: string;
@@ -53,18 +61,32 @@
 	}
 
 	const nodes = $derived((content?.content as TipTapNode[]) ?? []);
+
+	// node index -> anchor id, for headings only
+	const headingIdByIndex = $derived.by(() => {
+		const map: Record<number, string> = {};
+		let h = 0;
+		nodes.forEach((node, i) => {
+			if (node.type === 'heading') {
+				map[i] = headingIds[h] ?? '';
+				h++;
+			}
+		});
+		return map;
+	});
 </script>
 
 <div class="blog-content">
-	{#each nodes as node}
+	{#each nodes as node, nodeIndex}
 		{#if node.type === 'heading'}
 			{@const level = node.attrs?.level ?? 2}
+			{@const anchorId = headingIdByIndex[nodeIndex]}
 			{#if level === 2}
-				<h2 class="text-xl font-bold text-text-primary mt-8 mb-3">
+				<h2 id={anchorId} class="text-xl font-bold text-text-primary mt-8 mb-3 scroll-mt-20">
 					{#each node.content ?? [] as child}{@render textNode(child)}{/each}
 				</h2>
 			{:else}
-				<h3 class="text-lg font-bold text-text-primary mt-6 mb-2">
+				<h3 id={anchorId} class="text-lg font-bold text-text-primary mt-6 mb-2 scroll-mt-20">
 					{#each node.content ?? [] as child}{@render textNode(child)}{/each}
 				</h3>
 			{/if}
@@ -104,7 +126,14 @@
 			<hr class="border-t-2 border-border my-6" />
 		{:else if node.type === 'image'}
 			<figure class="my-4">
-				<img src={node.attrs?.src as string} alt={node.attrs?.alt as string ?? ''} class="w-full rounded-xl border-2 border-border shadow-[2px_2px_0_var(--color-border)]" />
+				<button
+					type="button"
+					class="block w-full cursor-zoom-in"
+					onclick={() => (lightboxSrc = node.attrs?.src as string)}
+					aria-label="View image full size"
+				>
+					<img src={node.attrs?.src as string} alt={node.attrs?.alt as string ?? ''} class="w-full rounded-xl border-2 border-border shadow-[2px_2px_0_var(--color-border)]" />
+				</button>
 			</figure>
 		{:else if node.type === 'codeBlock'}
 			<pre class="bg-primary text-card p-4 rounded-xl my-4 overflow-x-auto text-sm"><code>{#each node.content ?? [] as child}{child.text ?? ''}{/each}</code></pre>
@@ -150,3 +179,28 @@
 		<br />
 	{/if}
 {/snippet}
+
+<svelte:window onkeydown={(e) => { if (lightboxSrc && e.key === 'Escape') lightboxSrc = null; }} />
+
+<!-- Image lightbox -->
+{#if lightboxSrc}
+	<div
+		class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 sm:p-8 cursor-zoom-out"
+		role="dialog"
+		aria-modal="true"
+		aria-label="Image viewer"
+		tabindex="-1"
+		onclick={() => (lightboxSrc = null)}
+		onkeydown={(e) => { if (e.key === 'Escape') lightboxSrc = null; }}
+	>
+		<img src={lightboxSrc} alt="" class="max-w-full max-h-full object-contain rounded-lg" />
+		<button
+			type="button"
+			class="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer transition-colors"
+			onclick={() => (lightboxSrc = null)}
+			aria-label="Close image viewer"
+		>
+			<X size={20} weight="bold" />
+		</button>
+	</div>
+{/if}

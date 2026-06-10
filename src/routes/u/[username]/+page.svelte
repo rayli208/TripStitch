@@ -365,7 +365,7 @@
 				{:else}
 					<div class="grid grid-cols-1 sm:grid-cols-2 gap-5 {ready ? 'animate-fade-up fill-both delay-300' : 'opacity-0'}">
 						{#each blogs as blog}
-							<BlogCard {blog} />
+							<BlogCard {blog} showAuthor={false} />
 						{/each}
 					</div>
 				{/if}

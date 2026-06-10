@@ -76,7 +76,8 @@
 				content: blog.content,
 				linkedTripIds: blog.linkedTripIds,
 				youtubeUrl: blog.youtubeUrl,
-				coverImageUrl: blog.coverImageUrl
+				coverImageUrl: blog.coverImageUrl,
+				publishedAt: blog.publishedAt
 			}}
 			onsaved={handleSaved}
 		/>

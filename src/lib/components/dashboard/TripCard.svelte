@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Trip } from '$lib/types';
-	import { MapPin, PencilSimple, ShareNetwork, Trash, YoutubeLogo, InstagramLogo, TiktokLogo, Plus } from 'phosphor-svelte';
+	import { MapPin, PencilSimple, ShareNetwork, Trash, YoutubeLogo, InstagramLogo, TiktokLogo, Plus, Article } from 'phosphor-svelte';
 	import { getVideoUrl, parseVideoUrl } from '$lib/utils/videoEmbed';
 
 	let {
@@ -9,7 +9,8 @@
 		onedit,
 		onlinks,
 		ondelete,
-		onshare
+		onshare,
+		onwriteblog
 	}: {
 		trip: Trip;
 		onview: () => void;
@@ -17,6 +18,7 @@
 		onlinks: () => void;
 		ondelete: () => void;
 		onshare?: () => void;
+		onwriteblog?: () => void;
 	} = $props();
 
 	// ── Social video link status (YouTube / Instagram / TikTok) ──
@@ -248,6 +250,16 @@
 					>
 						<ShareNetwork size={12} weight="bold" />
 						Share
+					</button>
+				{/if}
+				{#if onwriteblog}
+					<button
+						class="inline-flex items-center justify-center w-8 text-text-muted hover:text-accent rounded-lg border-2 border-border hover:border-accent/40 transition-colors cursor-pointer shadow-[2px_2px_0_var(--color-border)]"
+						onclick={onwriteblog}
+						title="Write a blog post about this trip"
+						aria-label="Write a blog post about this trip"
+					>
+						<Article size={12} weight="bold" />
 					</button>
 				{/if}
 				<button

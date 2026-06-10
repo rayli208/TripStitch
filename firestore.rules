@@ -26,15 +26,23 @@ service cloud.firestore {
     }
 
     // ── Blog Posts ──
-    // Anyone can read (public blog pages, profiles)
+    // Read: public + unlisted posts are world-readable; drafts/private only by owner.
+    //   Queries must filter visibility == 'public' (or userId == auth.uid) to be provable.
     // Create: only if you set yourself as the owner
-    // Update/Delete: only the original owner
+    // Update: owner can edit anything; anyone (incl. anonymous readers) may
+    //   increment the `reads` counter by exactly 1 and touch nothing else.
+    // Delete: only the original owner
     match /blogs/{blogId} {
-      allow read: if true;
+      allow read: if resource.data.visibility in ['public', 'unlisted']
+                  || (request.auth != null && resource.data.userId == request.auth.uid);
       allow create: if request.auth != null
                     && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null
-                    && resource.data.userId == request.auth.uid;
+      allow update: if (request.auth != null
+                        && resource.data.userId == request.auth.uid)
+                    || (resource.data.visibility in ['public', 'unlisted']
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reads'])
+                        && request.resource.data.reads is int
+                        && request.resource.data.reads == resource.data.get('reads', 0) + 1);
       allow delete: if request.auth != null
                     && resource.data.userId == request.auth.uid;
     }

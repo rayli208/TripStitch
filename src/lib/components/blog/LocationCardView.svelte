@@ -32,10 +32,16 @@
 	{#if location.rating || location.priceTier || location.category}
 		<div class="flex items-center gap-2 mt-2 flex-wrap">
 			{#if location.rating}
-				<div class="flex gap-0.5">
+				<div class="flex items-center gap-0.5">
 					{#each starsArr as star}
-						<span class="text-xs {star === 'empty' ? 'text-text-muted/30' : 'text-warning'}">&#9679;</span>
+						{#if star === 'half'}
+							<!-- left half filled, right half empty -->
+							<span class="relative text-xs text-text-muted/30">&#9679;<span class="absolute inset-0 overflow-hidden text-warning" style="width: 50%;">&#9679;</span></span>
+						{:else}
+							<span class="text-xs {star === 'empty' ? 'text-text-muted/30' : 'text-warning'}">&#9679;</span>
+						{/if}
 					{/each}
+					<span class="text-[11px] font-bold text-text-muted ml-1">{location.rating}</span>
 				</div>
 			{/if}
 			{#if location.priceTier}

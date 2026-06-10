@@ -18,11 +18,14 @@ export function extractWordCount(content: Record<string, unknown>): number {
 	return count;
 }
 
-/** Extract first N characters of plain text from TipTap JSON */
+/** Extract first N characters of plain text from TipTap JSON.
+ *  Headings are skipped — an excerpt should be body prose, and including
+ *  them runs the title into the first sentence ("…in Pennsylvania Pennsylvania has…"). */
 export function extractExcerpt(content: Record<string, unknown>, maxLen = 160): string {
 	let text = '';
 	function walk(node: Record<string, unknown>) {
 		if (text.length >= maxLen) return;
+		if (node.type === 'heading') return;
 		if (node.type === 'text' && typeof node.text === 'string') {
 			text += node.text;
 		}

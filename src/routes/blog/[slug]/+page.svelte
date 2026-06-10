@@ -1,37 +1,99 @@
 <script lang="ts">
-	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
-	import { fetchBlogBySlug, getBlogUrl } from '$lib/services/blogService';
-	import type { SharedBlog } from '$lib/types';
+	import { fetchBlogBySlug, fetchRelatedBlogs, incrementReads, getBlogUrl } from '$lib/services/blogService';
+	import { fetchTrip } from '$lib/services/shareService';
+	import type { SharedBlog, SharedTrip } from '$lib/types';
+	import type { PageData } from './$types';
 	import BlogContentRenderer from '$lib/components/blog/BlogContentRenderer.svelte';
+	import BlogLocationsMap from '$lib/components/blog/BlogLocationsMap.svelte';
+	import BlogCard from '$lib/components/blog/BlogCard.svelte';
 	import Spinner from '$lib/components/ui/Spinner.svelte';
 	import AppShell from '$lib/components/layout/AppShell.svelte';
 	import ShareFooter from '$lib/components/ShareFooter.svelte';
 	import authState from '$lib/state/auth.svelte';
 	import profileState from '$lib/state/profile.svelte';
-	import { ShareNetwork, Clock, MapPin, CalendarBlank, Plus, Eye, Check } from 'phosphor-svelte';
+	import { extractHeadings } from '$lib/utils/blogToc';
+	import { ShareNetwork, Clock, MapPin, CalendarBlank, Plus, Eye, Check, ListBullets, ArrowRight } from 'phosphor-svelte';
 
-	const slug = page.params.slug!;
-	let blog = $state<SharedBlog | null>(null);
-	let loading = $state(true);
+	const SITE = 'https://tripstitch.blog';
+
+	let { data }: { data: PageData } = $props();
+
+	// The load function returns public/unlisted posts. For drafts (or before
+	// the post is prerendered+public), fall back to an authenticated SDK fetch
+	// so owners can preview their own non-public posts.
+	let ownerBlog = $state<SharedBlog | null>(null);
+	let triedOwnerFetch = $state(false);
 	let linkCopied = $state(false);
 
+	const blog = $derived(data.blog ?? ownerBlog);
+	const isOwner = $derived(!!blog && authState.user?.id === blog.userId);
+	const notFound = $derived(!data.blog && triedOwnerFetch && !ownerBlog);
+	const isPreview = $derived(!!blog && blog.visibility !== 'public' && blog.visibility !== 'unlisted');
+
 	$effect(() => {
-		loadBlog();
+		const slug = data.slug;
+		if (data.blog) {
+			ownerBlog = null;
+			triedOwnerFetch = false;
+			return;
+		}
+		if (authState.loading) return;
+		if (!authState.isSignedIn) {
+			triedOwnerFetch = true;
+			return;
+		}
+		fetchBlogBySlug(slug).then((b) => {
+			if (b && (b.visibility === 'public' || b.visibility === 'unlisted' || b.userId === authState.user?.id)) {
+				ownerBlog = b;
+			}
+			triedOwnerFetch = true;
+		});
 	});
 
 	$effect(() => {
 		if (authState.isSignedIn) profileState.load();
 	});
 
-	async function loadBlog() {
-		loading = true;
-		blog = await fetchBlogBySlug(slug);
-		loading = false;
-		if (!blog) {
-			goto('/trips');
+	// Count a read once per session, never for the author
+	$effect(() => {
+		if (!blog || blog.visibility !== 'public') return;
+		if (authState.loading || isOwner) return;
+		const key = `blog-read-${blog.id}`;
+		try {
+			if (sessionStorage.getItem(key)) return;
+			sessionStorage.setItem(key, '1');
+		} catch {
+			return;
 		}
-	}
+		incrementReads(blog.id);
+	});
+
+	// Related posts + linked trips
+	let related = $state<SharedBlog[]>([]);
+	let linkedTrips = $state<SharedTrip[]>([]);
+	$effect(() => {
+		const b = blog;
+		if (!b) {
+			related = [];
+			linkedTrips = [];
+			return;
+		}
+		const id = b.id;
+		fetchRelatedBlogs(b).then((r) => {
+			if (blog?.id === id) related = r;
+		});
+		if (b.linkedTripIds.length > 0) {
+			Promise.all(b.linkedTripIds.map((tid) => fetchTrip(tid).catch(() => null))).then((trips) => {
+				if (blog?.id === id) {
+					linkedTrips = trips.filter(
+						(t): t is SharedTrip => !!t && t.visibility === 'public' && !t.draft
+					);
+				}
+			});
+		} else {
+			linkedTrips = [];
+		}
+	});
 
 	async function share() {
 		if (!blog) return;
@@ -63,9 +125,6 @@
 		return match?.[1] ?? null;
 	});
 
-	// Try to derive a reads count if present, otherwise hide
-	const readsCount = $derived<number | null>((blog as unknown as { reads?: number })?.reads ?? null);
-
 	// First city/region label for the location pill
 	const regionLabel = $derived.by(() => {
 		if (!blog) return null;
@@ -76,25 +135,87 @@
 		if (countries.length) return countries[0];
 		return null;
 	});
+
+	// Table of contents (only worth showing for longer posts)
+	const headings = $derived(blog ? extractHeadings(blog.content) : []);
+	const showToc = $derived(headings.length >= 3);
+
+	// Reading progress
+	let articleEl = $state<HTMLElement | undefined>();
+	let progress = $state(0);
+	function onScroll() {
+		if (!articleEl) return;
+		const rect = articleEl.getBoundingClientRect();
+		const total = rect.height - window.innerHeight;
+		if (total <= 0) {
+			progress = 0;
+			return;
+		}
+		progress = Math.min(Math.max(-rect.top / total, 0), 1);
+	}
+
+	const canonicalUrl = $derived(blog ? `${SITE}/blog/${blog.slug}` : '');
+
+	const jsonLd = $derived.by(() => {
+		if (!blog || isPreview) return '';
+		const obj: Record<string, unknown> = {
+			'@context': 'https://schema.org',
+			'@type': 'BlogPosting',
+			headline: blog.title,
+			description: blog.excerpt,
+			datePublished: blog.publishedAt ?? blog.createdAt,
+			dateModified: blog.updatedAt || blog.publishedAt || blog.createdAt,
+			mainEntityOfPage: canonicalUrl,
+			author: {
+				'@type': 'Person',
+				name: blog.userDisplayName,
+				url: `${SITE}/u/${blog.username}`
+			}
+		};
+		if (blog.coverImageUrl) obj.image = blog.coverImageUrl;
+		const json = JSON.stringify(obj).replace(/</g, '\\u003c');
+		return `<script type="application/ld+json">${json}<` + `/script>`;
+	});
 </script>
+
+<svelte:window onscroll={onScroll} />
 
 <svelte:head>
 	{#if blog}
 		<title>{blog.title} | TripStitch</title>
 		<meta name="description" content={blog.excerpt} />
+		{#if !isPreview}
+			<link rel="canonical" href={canonicalUrl} />
+		{/if}
+		<meta property="og:type" content="article" />
 		<meta property="og:title" content={blog.title} />
 		<meta property="og:description" content={blog.excerpt} />
+		<meta property="og:url" content={canonicalUrl} />
 		{#if blog.coverImageUrl}
 			<meta property="og:image" content={blog.coverImageUrl} />
 		{/if}
+		{#if blog.publishedAt}
+			<meta property="article:published_time" content={blog.publishedAt} />
+		{/if}
+		<meta property="article:author" content={blog.userDisplayName} />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content={blog.title} />
+		<meta name="twitter:description" content={blog.excerpt} />
+		{#if blog.coverImageUrl}
+			<meta name="twitter:image" content={blog.coverImageUrl} />
+		{/if}
+		{@html jsonLd}
+	{:else}
+		<title>Blog | TripStitch</title>
 	{/if}
 </svelte:head>
 
-{#if loading}
-	<div class="flex justify-center items-center min-h-screen">
-		<Spinner size="lg" />
-	</div>
-{:else if blog}
+{#if blog}
+	<!-- Reading progress -->
+	{#if progress > 0}
+		<div class="fixed top-0 left-0 h-1 bg-accent z-50 transition-[width] duration-100" style="width: {progress * 100}%"></div>
+	{/if}
+
 	{#snippet shareButton()}
 		<button
 			type="button"
@@ -136,7 +257,13 @@
 		{/if}
 
 		<!-- ═══════════ Article ═══════════ -->
-		<article class="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+		<article bind:this={articleEl} class="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+			{#if isPreview}
+				<div class="mb-6 px-4 py-3 rounded-xl border-2 border-warning bg-warning/10 text-sm font-bold text-text-primary">
+					Draft preview — only you can see this post. Publish it to make it visible to everyone.
+				</div>
+			{/if}
+
 			<!-- Cover image -->
 			{#if blog.coverImageUrl}
 				<div class="rounded-2xl overflow-hidden border-2 border-border shadow-[4px_4px_0_var(--color-border)] mb-6">
@@ -166,8 +293,8 @@
 					<span class="flex items-center gap-1"><MapPin size={12} weight="bold" /> {blog.locations.length} locations</span>
 				{/if}
 				<span class="flex items-center gap-1"><Clock size={12} weight="bold" /> {blog.readingTime} min read</span>
-				{#if readsCount}
-					<span class="flex items-center gap-1"><Eye size={12} weight="bold" /> {readsCount.toLocaleString()} reads</span>
+				{#if blog.reads}
+					<span class="flex items-center gap-1"><Eye size={12} weight="bold" /> {blog.reads.toLocaleString()} reads</span>
 				{/if}
 			</div>
 
@@ -198,23 +325,12 @@
 						<p class="text-xs text-text-muted truncate">@{blog.username}</p>
 					</a>
 				</div>
-				<div class="flex items-center gap-2 shrink-0">
-					{#if !authState.isSignedIn || authState.user?.id !== blog.userId}
-						<button
-							type="button"
-							class="px-3 py-1.5 text-xs sm:text-sm font-bold rounded-lg border-2 border-border bg-accent text-white shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
-							onclick={() => goto(authState.isSignedIn && blog ? `/u/${blog.username}` : '/signin')}
-						>
-							Follow
-						</button>
-					{/if}
-					<a
-						href="/u/{blog.username}"
-						class="hidden sm:inline-flex px-3 py-1.5 text-sm font-bold rounded-lg border-2 border-border bg-card hover:bg-accent-light transition-colors cursor-pointer shadow-[2px_2px_0_var(--color-border)]"
-					>
-						View profile
-					</a>
-				</div>
+				<a
+					href="/u/{blog.username}"
+					class="shrink-0 inline-flex px-3 py-1.5 text-xs sm:text-sm font-bold rounded-lg border-2 border-border bg-card hover:bg-accent-light transition-colors cursor-pointer shadow-[2px_2px_0_var(--color-border)]"
+				>
+					View profile
+				</a>
 			</div>
 
 			<!-- Tags -->
@@ -226,6 +342,24 @@
 						</span>
 					{/each}
 				</div>
+			{/if}
+
+			<!-- Table of contents -->
+			{#if showToc}
+				<nav class="mb-8 p-4 rounded-xl border-2 border-border bg-card shadow-[2px_2px_0_var(--color-border)]" aria-label="Table of contents">
+					<p class="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-text-muted mb-2">
+						<ListBullets size={13} weight="bold" /> In this post
+					</p>
+					<ol class="space-y-1">
+						{#each headings as h}
+							<li class={h.level === 3 ? 'pl-4' : ''}>
+								<a href="#{h.id}" class="text-sm font-medium text-text-secondary hover:text-accent transition-colors">
+									{h.text}
+								</a>
+							</li>
+						{/each}
+					</ol>
+				</nav>
 			{/if}
 
 			<!-- Featured YouTube video (from blog metadata) -->
@@ -249,6 +383,65 @@
 				<BlogContentRenderer content={blog.content} />
 			</div>
 
+			<!-- ═══════════ Places map ═══════════ -->
+			{#if blog.locations.length > 0}
+				<section class="mt-10">
+					<h2 class="flex items-center gap-2 text-xl font-extrabold text-text-primary mb-1">
+						<MapPin size={20} weight="fill" class="text-accent" />
+						Places in this post
+					</h2>
+					<p class="text-sm text-text-muted">All {blog.locations.length === 1 ? 'location' : `${blog.locations.length} locations`} mentioned above — tap a pin for directions.</p>
+					<BlogLocationsMap locations={blog.locations} />
+				</section>
+			{/if}
+
+			<!-- ═══════════ Linked trips ═══════════ -->
+			{#if linkedTrips.length > 0}
+				<section class="mt-10">
+					<h2 class="text-xl font-extrabold text-text-primary mb-3">Trips featured in this post</h2>
+					<div class="grid gap-4 sm:grid-cols-2">
+						{#each linkedTrips as trip}
+							<a
+								href="/trip/{trip.id}"
+								class="block bg-card border-2 border-border rounded-2xl overflow-hidden shadow-[4px_4px_0_var(--color-border)] hover:shadow-[4px_4px_0_var(--color-accent)] hover:-translate-y-0.5 transition-all"
+							>
+								<div class="h-32 relative overflow-hidden">
+									{#if trip.coverImageUrl}
+										<img src={trip.coverImageUrl} alt={trip.title} class="w-full h-full object-cover" />
+									{:else}
+										<div class="w-full h-full bg-gradient-to-br from-accent/20 to-accent/5 flex items-center justify-center">
+											<MapPin size={28} weight="duotone" class="text-accent/40" />
+										</div>
+									{/if}
+								</div>
+								<div class="p-4">
+									<h3 class="font-bold text-sm text-text-primary line-clamp-1">{trip.title}</h3>
+									<div class="flex items-center gap-3 mt-1.5 text-[11px] text-text-muted">
+										<span class="flex items-center gap-1"><MapPin size={11} /> {trip.stats.stops} stops</span>
+										{#if trip.stats.miles > 0}
+											<span>{Math.round(trip.stats.miles)} mi</span>
+										{/if}
+										<span class="ml-auto inline-flex items-center gap-1 font-bold text-accent">Watch <ArrowRight size={11} weight="bold" /></span>
+									</div>
+								</div>
+							</a>
+						{/each}
+					</div>
+				</section>
+			{/if}
+
+			<!-- ═══════════ Related posts ═══════════ -->
+			{#if related.length > 0}
+				<section class="mt-10">
+					<h2 class="text-xl font-extrabold text-text-primary mb-3">Keep reading</h2>
+					<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						{#each related as rel}
+							<BlogCard blog={rel} />
+						{/each}
+					</div>
+				</section>
+			{/if}
+
 			<!-- ═══════════ Footer ═══════════ -->
 			<ShareFooter
 				username={blog.username}
@@ -271,6 +464,21 @@
 			{@render blogBody(blog)}
 		</div>
 	{/if}
+{:else if notFound}
+	<div class="min-h-screen bg-page flex flex-col items-center justify-center gap-4 px-6 text-center">
+		<h1 class="text-2xl font-extrabold text-text-primary">Post not found</h1>
+		<p class="text-sm text-text-muted max-w-sm">This post doesn't exist, was removed, or isn't public.</p>
+		<a
+			href="/"
+			class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold border-2 border-border rounded-lg bg-accent text-white shadow-[2px_2px_0_var(--color-border)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+		>
+			Back to TripStitch
+		</a>
+	</div>
+{:else}
+	<div class="flex justify-center items-center min-h-screen">
+		<Spinner size="lg" />
+	</div>
 {/if}
 
 <style>

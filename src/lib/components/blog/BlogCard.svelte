@@ -1,8 +1,15 @@
 <script lang="ts">
 	import type { SharedBlog } from '$lib/types';
-	import { Clock, MapPin, CalendarBlank } from 'phosphor-svelte';
+	import { Clock, MapPin, Eye } from 'phosphor-svelte';
 
-	let { blog }: { blog: SharedBlog } = $props();
+	let {
+		blog,
+		showAuthor = true
+	}: {
+		blog: SharedBlog;
+		/** Hide on single-author surfaces like the profile page */
+		showAuthor?: boolean;
+	} = $props();
 
 	const date = blog.publishedAt
 		? new Date(blog.publishedAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
@@ -42,6 +49,9 @@
 			{#if blog.locations.length > 0}
 				<span class="flex items-center gap-1"><MapPin size={11} /> {blog.locations.length}</span>
 			{/if}
+			{#if blog.reads}
+				<span class="flex items-center gap-1"><Eye size={11} /> {blog.reads.toLocaleString()}</span>
+			{/if}
 		</div>
 
 		<!-- Tags -->
@@ -53,6 +63,20 @@
 				{#if blog.tags.length > 3}
 					<span class="px-1.5 py-0.5 text-[9px] font-bold text-text-muted">+{blog.tags.length - 3}</span>
 				{/if}
+			</div>
+		{/if}
+
+		<!-- Author -->
+		{#if showAuthor && blog.userDisplayName}
+			<div class="flex items-center gap-2 mt-3 pt-3 border-t border-border/60">
+				{#if blog.userAvatarUrl}
+					<img src={blog.userAvatarUrl} alt="" referrerpolicy="no-referrer" class="w-5 h-5 rounded-full border border-border object-cover" />
+				{:else}
+					<div class="w-5 h-5 rounded-full border border-border bg-accent-light flex items-center justify-center text-[8px] font-bold text-accent">
+						{blog.userDisplayName.charAt(0).toUpperCase()}
+					</div>
+				{/if}
+				<span class="text-[11px] font-bold text-text-secondary truncate">{blog.userDisplayName}</span>
 			</div>
 		{/if}
 	</div>

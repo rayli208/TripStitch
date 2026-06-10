@@ -249,6 +249,7 @@ export interface BlogPost {
 	cities: string[];
 	states: string[];
 	countries: string[];
+	reads?: number;
 	createdAt: string;
 	updatedAt: string;
 	publishedAt: string | null;
@@ -277,6 +278,7 @@ export interface SharedBlog {
 	cities: string[];
 	states: string[];
 	countries: string[];
+	reads?: number;
 	createdAt: string;
 	updatedAt: string;
 	publishedAt: string | null;

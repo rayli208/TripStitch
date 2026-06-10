@@ -6,6 +6,12 @@ on:
   push:
     branches:
       - main
+  # Blog posts are prerendered at build time, so a periodic rebuild picks up
+  # posts published since the last deploy (fresh social cards + sitemap).
+  schedule:
+    - cron: '0 6 * * *'
+  # Manual trigger: rebuild immediately after publishing something important
+  workflow_dispatch:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest

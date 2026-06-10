@@ -1,7 +1,7 @@
 import type { BlogPost } from '$lib/types';
 import { db, storage } from '$lib/firebase';
 import authState from './auth.svelte';
-import { uniqueSlug } from '$lib/utils/slug';
+import { uniqueSlug, generateSlug } from '$lib/utils/slug';
 import {
 	collection,
 	doc,
@@ -41,6 +41,7 @@ function serializeBlog(blog: BlogPost, userId: string) {
 		cities: [...new Set(blog.locations?.map((l) => l.city).filter((v): v is string => !!v) ?? [])],
 		states: [...new Set(blog.locations?.map((l) => l.state).filter((v): v is string => !!v) ?? [])],
 		countries: [...new Set(blog.locations?.map((l) => l.country).filter((v): v is string => !!v) ?? [])],
+		reads: blog.reads ?? 0,
 		createdAt: blog.createdAt,
 		updatedAt: blog.updatedAt,
 		publishedAt: blog.publishedAt ?? null
@@ -97,6 +98,7 @@ function createBlogsState() {
 						cities: data.cities ?? [],
 						states: data.states ?? [],
 						countries: data.countries ?? [],
+						reads: data.reads ?? 0,
 						createdAt: data.createdAt,
 						updatedAt: data.updatedAt,
 						publishedAt: data.publishedAt ?? null
@@ -151,10 +153,15 @@ function createBlogsState() {
 			return docId;
 		},
 
-		async updateBlog(id: string, updates: Partial<BlogPost>) {
+		/**
+		 * Update a blog. Returns the blog's slug (which may change on first
+		 * publish — see below), or undefined when not signed in.
+		 */
+		async updateBlog(id: string, updates: Partial<BlogPost>): Promise<string | undefined> {
 			const uid = authState.user?.id;
 			if (!uid) return;
 			const docRef = doc(db, 'blogs', id);
+			const existing = blogs.find((b) => b.id === id);
 			const data: Record<string, unknown> = {};
 
 			if (updates.title !== undefined) data.title = updates.title;
@@ -178,7 +185,9 @@ function createBlogsState() {
 			}
 			if (updates.routes !== undefined) data.routes = updates.routes;
 
-			// Upload cover image if a new file is present
+			// Cover image: a new file wins; otherwise an explicit null clears the
+			// stored cover (and removes the old file from Storage). Blob preview
+			// URLs are never written — they only exist until the file uploads.
 			if (updates.coverImageFile) {
 				try {
 					const compressed = await compressImage(updates.coverImageFile, 1600, 0.82);
@@ -192,9 +201,38 @@ function createBlogsState() {
 				} catch (err) {
 					console.warn('[Blogs] Cover image upload failed:', err);
 				}
+			} else if (updates.coverImageUrl === null && existing?.coverImageUrl) {
+				data.coverImageUrl = null;
+				await this.deleteBlogImageByUrl(existing.coverImageUrl);
+			}
+
+			// First publish: the draft slug was derived from whatever the title was
+			// at first autosave (often "untitled"). If the title has since changed,
+			// mint the public URL from the real title. Once published, the slug is
+			// permanent — shared links must keep working.
+			let slug = existing?.slug ?? '';
+			const isFirstPublish = !!updates.publishedAt && !existing?.publishedAt;
+			if (isFirstPublish && existing) {
+				const title = updates.title ?? existing.title;
+				const base = generateSlug(title);
+				const slugMatchesTitle = base && existing.slug.startsWith(`${base}-`);
+				if (base && !slugMatchesTitle) {
+					const newSlug = uniqueSlug(title);
+					await setDoc(doc(db, 'blogSlugs', newSlug), { blogId: id, userId: uid });
+					data.slug = newSlug;
+					if (existing.slug) {
+						try {
+							await deleteDoc(doc(db, 'blogSlugs', existing.slug));
+						} catch (err) {
+							console.warn('[Blogs] Old slug cleanup:', err);
+						}
+					}
+					slug = newSlug;
+				}
 			}
 
 			await updateDoc(docRef, data);
+			return slug;
 		},
 
 		async deleteBlog(id: string) {

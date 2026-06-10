@@ -327,6 +327,7 @@
 								navigator.clipboard.writeText(getShareUrl(trip.id));
 								toast.success('Link copied!');
 							}}
+							onwriteblog={() => goto(`/create/blog?tripId=${trip.id}`)}
 							ondelete={async () => {
 								try {
 									await tripsState.deleteTrip(trip.id);

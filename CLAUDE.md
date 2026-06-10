@@ -25,14 +25,20 @@ src/
       edit/                  # Edit existing trip
       export/                # Export trip to video
     u/[username]/            # Public profile page
-    explore/                 # Trip discovery
+    explore/                 # Public blog discovery (search + category filters)
     invite/                  # Invite flow
+    blog/[slug]/             # Public blog post (PRERENDERED at build — see Deployment)
+      edit/                  # Edit existing blog post
+    blog/rss.xml             # RSS feed (prerendered)
+    create/blog/             # Blog editor (Pro); ?tripId= seeds a draft from a trip
+    sitemap.xml              # Dynamic sitemap incl. blog posts (prerendered)
 
   lib/
     components/
       ui/                    # Primitives: Button, Input, Modal, ColorPicker, Spinner, etc.
       editor/                # Editor steps: TitleStep, LocationsStep, ReviewStep, ExportStep (orchestrator), ExportProgress, ExportResult, AudioEditor
-      dashboard/             # Trip cards, empty states
+      blog/                  # TipTap editor, content renderer, location cards, route blocks, locations map
+      dashboard/             # Trip cards, blog cards, empty states
       layout/                # AppShell, navigation
       TravelMap.svelte       # MapLibre map display
       TravelGlobe.svelte     # 3D globe (globe.gl)
@@ -42,6 +48,8 @@ src/
       trips.svelte.ts        # Trip list with Firestore real-time sync
       profile.svelte.ts      # User profile (fonts, colors, social links)
       editor.svelte.ts       # Multi-step editor state (factory function)
+      blogs.svelte.ts        # User's blog posts with Firestore real-time sync
+      blogEditor.svelte.ts   # Blog editor state (factory) + TipTap content extraction
       toast.svelte.ts        # Toast notifications
 
     services/                # Core business logic
@@ -52,6 +60,8 @@ src/
       routeService.ts        # Route calculation between locations (cached)
       musicService.ts        # Music track management (cached)
       shareService.ts        # Public sharing / trip fetching
+      blogService.ts         # Blog fetching via Firebase SDK (public, related, reads counter)
+      blogRest.ts            # Blog fetching via Firestore REST (build-time prerender + browser, no SDK)
       exportGuard.ts         # Prevents mobile backgrounding during export
       webCodecsEncoder.ts    # WebCodecs API encoder
       browserCompat.ts       # Feature detection (WebCodecs, Safari workarounds)
@@ -88,10 +98,10 @@ All prefixed `PUBLIC_` (client-side accessible via SvelteKit):
 
 ## Firebase
 
-- **Firestore collections**: `trips` (top-level), `users/{uid}/profile/main`, `usernames/{username}`
-- **Storage paths**: `users/{uid}/logo.*`, `trips/{tripId}/*`
-- **Security rules**: `firestore.rules`, `storage.rules`
-- **Index**: Composite index on trips `(userId ASC, createdAt DESC)`
+- **Firestore collections**: `trips` (top-level), `blogs` (top-level), `blogSlugs` (slug -> blogId index), `users/{uid}/profile/main`, `usernames/{username}`
+- **Storage paths**: `users/{uid}/logo.*`, `trips/{tripId}/*`, `blogs/{blogId}/*`
+- **Security rules**: `firestore.rules`, `storage.rules`. Blogs: public/unlisted world-readable, drafts owner-only; anyone may increment `reads` by exactly 1.
+- **Indexes**: `firestore.indexes.json` (trips + 3 blog composites). Deploy with rules: `firebase deploy --only firestore --project <project-id>`
 
 ## Firebase Projects
 
@@ -101,6 +111,7 @@ All prefixed `PUBLIC_` (client-side accessible via SvelteKit):
 
 ## Deployment
 
-- **Hosting**: Firebase Hosting with `adapter-static` (SPA fallback to `200.html`)
+- **Hosting**: Firebase Hosting with `adapter-static` (SPA fallback to `200.html`, `cleanUrls: true`)
 - **CI/CD**: GitHub Actions auto-deploy on push to `main`, preview deploys on PRs
 - **Domain**: `tripstitch.blog` (custom domain via Namecheap DNS)
+- **Blog prerendering**: `/blog/[slug]`, `sitemap.xml`, and `blog/rss.xml` are prerendered at build time from Firestore (via REST, see `blogRest.ts`) so crawlers/social scrapers get real meta tags. Posts published after the last deploy fall back to SPA rendering until the next build — the merge workflow also runs on a daily cron (and `workflow_dispatch`) to pick them up.
