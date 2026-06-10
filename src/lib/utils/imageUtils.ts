@@ -24,12 +24,15 @@ export async function normalizeImageFile(file: File): Promise<File> {
 }
 
 /** Compress and resize an image File to WebP, returning a Blob.
- *  Maintains aspect ratio. Defaults to max 1200px wide, 0.8 quality. */
+ *  Maintains aspect ratio. Defaults to max 1200px wide, 0.8 quality.
+ *  HEIC input is converted first — createImageBitmap can't decode it
+ *  outside Safari, so every caller would otherwise fail on iPhone photos. */
 export async function compressImage(
 	file: File,
 	maxWidth = 1200,
 	quality = 0.8
 ): Promise<Blob> {
+	file = await normalizeImageFile(file);
 	const bitmap = await createImageBitmap(file);
 	const scale = Math.min(1, maxWidth / bitmap.width);
 	const width = Math.round(bitmap.width * scale);

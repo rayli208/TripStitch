@@ -10,6 +10,7 @@
 	import blogsState from '$lib/state/blogs.svelte';
 	import { createBlogEditorState } from '$lib/state/blogEditor.svelte';
 	import tripsState from '$lib/state/trips.svelte';
+	import { normalizeImageFile } from '$lib/utils/imageUtils';
 
 	let {
 		blogId = null,
@@ -254,10 +255,21 @@
 		}
 	}
 
-	function handleCoverImage(e: Event) {
+	async function handleCoverImage(e: Event) {
 		const input = e.target as HTMLInputElement;
 		const file = input.files?.[0];
-		if (file) blogEditor.updateCoverImage(file);
+		if (!file) return;
+		try {
+			// HEIC (iPhone) photos can't be displayed by non-Safari browsers —
+			// convert before previewing/uploading
+			const normalized = await normalizeImageFile(file);
+			blogEditor.updateCoverImage(normalized);
+		} catch (err) {
+			console.warn('[BlogEditor] Cover image conversion failed:', err);
+			uploadError = "Couldn't read that image. Try a JPG or PNG instead.";
+		} finally {
+			input.value = '';
+		}
 	}
 
 	function handleImageInsert() {
